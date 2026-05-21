@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+
 from app.database import Base, engine, SessionLocal
 
 from app.models.user import User
@@ -47,6 +48,7 @@ app.include_router(quotations.router)
 app.include_router(production.router)
 app.include_router(inventory.router)
 app.include_router(shipments.router)
+
 
 
 def create_admin():

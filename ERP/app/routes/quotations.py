@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from datetime import date
 from datetime import timedelta
 
+from app.models import quotation
 from app.utils.pdf import generate_quotation_pdf
 
 from fastapi.responses import HTMLResponse
@@ -118,6 +119,22 @@ async def approve_quotation(
         Quotation.id == quotation_id
     ).first()
 
+    if not quotation:
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # SOLO PENDIENTES
+    if quotation.status != "pendiente":
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # APROBAR
     quotation.status = "aprobada"
 
     db.commit()
@@ -126,6 +143,277 @@ async def approve_quotation(
         url=f"/quotations/{quotation_id}",
         status_code=302
     )
+
+@router.get("/{quotation_id}/cancel")
+async def cancel_quotation(
+    quotation_id: int,
+    db: Session = Depends(get_db)
+):
+
+    quotation = db.query(
+        Quotation
+    ).filter(
+        Quotation.id == quotation_id
+    ).first()
+
+    if not quotation:
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # SOLO SI ESTÁ PENDIENTE
+    if quotation.status != "pendiente":
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    quotation.status = "cancelada"
+
+    db.commit()
+
+    return RedirectResponse(
+        url="/quotations",
+        status_code=302
+    )
+
+@router.get("/{quotation_id}/delete")
+async def delete_quotation(
+    quotation_id: int,
+    db: Session = Depends(get_db)
+):
+
+    quotation = db.query(
+        Quotation
+    ).filter(
+        Quotation.id == quotation_id
+    ).first()
+
+    if not quotation:
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # SOLO PENDIENTES
+    if quotation.status != "pendiente":
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # BORRAR ITEMS
+    db.query(
+        QuotationItem
+    ).filter(
+        QuotationItem.quotation_id == quotation.id
+    ).delete()
+
+    # BORRAR COTIZACIÓN
+    db.delete(quotation)
+
+    db.commit()
+
+    return RedirectResponse(
+        url="/quotations",
+        status_code=302
+    )
+
+@router.get("/{quotation_id}/edit",
+    response_class=HTMLResponse
+)
+async def edit_quotation_page(
+
+    quotation_id: int,
+
+    request: Request,
+
+    db: Session = Depends(get_db)
+
+):
+
+    quotation = db.query(
+        Quotation
+    ).filter(
+        Quotation.id == quotation_id
+    ).first()
+
+    if not quotation:
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # SOLO PENDIENTES
+    if quotation.status != "pendiente":
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    clients = db.query(Client).all()
+
+    products = db.query(Product).all()
+
+    items = db.query(
+        QuotationItem
+    ).filter(
+        QuotationItem.quotation_id == quotation.id
+    ).all()
+
+    # ITEMS PARA JS
+    items_json = []
+
+    for item in items:
+
+        items_json.append({
+
+            "type": "inventory",
+
+            "product_id": None,
+
+            "quantity": item.quantity,
+
+            "detail": item.detail,
+
+            "price": item.unit_price,
+
+            "total": item.total
+
+        })
+
+    return templates.TemplateResponse(
+
+        request=request,
+
+        name="quotation_new.html",
+
+        context={
+
+            "clients": clients,
+
+            "products": products,
+
+            "quotation": quotation,
+
+            "items_json": json.dumps(items_json),
+
+            "edit_mode": True
+
+        }
+
+    )
+
+@router.post("/{quotation_id}/edit")
+async def update_quotation(
+
+    quotation_id: int,
+
+    client_id: int = Form(...),
+
+    subtotal: float = Form(...),
+
+    discount: float = Form(...),
+
+    iva: float = Form(...),
+
+    total: float = Form(...),
+
+    items: str = Form(...),
+
+    db: Session = Depends(get_db)
+
+):
+
+    quotation = db.query(
+        Quotation
+    ).filter(
+        Quotation.id == quotation_id
+    ).first()
+
+    if not quotation:
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # SOLO PENDIENTES
+    if quotation.status != "pendiente":
+
+        return RedirectResponse(
+            url="/quotations",
+            status_code=302
+        )
+
+    # UPDATE HEADER
+    quotation.client_id = client_id
+
+    quotation.subtotal = subtotal
+
+    quotation.discount = discount
+
+    quotation.iva = iva
+
+    quotation.total = total
+
+    # DELETE OLD ITEMS
+    db.query(
+        QuotationItem
+    ).filter(
+        QuotationItem.quotation_id == quotation.id
+    ).delete()
+
+    items_data = json.loads(items)
+
+    # INSERT NEW ITEMS
+    for item in items_data:
+
+        quotation_item = QuotationItem(
+
+            quotation_id=quotation.id,
+
+            quantity=item.get(
+                "quantity",
+                1
+            ),
+
+            detail=item.get(
+                "detail",
+                ""
+            ),
+
+            unit_price=item.get(
+                "price",
+                0.0
+            ),
+
+            total=item.get(
+                "total",
+                0.0
+            )
+
+        )
+
+        db.add(quotation_item)
+
+    db.commit()
+
+    return RedirectResponse(
+
+        url=f"/quotations/{quotation.id}",
+
+        status_code=302
+
+    )
+
 
 
 @router.get("/{quotation_id}/production")
@@ -186,7 +474,9 @@ async def shipping_quotation(
 
     db.commit()
 
-    return RedirectResponse(
+    if quotation.status != "produccion":
+
+        return RedirectResponse(
         url=f"/quotations/{quotation_id}",
         status_code=302
     )
@@ -332,9 +622,9 @@ async def create_quotation(
             ),
 
             unit_price=item.get(
-                "unit_price",
-                0.0
-            ),
+    "price",
+    0.0
+),
 
             total=item.get(
                 "total",

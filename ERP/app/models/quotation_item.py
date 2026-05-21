@@ -4,7 +4,10 @@ from sqlalchemy import String
 from sqlalchemy import Float
 from sqlalchemy import ForeignKey
 
+from sqlalchemy.orm import relationship
+
 from app.database import Base
+
 
 class QuotationItem(Base):
 
@@ -16,15 +19,26 @@ class QuotationItem(Base):
         index=True
     )
 
+    # RELACIÓN COTIZACIÓN
     quotation_id = Column(
         Integer,
         ForeignKey("quotations.id")
     )
 
+    # RELACIÓN PRODUCTO
+    product_id = Column(
+        Integer,
+        ForeignKey("products.id"),
+        nullable=True
+    )
+
+    # CANTIDAD
     quantity = Column(Integer)
 
+    # DETALLE PRODUCTO
     detail = Column(String)
 
+    # PERSONALIZADOS
     measure = Column(String)
 
     shape = Column(String)
@@ -33,6 +47,12 @@ class QuotationItem(Base):
 
     logo = Column(String)
 
+    # PRECIOS
     unit_price = Column(Float)
 
     total = Column(Float)
+
+    # RELACIÓN PRODUCTO
+    product = relationship(
+        "Product"
+    )

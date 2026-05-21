@@ -15,11 +15,16 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.database import get_db
 
 from app.models.product import Product
 
+
+# =====================================
+# ROUTER
+# =====================================
 
 router = APIRouter(
     prefix="/products",
@@ -32,6 +37,10 @@ templates = Jinja2Templates(
 
 UPLOAD_DIR = "uploads/products"
 
+
+# =====================================
+# PRODUCTS PAGE
+# =====================================
 
 @router.get(
     "/",
@@ -53,6 +62,10 @@ async def products_page(
     )
 
 
+# =====================================
+# NEW PRODUCT PAGE
+# =====================================
+
 @router.get(
     "/new",
     response_class=HTMLResponse
@@ -66,25 +79,98 @@ async def new_product_page(request: Request):
     )
 
 
-@router.post("/new")
-async def create_product(
-    code: str = Form(...),
-    name: str = Form(...),
-    description: str = Form(""),
-    category: str = Form(""),
-    material: str = Form(""),
-    color: str = Form(""),
-    size: str = Form(""),
-    thickness: str = Form(""),
-    price: float = Form(...),
-    cost: float = Form(...),
-    stock: int = Form(0),
-    custom: str = Form("no"),
-    image: UploadFile = File(None),
+# =====================================
+# SEARCH PRODUCTS API
+# =====================================
+
+@router.get("/search")
+def search_products(
+    q: str,
     db: Session = Depends(get_db)
 ):
 
+    products = db.query(Product).filter(
+
+        or_(
+
+            Product.name.ilike(f"%{q}%"),
+
+            Product.code.ilike(f"%{q}%"),
+
+            Product.category.ilike(f"%{q}%")
+
+        )
+
+    ).order_by(
+
+        Product.name.asc()
+
+    ).limit(10).all()
+
+    return [
+
+        {
+            "id": product.id,
+
+            "code": product.code,
+
+            "name": product.name,
+
+            "price": float(product.price or 0),
+
+            "stock": float(product.stock or 0),
+
+            "category": product.category or ""
+
+        }
+
+        for product in products
+
+    ]
+
+
+# =====================================
+# CREATE PRODUCT
+# =====================================
+
+@router.post("/new")
+async def create_product(
+
+    code: str = Form(...),
+
+    name: str = Form(...),
+
+    description: str = Form(""),
+
+    category: str = Form(""),
+
+    material: str = Form(""),
+
+    color: str = Form(""),
+
+    size: str = Form(""),
+
+    thickness: str = Form(""),
+
+    price: float = Form(...),
+
+    cost: float = Form(...),
+
+    stock: int = Form(0),
+
+    custom: str = Form("no"),
+
+    image: UploadFile = File(None),
+
+    db: Session = Depends(get_db)
+
+):
+
     image_name = None
+
+    # =====================================
+    # SAVE IMAGE
+    # =====================================
 
     if image and image.filename:
 
@@ -109,20 +195,38 @@ async def create_product(
                 buffer
             )
 
+    # =====================================
+    # CREATE PRODUCT
+    # =====================================
+
     product = Product(
+
         code=code,
+
         name=name,
+
         description=description,
+
         category=category,
+
         material=material,
+
         color=color,
+
         size=size,
+
         thickness=thickness,
+
         price=price,
+
         cost=cost,
+
         stock=stock,
+
         custom=True if custom == "yes" else False,
+
         image=image_name
+
     )
 
     db.add(product)
@@ -132,6 +236,9 @@ async def create_product(
     db.refresh(product)
 
     return RedirectResponse(
+
         url="/products",
+
         status_code=302
+
     )
