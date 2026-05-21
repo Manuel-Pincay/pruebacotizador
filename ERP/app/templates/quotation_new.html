@@ -1,0 +1,1103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="grid grid-cols-12 gap-6">
+
+    <!-- LEFT -->
+
+    <div class="col-span-8">
+
+        <!-- HEADER -->
+
+        <div class="bg-white rounded-2xl shadow p-6 mb-6">
+
+            <h1 class="text-3xl font-bold mb-6">
+
+                Nueva Cotización
+
+            </h1>
+
+            <div>
+
+                <label class="block mb-2 font-semibold">
+
+                    Cliente
+
+                </label>
+
+                <select
+                    id="client_id"
+                    class="w-full border rounded-xl p-3"
+                >
+
+                    {% for client in clients %}
+
+                    <option value="{{ client.id }}">
+
+                        {{ client.name }}
+
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+        </div>
+
+        <!-- INVENTORY -->
+
+        <div class="bg-white rounded-2xl shadow p-6 mb-6">
+
+            <div class="flex justify-between items-center mb-6">
+
+                <h2 class="text-2xl font-bold">
+
+                    Productos
+
+                </h2>
+
+                <button
+                    onclick="openCustomModal()"
+                    class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-2 rounded-xl"
+                >
+
+                    + Personalizado
+
+                </button>
+
+            </div>
+
+            <!-- SEARCH -->
+
+            <div class="grid grid-cols-12 gap-4">
+
+                <div class="col-span-6">
+
+                    <input
+                        list="products_list"
+                        id="product_search"
+                        placeholder="🔍 Buscar producto..."
+                        class="w-full border rounded-xl p-3"
+                    >
+
+                    <datalist id="products_list">
+
+                        {% for product in products %}
+
+                        <option value="{{ product.name }}">
+
+                        {% endfor %}
+
+                    </datalist>
+
+                </div>
+
+
+
+                <div class="col-span-2">
+
+                    <input
+                        type="number"
+                        id="quantity"
+                        value="1"
+                        min="1"
+                        class="w-full border rounded-xl p-3"
+                    >
+                    
+
+                </div>
+
+                <input
+    type="hidden"
+    id="selected_product_id"
+>
+
+<div
+    id="product_stock"
+    class="text-sm text-gray-500 mt-2"
+></div>
+
+                <div class="col-span-2">
+
+                    <input
+                        type="number"
+                        id="price"
+                        placeholder="Precio"
+                        class="w-full border rounded-xl p-3"
+                    >
+
+                </div>
+
+                <div class="col-span-2">
+
+                    <button
+                        onclick="addInventoryItem()"
+                        class="w-full bg-purple-700 hover:bg-purple-800 text-white p-3 rounded-xl"
+                    >
+
+                        Agregar
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ITEMS -->
+
+        <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+            <table class="w-full">
+
+                <thead class="bg-gray-100">
+
+                    <tr>
+
+                        <th class="text-left p-4">
+                            Cant
+                        </th>
+
+                        <th class="text-left p-4">
+                            Detalle
+                        </th>
+
+                        <th class="text-left p-4">
+                            Precio
+                        </th>
+
+                        <th class="text-left p-4">
+                            Total
+                        </th>
+
+                        <th class="text-left p-4">
+                            Acción
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody id="quotation_items">
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <!-- RIGHT -->
+
+    <div class="col-span-4">
+
+        <div class="bg-white rounded-2xl shadow p-6 sticky top-6">
+
+            <h2 class="text-3xl font-bold mb-6">
+
+                Resumen
+
+            </h2>
+
+            <!-- DISCOUNT -->
+
+            <div class="mb-6">
+
+                <label class="block mb-2">
+
+                    Descuento %
+
+                </label>
+
+                <input
+                    type="number"
+                    id="discount"
+                    value="0"
+                    class="w-full border rounded-xl p-3"
+                    oninput="calculateTotals()"
+                >
+
+            </div>
+
+            <!-- IVA -->
+
+            <div class="mb-6">
+
+                <label class="block mb-2">
+
+                    IVA %
+
+                </label>
+
+                <input
+                    type="number"
+                    id="iva"
+                    value="15"
+                    class="w-full border rounded-xl p-3"
+                    oninput="calculateTotals()"
+                >
+
+            </div>
+
+            <!-- TOTALS -->
+
+            <div class="space-y-4 border-t pt-6">
+
+                <div class="flex justify-between">
+
+                    <span>
+
+                        Subtotal
+
+                    </span>
+
+                    <span id="subtotal_text">
+
+                        $0.00
+
+                    </span>
+
+                </div>
+
+                <div class="flex justify-between">
+
+                    <span>
+
+                        Descuento
+
+                    </span>
+
+                    <span id="discount_text">
+
+                        $0.00
+
+                    </span>
+
+                </div>
+
+                <div class="flex justify-between">
+
+                    <span>
+
+                        IVA
+
+                    </span>
+
+                    <span id="iva_text">
+
+                        $0.00
+
+                    </span>
+
+                </div>
+
+            </div>
+
+            <div class="border-t mt-6 pt-6 flex justify-between items-center">
+
+                <span class="text-3xl font-bold">
+
+                    Total
+
+                </span>
+
+                <span
+                    id="total_text"
+                    class="text-4xl font-black text-purple-700"
+                >
+
+                    $0.00
+
+                </span>
+
+            </div>
+
+            <!-- SAVE -->
+
+            <button
+                onclick="saveQuotation()"
+                class="w-full mt-8 bg-purple-700 hover:bg-purple-800 text-white p-4 rounded-xl text-lg"
+            >
+
+                Guardar Cotización
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- CUSTOM MODAL -->
+
+<div
+    id="custom_modal"
+    class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50"
+>
+
+    <div class="bg-white rounded-2xl p-8 w-[700px]">
+
+        <div class="flex justify-between items-center mb-6">
+
+            <h2 class="text-2xl font-bold">
+
+                Producto Personalizado
+
+            </h2>
+
+            <button
+                onclick="closeCustomModal()"
+                class="text-2xl"
+            >
+
+                ✕
+
+            </button>
+
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+
+            <input
+                id="custom_detail"
+                placeholder="Detalle"
+                class="border rounded-xl p-3"
+            >
+
+            <input
+                id="custom_measure"
+                placeholder="Medida"
+                class="border rounded-xl p-3"
+            >
+
+            <input
+                id="custom_color"
+                placeholder="Color"
+                class="border rounded-xl p-3"
+            >
+
+            <input
+                id="custom_shape"
+                placeholder="Forma"
+                class="border rounded-xl p-3"
+            >
+
+            <input
+                id="custom_logo"
+                placeholder="Logo"
+                class="border rounded-xl p-3"
+            >
+
+            <input
+                type="number"
+                id="custom_price"
+                placeholder="Precio"
+                class="border rounded-xl p-3"
+            >
+
+        </div>
+
+        <button
+            onclick="addCustomItem()"
+            class="w-full mt-6 bg-purple-700 hover:bg-purple-800 text-white p-3 rounded-xl"
+        >
+
+            Agregar Personalizado
+
+        </button>
+
+    </div>
+
+</div>
+<script>
+
+let quotationItems = []
+
+
+// =====================================
+// PRODUCTS ARRAY
+// =====================================
+
+const products = {
+   {% for product in products %}
+
+    products["{{ product.name|escape }}"] = {
+
+    id: "{{ product.id }}",
+
+    name: "{{ product.name|escape }}",
+
+    price: "{{ product.price or 0 }}",
+
+    stock: "{{ product.stock or 0 }}"
+
+}
+
+{% endfor %} 
+
+}
+
+
+// =====================================
+// PRODUCT AUTOCOMPLETE
+// =====================================
+
+document.getElementById(
+    "product_search"
+).addEventListener(
+    "input",
+    function() {
+
+        let selected = products[this.value]
+        console.log(selected)
+
+        if (selected) {
+
+            document.getElementById(
+                "selected_product_id"
+            ).value = selected.id
+
+            document.getElementById(
+                "price"
+            ).value = parseFloat(
+                selected.price
+            ).toFixed(2)
+
+            document.getElementById(
+                "product_stock"
+            ).innerHTML = `
+
+                Stock disponible:
+                <strong>
+                    ${selected.stock}
+                </strong>
+
+            `
+
+        }
+
+    }
+)
+
+
+// =====================================
+// INVENTORY ITEM
+// =====================================
+
+function addInventoryItem() {
+
+    let productName = document.getElementById(
+        "product_search"
+    ).value.trim()
+
+    let productId = document.getElementById(
+        "selected_product_id"
+    ).value
+
+    let quantity = parseFloat(
+        document.getElementById(
+            "quantity"
+        ).value
+    )
+
+    let price = parseFloat(
+        document.getElementById(
+            "price"
+        ).value
+    )
+
+    if (!productName) {
+
+        alert(
+            "Selecciona un producto"
+        )
+
+        return
+
+    }
+
+    if (!quantity || quantity <= 0) {
+
+        alert(
+            "Cantidad inválida"
+        )
+
+        return
+
+    }
+
+    if (!price || price <= 0) {
+
+        alert(
+            "Precio inválido"
+        )
+
+        return
+
+    }
+
+    let item = {
+
+        type: "inventory",
+
+        product_id: productId,
+
+        quantity: quantity,
+
+        detail: productName,
+
+        price: price,
+
+        total: quantity * price
+
+    }
+
+    quotationItems.push(item)
+
+    renderItems()
+
+    calculateTotals()
+
+    clearInventoryFields()
+
+}
+
+
+// =====================================
+// CUSTOM ITEM
+// =====================================
+
+function addCustomItem() {
+
+    let detail = document.getElementById(
+        "custom_detail"
+    ).value.trim()
+
+    let measure = document.getElementById(
+        "custom_measure"
+    ).value.trim()
+
+    let color = document.getElementById(
+        "custom_color"
+    ).value.trim()
+
+    let shape = document.getElementById(
+        "custom_shape"
+    ).value.trim()
+
+    let logo = document.getElementById(
+        "custom_logo"
+    ).value.trim()
+
+    let price = parseFloat(
+        document.getElementById(
+            "custom_price"
+        ).value
+    )
+
+    if (!detail) {
+
+        alert(
+            "Ingresa detalle"
+        )
+
+        return
+
+    }
+
+    if (!price || price <= 0) {
+
+        alert(
+            "Precio inválido"
+        )
+
+        return
+
+    }
+
+    let fullDetail = detail
+
+    if (measure) {
+
+        fullDetail += ` | ${measure}`
+
+    }
+
+    if (color) {
+
+        fullDetail += ` | ${color}`
+
+    }
+
+    if (shape) {
+
+        fullDetail += ` | ${shape}`
+
+    }
+
+    if (logo) {
+
+        fullDetail += ` | Logo: ${logo}`
+
+    }
+
+    let item = {
+
+        type: "custom",
+
+        product_id: null,
+
+        quantity: 1,
+
+        detail: fullDetail,
+
+        price: price,
+
+        total: price
+
+    }
+
+    quotationItems.push(item)
+
+    renderItems()
+
+    calculateTotals()
+
+    closeCustomModal()
+
+    clearCustomFields()
+
+}
+
+
+// =====================================
+// RENDER ITEMS
+// =====================================
+
+function renderItems() {
+
+    let tbody = document.getElementById(
+        "quotation_items"
+    )
+
+    tbody.innerHTML = ""
+
+    quotationItems.forEach((item, index) => {
+
+        tbody.innerHTML += `
+
+            <tr class="border-t hover:bg-gray-50">
+
+                <!-- QUANTITY -->
+
+                <td class="p-4 w-28">
+
+                    <input
+                        type="number"
+                        min="1"
+                        value="${item.quantity}"
+                        onchange="updateQuantity(${index}, this.value)"
+                        class="w-20 border rounded-lg p-2"
+                    >
+
+                </td>
+
+                <!-- DETAIL -->
+
+                <td class="p-4">
+
+                    <div class="font-semibold">
+
+                        ${item.detail}
+
+                    </div>
+
+                    ${
+                        item.type === "inventory"
+
+                        ?
+
+                        `<div class="text-sm text-gray-500">
+                            Inventario
+                        </div>`
+
+                        :
+
+                        `<div class="text-sm text-purple-700">
+                            Personalizado
+                        </div>`
+                    }
+
+                </td>
+
+                <!-- PRICE -->
+
+                <td class="p-4 w-40">
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        value="${item.price}"
+                        onchange="updatePrice(${index}, this.value)"
+                        class="w-32 border rounded-lg p-2"
+                    >
+
+                </td>
+
+                <!-- TOTAL -->
+
+                <td class="p-4 font-bold text-lg">
+
+                    $${item.total.toFixed(2)}
+
+                </td>
+
+                <!-- ACTION -->
+
+                <td class="p-4">
+
+                    <button
+                        onclick="removeItem(${index})"
+                        class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+                    >
+
+                        ✕
+
+                    </button>
+
+                </td>
+
+            </tr>
+
+        `
+
+    })
+
+}
+
+// =====================================
+// REMOVE ITEM
+// =====================================
+
+function removeItem(index) {
+
+    quotationItems.splice(index, 1)
+
+    renderItems()
+
+    calculateTotals()
+
+}
+
+// =====================================
+// UPDATE QUANTITY
+// =====================================
+
+function updateQuantity(index, value) {
+
+    let quantity = parseFloat(value)
+
+    if (!quantity || quantity <= 0) {
+
+        return
+
+    }
+
+    quotationItems[index].quantity = quantity
+
+    quotationItems[index].total =
+        quotationItems[index].quantity *
+        quotationItems[index].price
+
+    renderItems()
+
+    calculateTotals()
+
+}
+
+
+// =====================================
+// UPDATE PRICE
+// =====================================
+
+function updatePrice(index, value) {
+
+    let price = parseFloat(value)
+
+    if (!price || price <= 0) {
+
+        return
+
+    }
+
+    quotationItems[index].price = price
+
+    quotationItems[index].total =
+        quotationItems[index].quantity *
+        quotationItems[index].price
+
+    renderItems()
+
+    calculateTotals()
+
+}
+
+
+// =====================================
+// TOTALS
+// =====================================
+
+function calculateTotals() {
+
+    let subtotal = 0
+
+    quotationItems.forEach(item => {
+
+        subtotal += item.total
+
+    })
+
+    let discountPercent = parseFloat(
+        document.getElementById(
+            "discount"
+        ).value
+    ) || 0
+
+    let ivaPercent = parseFloat(
+        document.getElementById(
+            "iva"
+        ).value
+    ) || 0
+
+    let discount = subtotal * (
+        discountPercent / 100
+    )
+
+    let subtotalAfterDiscount = subtotal - discount
+
+    let iva = subtotalAfterDiscount * (
+        ivaPercent / 100
+    )
+
+    let total = subtotalAfterDiscount + iva
+
+    document.getElementById(
+        "subtotal_text"
+    ).innerText = `$${subtotal.toFixed(2)}`
+
+    document.getElementById(
+        "discount_text"
+    ).innerText = `$${discount.toFixed(2)}`
+
+    document.getElementById(
+        "iva_text"
+    ).innerText = `$${iva.toFixed(2)}`
+
+    document.getElementById(
+        "total_text"
+    ).innerText = `$${total.toFixed(2)}`
+
+}
+
+
+// =====================================
+// MODAL
+// =====================================
+
+function openCustomModal() {
+
+    document.getElementById(
+        "custom_modal"
+    ).classList.remove(
+        "hidden"
+    )
+
+    document.getElementById(
+        "custom_modal"
+    ).classList.add(
+        "flex"
+    )
+
+}
+
+
+function closeCustomModal() {
+
+    document.getElementById(
+        "custom_modal"
+    ).classList.add(
+        "hidden"
+    )
+
+    document.getElementById(
+        "custom_modal"
+    ).classList.remove(
+        "flex"
+    )
+
+}
+
+
+// =====================================
+// CLEAR
+// =====================================
+
+function clearInventoryFields() {
+
+    document.getElementById(
+        "product_search"
+    ).value = ""
+
+    document.getElementById(
+        "selected_product_id"
+    ).value = ""
+
+    document.getElementById(
+        "quantity"
+    ).value = 1
+
+    document.getElementById(
+        "price"
+    ).value = ""
+
+    document.getElementById(
+        "product_stock"
+    ).innerHTML = ""
+
+}
+
+
+function clearCustomFields() {
+
+    document.getElementById(
+        "custom_detail"
+    ).value = ""
+
+    document.getElementById(
+        "custom_measure"
+    ).value = ""
+
+    document.getElementById(
+        "custom_color"
+    ).value = ""
+
+    document.getElementById(
+        "custom_shape"
+    ).value = ""
+
+    document.getElementById(
+        "custom_logo"
+    ).value = ""
+
+    document.getElementById(
+        "custom_price"
+    ).value = ""
+
+}
+
+
+// =====================================
+// SAVE QUOTATION
+// =====================================
+
+async function saveQuotation() {
+
+    if (quotationItems.length === 0) {
+
+        alert(
+            "Agrega productos"
+        )
+
+        return
+
+    }
+
+    let subtotal = 0
+
+    quotationItems.forEach(item => {
+
+        subtotal += item.total
+
+    })
+
+    let discount = parseFloat(
+        document.getElementById(
+            "discount"
+        ).value
+    ) || 0
+
+    let iva = parseFloat(
+        document.getElementById(
+            "iva"
+        ).value
+    ) || 0
+
+    let totalText = document.getElementById(
+        "total_text"
+    ).innerText
+
+    let total = parseFloat(
+        totalText.replace("$", "")
+    )
+
+    let formData = new FormData()
+
+    formData.append(
+        "client_id",
+        document.getElementById(
+            "client_id"
+        ).value
+    )
+
+    formData.append(
+        "subtotal",
+        subtotal
+    )
+
+    formData.append(
+        "discount",
+        discount
+    )
+
+    formData.append(
+        "iva",
+        iva
+    )
+
+    formData.append(
+        "total",
+        total
+    )
+
+    formData.append(
+        "items",
+        JSON.stringify(
+            quotationItems
+        )
+    )
+
+    let response = await fetch(
+        "/quotations/create",
+        {
+            method: "POST",
+            body: formData
+        }
+    )
+
+    if (response.redirected) {
+
+        window.location.href = response.url
+
+    }
+
+}
+
+</script>
+
+{% endblock %}

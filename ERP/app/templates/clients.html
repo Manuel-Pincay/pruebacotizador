@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-6">
+
+    <h1 class="text-3xl font-bold">
+        Clientes
+    </h1>
+
+    <a
+        href="/clients/new"
+        class="bg-purple-700 text-white px-5 py-3 rounded-lg"
+    >
+        Nuevo Cliente
+    </a>
+
+</div>
+
+<div class="bg-white rounded-xl shadow overflow-hidden">
+
+    <table class="w-full">
+
+        <thead class="bg-gray-100">
+
+            <tr>
+
+                <th class="text-left p-4">Nombre</th>
+                <th class="text-left p-4">Teléfono</th>
+                <th class="text-left p-4">Tipo</th>
+                <th class="text-left p-4">Empresa</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for client in clients %}
+
+            <tr class="border-t">
+
+                <td class="p-4">
+                    {{ client.name }}
+                </td>
+
+                <td class="p-4">
+                    {{ client.phone }}
+                </td>
+
+                <td class="p-4">
+                    {{ client.client_type }}
+                </td>
+
+                <td class="p-4">
+                    {{ client.company }}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

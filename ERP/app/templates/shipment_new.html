@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="max-w-5xl mx-auto">
+
+    <div class="flex justify-between items-center mb-8">
+
+        <div>
+
+            <h1 class="text-3xl font-bold">
+                Nueva Guía de Envío
+            </h1>
+
+            <p class="text-gray-500 mt-2">
+                Generar etiqueta logística para despacho
+            </p>
+
+        </div>
+
+    </div>
+
+    <div class="bg-white rounded-2xl shadow p-8">
+
+        <form
+            method="POST"
+            action="/shipments/create"
+        >
+
+            <!-- QUOTATION -->
+
+            <input
+                type="hidden"
+                name="quotation_id"
+                value="{{ quotation.id }}"
+            >
+
+            <!-- CLIENT INFO -->
+
+            <div class="grid grid-cols-2 gap-6">
+
+                <div>
+
+                    <label class="block mb-2 font-semibold">
+                        Cliente
+                    </label>
+
+                    <input
+                        type="text"
+                        name="customer_name"
+                        value="{{ client.name or '' }}"
+                        required
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+
+                </div>
+
+                <div>
+
+                    <label class="block mb-2 font-semibold">
+                        Teléfono
+                    </label>
+
+                    <input
+    type="tel"
+    name="customer_phone"
+    value="{{ client.phone or '' }}"
+    placeholder="0999999999"
+    pattern="[0-9]+"
+    required
+    class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+>
+
+                </div>
+
+            </div>
+
+            <!-- DESTINATION -->
+
+            <div class="grid grid-cols-2 gap-6 mt-6">
+
+                <div>
+
+                    <label class="block mb-2 font-semibold">
+                        Ciudad Destino
+                    </label>
+
+                    <input
+                        type="text"
+                        name="destination_city"
+                        placeholder="Quito"
+                        required
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+
+                </div>
+
+                <div>
+
+                    <label class="block mb-2 font-semibold">
+                        Transportadora
+                    </label>
+
+                    <select
+                        name="carrier"
+                        required
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+
+                        <option value="">
+                            Seleccionar transportadora
+                        </option>
+
+                        <option value="Servientrega">
+                            Servientrega
+                        </option>
+
+                        <option value="Tramaco">
+                            Tramaco
+                        </option>
+
+                        <option value="Coactur">
+                            Coactur
+                        </option>
+
+                        <option value="Reina del Camino">
+                            Reina del Camino
+                        </option>
+
+                        <option value="Trans Esmeraldas">
+                            Trans Esmeraldas
+                        </option>
+
+                        <option value="Vía Cargo">
+                            Vía Cargo
+                        </option>
+
+                        <option value="Otro">
+                            Otro
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <!-- ADDRESS -->
+
+            <div class="mt-6">
+
+                <label class="block mb-2 font-semibold">
+                    Dirección Destino
+                </label>
+
+                <textarea
+                    name="destination_address"
+                    rows="4"
+                    placeholder="Dirección completa del cliente"
+                    required
+                    class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                ></textarea>
+
+            </div>
+
+            <!-- EXTRA -->
+
+            <div class="grid grid-cols-2 gap-6 mt-6">
+
+                <div>
+
+                    <label class="block mb-2 font-semibold">
+                        Bultos
+                    </label>
+
+                    <input
+                        type="number"
+                        name="boxes"
+                        min="1"
+                        value="1"
+                        required
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+
+                </div>
+
+                <div>
+
+                    <label class="block mb-2 font-semibold">
+                        Observaciones
+                    </label>
+
+                    <input
+                        type="text"
+                        name="notes"
+                        placeholder="Frágil MDF / No apilar"
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+
+                </div>
+
+            </div>
+
+            <!-- ACTIONS -->
+
+            <div class="flex justify-end mt-10">
+
+                <button
+                    type="submit"
+                    class="bg-purple-700 hover:bg-purple-800 text-white px-8 py-3 rounded-xl font-semibold transition"
+                >
+                    Generar Guía
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+<script>
+
+document.querySelector("form").addEventListener(
+    "submit",
+    function(event) {
+
+        let valid = true
+
+        let requiredFields = [
+
+            "customer_name",
+            "customer_phone",
+            "destination_city",
+            "destination_address",
+            "carrier",
+            "boxes"
+
+        ]
+
+        requiredFields.forEach(fieldName => {
+
+            let field = document.querySelector(
+                `[name="${fieldName}"]`
+            )
+
+            field.classList.remove(
+                "border-red-500"
+            )
+
+            if (!field.value.trim()) {
+
+                valid = false
+
+                field.classList.add(
+                    "border-red-500"
+                )
+
+            }
+
+        })
+
+        if (!valid) {
+
+            event.preventDefault()
+
+            alert(
+                "Completa todos los campos obligatorios."
+            )
+
+        }
+
+    }
+)
+
+</script>
+
+{% endblock %}

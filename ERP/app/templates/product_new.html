@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1 class="text-3xl font-bold mb-6">
+    Nuevo Producto
+</h1>
+
+<form
+    method="POST"
+    enctype="multipart/form-data"
+    class="bg-white p-8 rounded-xl shadow"
+>
+
+    <div class="grid grid-cols-3 gap-5">
+
+        <div>
+
+            <label class="block mb-2">
+                Código
+            </label>
+
+            <input
+                type="text"
+                name="code"
+                class="w-full border p-3 rounded-lg"
+                required
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Nombre
+            </label>
+
+            <input
+                type="text"
+                name="name"
+                class="w-full border p-3 rounded-lg"
+                required
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Categoría
+            </label>
+
+            <input
+                type="text"
+                name="category"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Material
+            </label>
+
+            <input
+                type="text"
+                name="material"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Color
+            </label>
+
+            <input
+                type="text"
+                name="color"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Tamaño
+            </label>
+
+            <input
+                type="text"
+                name="size"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Grosor
+            </label>
+
+            <input
+                type="text"
+                name="thickness"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Precio
+            </label>
+
+            <input
+                type="number"
+                step="0.01"
+                name="price"
+                class="w-full border p-3 rounded-lg"
+                required
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Costo
+            </label>
+
+            <input
+                type="number"
+                step="0.01"
+                name="cost"
+                class="w-full border p-3 rounded-lg"
+                required
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Stock
+            </label>
+
+            <input
+                type="number"
+                name="stock"
+                value="0"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Personalizado
+            </label>
+
+            <select
+                name="custom"
+                class="w-full border p-3 rounded-lg"
+            >
+
+                <option value="no">
+                    No
+                </option>
+
+                <option value="yes">
+                    Sí
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div class="mt-5">
+
+        <label class="block mb-2">
+            Descripción
+        </label>
+
+        <textarea
+            name="description"
+            class="w-full border p-3 rounded-lg"
+        ></textarea>
+
+    </div>
+
+    <div class="mt-5">
+
+    <label class="block mb-2">
+        Imagen
+    </label>
+
+    <input
+        type="file"
+        name="image"
+        class="w-full border p-3 rounded-lg"
+    >
+
+</div>
+
+    <button
+        class="mt-6 bg-purple-700 text-white px-6 py-3 rounded-lg"
+    >
+        Guardar Producto
+    </button>
+
+</form>
+
+{% endblock %}

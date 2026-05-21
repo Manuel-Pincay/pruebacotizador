@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-8">
+
+    <div>
+
+        <h1 class="text-3xl font-bold">
+            Kanban Producción
+        </h1>
+
+        <p class="text-gray-500 mt-2">
+            Flujo visual de pedidos
+        </p>
+
+    </div>
+
+</div>
+
+<div class="grid grid-cols-5 gap-5">
+
+    <!-- PENDIENTE -->
+
+    <div class="bg-gray-100 rounded-2xl p-4">
+
+        <h2 class="font-bold text-lg mb-4">
+            Pendiente
+        </h2>
+
+        {% for order in pending %}
+
+        <div class="bg-white rounded-xl p-4 mb-4 shadow">
+
+            <div class="font-bold text-purple-700 mb-2">
+                Orden #{{ order.id }}
+            </div>
+
+            <div class="text-sm text-gray-500 mb-2">
+                Cotización #{{ order.quotation_id }}
+            </div>
+
+            <div class="mb-3">
+
+                <span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs">
+                    {{ order.priority }}
+                </span>
+
+            </div>
+
+            <a
+                href="/production/move/{{ order.id }}/diseño"
+                class="block text-center bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg"
+            >
+                Pasar a Diseño
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <!-- DISEÑO -->
+
+    <div class="bg-gray-100 rounded-2xl p-4">
+
+        <h2 class="font-bold text-lg mb-4">
+            Diseño
+        </h2>
+
+        {% for order in designing %}
+
+        <div class="bg-white rounded-xl p-4 mb-4 shadow">
+
+            <div class="font-bold text-purple-700 mb-2">
+                Orden #{{ order.id }}
+            </div>
+
+            <div class="text-sm text-gray-500 mb-3">
+                Cotización #{{ order.quotation_id }}
+            </div>
+
+            <a
+                href="/production/move/{{ order.id }}/produccion"
+                class="block text-center bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg"
+            >
+                Pasar a Producción
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <!-- PRODUCCION -->
+
+    <div class="bg-gray-100 rounded-2xl p-4">
+
+        <h2 class="font-bold text-lg mb-4">
+            Producción
+        </h2>
+
+        {% for order in producing %}
+
+        <div class="bg-white rounded-xl p-4 mb-4 shadow">
+
+            <div class="font-bold text-purple-700 mb-2">
+                Orden #{{ order.id }}
+            </div>
+
+            <div class="text-sm text-gray-500 mb-3">
+                Cotización #{{ order.quotation_id }}
+            </div>
+
+            <a
+                href="/production/move/{{ order.id }}/empacado"
+                class="block text-center bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg"
+            >
+                Pasar a Empacado
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <!-- EMPACADO -->
+
+    <div class="bg-gray-100 rounded-2xl p-4">
+
+        <h2 class="font-bold text-lg mb-4">
+            Empacado
+        </h2>
+
+        {% for order in packed %}
+
+        <div class="bg-white rounded-xl p-4 mb-4 shadow">
+
+            <div class="font-bold text-purple-700 mb-2">
+                Orden #{{ order.id }}
+            </div>
+
+            <div class="text-sm text-gray-500 mb-3">
+                Cotización #{{ order.quotation_id }}
+            </div>
+
+            <a
+                href="/production/move/{{ order.id }}/enviado"
+                class="block text-center bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg"
+            >
+                Marcar Enviado
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <!-- ENVIADO -->
+
+    <div class="bg-gray-100 rounded-2xl p-4">
+
+        <h2 class="font-bold text-lg mb-4">
+            Enviado
+        </h2>
+
+        {% for order in shipped %}
+
+        <div class="bg-white rounded-xl p-4 mb-4 shadow">
+
+            <div class="font-bold text-purple-700 mb-2">
+                Orden #{{ order.id }}
+            </div>
+
+            <div class="text-sm text-gray-500">
+                Completado
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+{% endblock %}

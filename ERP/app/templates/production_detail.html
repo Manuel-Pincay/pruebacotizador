@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-8">
+
+    <div>
+
+        <h1 class="text-3xl font-bold">
+            Orden Producción #{{ order.id }}
+        </h1>
+
+        <div class="text-gray-500 mt-1">
+            Cotización #{{ order.quotation_id }}
+        </div>
+
+    </div>
+
+</div>
+
+<div class="grid grid-cols-3 gap-5">
+
+    <div class="col-span-2">
+
+        <div class="bg-white p-6 rounded-2xl shadow">
+
+            <h2 class="text-2xl font-bold mb-5">
+                Productos
+            </h2>
+
+            <table class="w-full">
+
+                <thead class="bg-gray-100">
+
+                    <tr>
+
+                        <th class="text-left p-4">
+                            Producto
+                        </th>
+
+                        <th class="text-left p-4">
+                            Cantidad
+                        </th>
+
+                        <th class="text-left p-4">
+                            Precio Unitario
+                        </th>
+
+                        <th class="text-left p-4">
+                            Total
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for item in order.quotation.items %}
+
+                    <tr class="border-t">
+
+                        <td class="p-4">
+                            {{ item.detail }}
+                        </td>
+
+                        <td class="p-4">
+                            {{ item.quantity }}
+                        </td>
+
+                        <td class="p-4">
+                            ${{ "%.2f"|format(item.unit_price) }}
+                        </td>
+
+                        <td class="p-4 font-bold text-purple-700">
+                            ${{ "%.2f"|format(item.total) }}
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <div>
+
+        <form
+            action="/production/{{ order.id }}/update/"
+            method="POST"
+            class="bg-white p-6 rounded-2xl shadow"
+        >
+
+            <h2 class="text-2xl font-bold mb-5">
+                Gestión
+            </h2>
+
+            <div class="mb-4">
+
+                <label class="block mb-2">
+                    Diseñador
+                </label>
+
+                <input
+                    type="text"
+                    name="designer"
+                    value="{{ order.designer or '' }}"
+                    class="w-full border p-3 rounded-lg"
+                >
+
+            </div>
+
+            <div class="mb-4">
+
+                <label class="block mb-2">
+                    Fabricador
+                </label>
+
+                <input
+                    type="text"
+                    name="fabricator"
+                    value="{{ order.fabricator or '' }}"
+                    class="w-full border p-3 rounded-lg"
+                >
+
+            </div>
+
+            <div class="mb-4">
+
+                <label class="block mb-2">
+                    Prioridad
+                </label>
+
+                <select
+                    name="priority"
+                    class="w-full border p-3 rounded-lg"
+                >
+
+                    <option value="baja">
+                        Baja
+                    </option>
+
+                    <option value="media">
+                        Media
+                    </option>
+
+                    <option value="alta">
+                        Alta
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div class="mb-4">
+
+                <label class="block mb-2">
+                    Estado
+                </label>
+
+                <select
+                    name="status"
+                    class="w-full border p-3 rounded-lg"
+                >
+
+                    <option value="pendiente">
+                        Pendiente
+                    </option>
+
+                    <option value="diseño">
+                        Diseño
+                    </option>
+
+                    <option value="fabricacion">
+                        Fabricación
+                    </option>
+
+                    <option value="terminado">
+                        Terminado
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div class="mb-4">
+
+                <label class="block mb-2">
+                    Observaciones
+                </label>
+
+                <textarea
+                    name="observations"
+                    rows="5"
+                    class="w-full border p-3 rounded-lg"
+                >{{ order.observations or '' }}</textarea>
+
+            </div>
+
+            <button
+                class="w-full bg-purple-700 hover:bg-purple-800 text-white p-4 rounded-xl"
+            >
+                Guardar
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

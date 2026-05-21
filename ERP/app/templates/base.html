@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>INNOVA ARTE ERP</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+    <div class="flex min-h-screen">
+
+        <aside class="w-64 bg-purple-800 text-white p-5">
+            <h1 class="text-2xl font-bold mb-10">
+                ERP
+            </h1>
+
+            <nav class="space-y-3">
+                <a href="/quotations" class="block hover:bg-purple-700 p-2 rounded">
+                    Cotizaciones
+                </a>
+
+                <a href="/" class="block hover:bg-purple-700 p-2 rounded">
+                    Dashboard
+                </a>
+
+                <a href="/clients" class="block hover:bg-purple-700 p-2 rounded">
+                    Clientes
+                </a>
+                <a href="/products" class="block hover:bg-purple-700 p-2 rounded">
+                    Productos
+                </a>
+
+                <a href="/production" class="block hover:bg-purple-700 p-2 rounded">
+                    Producción
+                </a>
+
+                <a href="/inventory/" class="block py-3 px-4 rounded-xl hover:bg-purple-700"
+                >
+                    Inventario
+                </a>
+                <a href="/shipments/" class="block py-3 px-4 rounded-xl hover:bg-purple-700"
+                >
+                    Envíos
+                </a>
+                <a href="/production/kanban" class="block py-3 px-4 rounded-xl hover:bg-purple-700"
+                >
+                    Kanban
+                </a>
+
+                
+            </nav>
+        </aside>
+
+        <main class="flex-1 p-6">
+            {% block content %}
+            {% endblock %}
+        </main>
+
+    </div>
+
+</body>
+</html>

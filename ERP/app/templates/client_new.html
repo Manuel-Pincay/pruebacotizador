@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1 class="text-3xl font-bold mb-6">
+    Nuevo Cliente
+</h1>
+
+<form
+    method="POST"
+    class="bg-white p-8 rounded-xl shadow"
+>
+
+    <div class="grid grid-cols-2 gap-5">
+
+        <div>
+
+            <label class="block mb-2">
+                Nombre
+            </label>
+
+            <input
+                type="text"
+                name="name"
+                class="w-full border p-3 rounded-lg"
+                required
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Empresa
+            </label>
+
+            <input
+                type="text"
+                name="company"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                RUC / CI
+            </label>
+
+            <input
+                type="text"
+                name="ruc_ci"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Teléfono
+            </label>
+
+            <input
+                type="text"
+                name="phone"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Correo
+            </label>
+
+            <input
+                type="email"
+                name="email"
+                class="w-full border p-3 rounded-lg"
+            >
+
+        </div>
+
+        <div>
+
+            <label class="block mb-2">
+                Tipo Cliente
+            </label>
+
+            <select
+                name="client_type"
+                class="w-full border p-3 rounded-lg"
+            >
+
+                <option value="minorista">
+                    Minorista
+                </option>
+
+                <option value="mayorista">
+                    Mayorista
+                </option>
+
+                <option value="frecuente">
+                    Frecuente
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div class="mt-5">
+
+        <label class="block mb-2">
+            Dirección
+        </label>
+
+        <textarea
+            name="address"
+            class="w-full border p-3 rounded-lg"
+        ></textarea>
+
+    </div>
+
+    <div class="mt-5">
+
+        <label class="block mb-2">
+            Observaciones
+        </label>
+
+        <textarea
+            name="observations"
+            class="w-full border p-3 rounded-lg"
+        ></textarea>
+
+    </div>
+
+    <button
+        class="mt-6 bg-purple-700 text-white px-6 py-3 rounded-lg"
+    >
+        Guardar Cliente
+    </button>
+
+</form>
+
+{% endblock %}
