@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 <div class="flex justify-between items-center mb-8">
 
@@ -16,57 +17,95 @@
 
     </div>
 
-    <div class="flex gap-3">
+    <div class="flex gap-3 flex-wrap">
+
+        <!-- APROBAR -->
 
         {% if quotation.status == 'pendiente' %}
 
         <a
             href="/quotations/{{ quotation.id }}/approve"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl transition"
         >
             Aprobar
         </a>
 
         {% endif %}
 
+        <!-- PRODUCCION -->
+
         {% if quotation.status == 'aprobada' %}
 
         <a
             href="/quotations/{{ quotation.id }}/production"
-            class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl"
+            class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl transition"
         >
             Producción
         </a>
 
         {% endif %}
 
+        <!-- ENVIAR -->
+
         {% if quotation.status == 'produccion' %}
 
         <a
             href="/quotations/{{ quotation.id }}/shipping"
-            class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl"
+            class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl transition"
         >
             Enviar
         </a>
 
         {% endif %}
 
+        <!-- ENTREGADA -->
+
         {% if quotation.status == 'enviada' %}
 
         <a
             href="/quotations/{{ quotation.id }}/delivered"
-            class="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl"
+            class="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl transition"
         >
             Entregada
         </a>
 
         {% endif %}
 
+        <!-- PDF -->
+
+        <a
+            href="/quotations/{{ quotation.id }}/pdf"
+            class="bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-xl transition"
+        >
+            Descargar PDF
+        </a>
+
+        <!-- PRINT -->
+
+        <button
+            onclick="window.print()"
+            class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-3 rounded-xl transition"
+        >
+            Imprimir
+        </button>
+
+        <!-- COPY IMAGE -->
+
+        <button
+            onclick="copyQuotationImage()"
+            class="bg-green-500 hover:bg-green-600 text-white px-5 py-3 rounded-xl transition"
+        >
+            Copiar Imagen
+        </button>
+
     </div>
 
 </div>
 
-<div class="grid grid-cols-3 gap-5">
+<div
+    id="quotation_capture"
+    class="grid grid-cols-3 gap-6"
+>
 
     <div class="col-span-2">
 
@@ -271,5 +310,50 @@
     </div>
 
 </div>
+
+<script>
+
+async function copyQuotationImage() {
+
+    try {
+
+        const element = document.getElementById(
+            "quotation_capture"
+        )
+
+        const canvas = await html2canvas(
+            element,
+            {
+                scale: 2
+            }
+        )
+
+        canvas.toBlob(async (blob) => {
+
+            await navigator.clipboard.write([
+
+                new ClipboardItem({
+                    "image/png": blob
+                })
+
+            ])
+
+            alert(
+                "Cotización copiada como imagen"
+            )
+
+        })
+
+    } catch(error) {
+
+        console.error(error)
+
+        alert(
+            "Error copiando imagen"
+        )
+    }
+}
+
+</script>
 
 {% endblock %}

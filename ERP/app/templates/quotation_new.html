@@ -115,7 +115,81 @@
                         class="text-sm text-gray-500 mt-2"
                     ></div>
 
+                    <!--datos de porducto  -->
+                                        <!-- PRODUCT PARAMETERS -->
+
+                    <div
+                        id="product_parameters"
+                        class="grid grid-cols-4 gap-4 mt-4 hidden"
+                    >
+
+                        <div>
+
+                            <label class="text-sm text-gray-500">
+                                Medida
+                            </label>
+
+                            <input
+                                type="text"
+                                id="measure"
+                                class="w-full border rounded-xl p-3 bg-gray-100"
+                                readonly
+                            >
+
+                        </div>
+
+                        <div>
+
+                            <label class="text-sm text-gray-500">
+                                Forma
+                            </label>
+
+                            <input
+                                type="text"
+                                id="shape"
+                                class="w-full border rounded-xl p-3 bg-gray-100"
+                                readonly
+                            >
+
+                        </div>
+
+                        <div>
+
+                            <label class="text-sm text-gray-500">
+                                Color
+                            </label>
+
+                            <input
+                                type="text"
+                                id="color"
+                                class="w-full border rounded-xl p-3 bg-gray-100"
+                                readonly
+                            >
+
+                        </div>
+
+                        <div>
+
+                            <label class="text-sm text-gray-500">
+                                Logo
+                            </label>
+
+                            <input
+                                type="text"
+                                id="logo"
+                                class="w-full border rounded-xl p-3 bg-gray-100"
+                                readonly
+                            >
+
+                        </div>
+
+                    </div>
+
+                    <!-- fin -->
+
                 </div>
+
+                
 
                 <!-- QUANTITY -->
 
@@ -158,6 +232,7 @@
                     </button>
 
                 </div>
+                
 
             </div>
 
@@ -167,6 +242,9 @@
             >
 
         </div>
+        
+
+        
 
         <!-- ITEMS -->
 
@@ -176,31 +254,47 @@
 
                 <thead class="bg-gray-100">
 
-                    <tr>
+                <tr>
 
-                        <th class="text-left p-4">
-                            Cant
-                        </th>
+                    <th class="text-left p-4">
+                        Cant
+                    </th>
 
-                        <th class="text-left p-4">
-                            Detalle
-                        </th>
+                    <th class="text-left p-4">
+                        Detalle
+                    </th>
 
-                        <th class="text-left p-4">
-                            Precio
-                        </th>
+                    <th class="text-left p-4">
+                        Medida
+                    </th>
 
-                        <th class="text-left p-4">
-                            Total
-                        </th>
+                    <th class="text-left p-4">
+                        Forma
+                    </th>
 
-                        <th class="text-left p-4">
-                            Acción
-                        </th>
+                    <th class="text-left p-4">
+                        Color
+                    </th>
 
-                    </tr>
+                    <th class="text-left p-4">
+                        Logo
+                    </th>
 
-                </thead>
+                    <th class="text-left p-4">
+                        V. Unitario
+                    </th>
+
+                    <th class="text-left p-4">
+                        Total
+                    </th>
+
+                    <th class="text-left p-4">
+                        Acción
+                    </th>
+
+                </tr>
+
+            </thead>
 
                 <tbody id="quotation_items">
 
@@ -562,20 +656,24 @@ searchInput.addEventListener(
 
 function selectProduct(product) {
 
+    // NAME
     document.getElementById(
         "product_search"
     ).value = product.name
 
+    // PRODUCT ID
     document.getElementById(
         "selected_product_id"
     ).value = product.id
 
+    // PRICE
     document.getElementById(
         "price"
     ).value = parseFloat(
         product.price
     ).toFixed(2)
 
+    // STOCK
     document.getElementById(
         "product_stock"
     ).innerHTML = `
@@ -589,12 +687,35 @@ function selectProduct(product) {
 
     `
 
+    // SHOW PARAMETERS
+    document.getElementById(
+        "product_parameters"
+    ).classList.remove(
+        "hidden"
+    )
+
+    // LOAD PARAMETERS
+    document.getElementById(
+        "measure"
+    ).value = product.measure || "-"
+
+    document.getElementById(
+        "shape"
+    ).value = product.shape || "-"
+
+    document.getElementById(
+        "color"
+    ).value = product.color || "-"
+
+    document.getElementById(
+        "logo"
+    ).value = product.logo || "-"
+
+    // CLOSE RESULTS
     resultsBox.classList.add(
         "hidden"
     )
 }
-
-
 // =====================================
 // ADD INVENTORY ITEM
 // =====================================
@@ -630,19 +751,35 @@ function addInventoryItem() {
 
     let item = {
 
-        type: "inventory",
+    type: "inventory",
 
-        product_id: productId,
+    product_id: productId,
 
-        quantity: quantity,
+    quantity: quantity,
 
-        detail: productName,
+    detail: productName,
 
-        price: price,
+    measure: document.getElementById(
+        "measure"
+    ).value,
 
-        total: quantity * price
+    shape: document.getElementById(
+        "shape"
+    ).value,
 
-    }
+    color: document.getElementById(
+        "color"
+    ).value,
+
+    logo: document.getElementById(
+        "logo"
+    ).value,
+
+    price: price,
+
+    total: quantity * price
+
+}
 
     quotationItems.push(item)
 
@@ -679,19 +816,37 @@ function addCustomItem() {
 
     let item = {
 
-        type: "custom",
+    type: "custom",
 
-        product_id: null,
+    product_id: null,
 
-        quantity: 1,
+    quantity: 1,
 
-        detail: detail,
+    detail: document.getElementById(
+        "custom_detail"
+    ).value,
 
-        price: price,
+    measure: document.getElementById(
+        "custom_measure"
+    ).value,
 
-        total: price
+    shape: document.getElementById(
+        "custom_shape"
+    ).value,
 
-    }
+    color: document.getElementById(
+        "custom_color"
+    ).value,
+
+    logo: document.getElementById(
+        "custom_logo"
+    ).value,
+
+    price: price,
+
+    total: price
+
+}
 
     quotationItems.push(item)
 
@@ -738,6 +893,30 @@ function renderItems() {
                 <td class="p-4">
 
                     ${item.detail}
+
+                </td>
+
+                <td class="p-4">
+
+                    ${item.measure || "-"}
+
+                </td>
+
+                <td class="p-4">
+
+                    ${item.shape || "-"}
+
+                </td>
+
+                <td class="p-4">
+
+                    ${item.color || "-"}
+
+                </td>
+
+                <td class="p-4">
+
+                    ${item.logo || "-"}
 
                 </td>
 
@@ -915,27 +1094,55 @@ function closeCustomModal() {
 
 function clearInventoryFields() {
 
+    // SEARCH
     document.getElementById(
         "product_search"
     ).value = ""
 
+    // PRODUCT ID
     document.getElementById(
         "selected_product_id"
     ).value = ""
 
+    // QUANTITY
     document.getElementById(
         "quantity"
     ).value = 1
 
+    // PRICE
     document.getElementById(
         "price"
     ).value = ""
 
+    // STOCK
     document.getElementById(
         "product_stock"
     ).innerHTML = ""
-}
 
+    // HIDE PARAMETERS
+    document.getElementById(
+        "product_parameters"
+    ).classList.add(
+        "hidden"
+    )
+
+    // CLEAR PARAMETERS
+    document.getElementById(
+        "measure"
+    ).value = ""
+
+    document.getElementById(
+        "shape"
+    ).value = ""
+
+    document.getElementById(
+        "color"
+    ).value = ""
+
+    document.getElementById(
+        "logo"
+    ).value = ""
+}
 function clearCustomFields() {
 
     document.getElementById(

@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="max-w-3xl mx-auto">
+
+    <!-- HEADER -->
+
+    <div class="flex justify-between items-center mb-8">
+
+        <div>
+
+            <h1 class="text-3xl font-bold">
+                Nuevo Usuario
+            </h1>
+
+            <p class="text-gray-500 mt-1">
+                Crear acceso para empleado
+            </p>
+
+        </div>
+
+        <a
+            href="/users"
+            class="bg-gray-200 hover:bg-gray-300 px-5 py-3 rounded-xl transition"
+        >
+            Volver
+        </a>
+
+    </div>
+
+    <!-- ERROR -->
+
+    {% if error %}
+
+    <div class="bg-red-100 text-red-700 px-4 py-3 rounded-xl mb-6">
+
+        {{ error }}
+
+    </div>
+
+    {% endif %}
+
+    <!-- FORM -->
+
+    <form
+        action="/users/new"
+        method="POST"
+        class="bg-white rounded-2xl shadow p-8"
+    >
+
+        <!-- USERNAME -->
+
+        <div class="mb-6">
+
+            <label class="block text-sm font-semibold mb-2">
+                Usuario
+            </label>
+
+            <input
+                type="text"
+                name="username"
+                class="w-full border rounded-xl p-3"
+                required
+            >
+
+        </div>
+
+        <!-- FULL NAME -->
+
+        <div class="mb-6">
+
+            <label class="block text-sm font-semibold mb-2">
+                Nombre Completo
+            </label>
+
+            <input
+                type="text"
+                name="full_name"
+                class="w-full border rounded-xl p-3"
+                required
+            >
+
+        </div>
+
+        <!-- PASSWORD -->
+
+        <div class="mb-6">
+
+            <label class="block text-sm font-semibold mb-2">
+                Contraseña
+            </label>
+
+            <input
+                type="password"
+                name="password"
+                class="w-full border rounded-xl p-3"
+                required
+            >
+
+        </div>
+
+        <!-- ROLE -->
+
+        <div class="mb-8">
+
+            <label class="block text-sm font-semibold mb-2">
+                Rol
+            </label>
+
+            <select
+                name="role"
+                class="w-full border rounded-xl p-3"
+                required
+            >
+
+                <option value="admin">
+                    Admin
+                </option>
+
+                <option value="ventas">
+                    Ventas
+                </option>
+
+                <option value="produccion">
+                    Producción
+                </option>
+
+                <option value="despacho">
+                    Despacho
+                </option>
+
+            </select>
+
+        </div>
+
+        <!-- BUTTON -->
+
+        <button
+            type="submit"
+            class="bg-purple-700 hover:bg-purple-800 text-white px-8 py-3 rounded-xl transition"
+        >
+            Crear Usuario
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}

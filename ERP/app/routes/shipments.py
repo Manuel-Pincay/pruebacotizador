@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.auth.auth_handler import login_required, role_required
 
 from app.models.shipment import Shipment
 from app.models.quotation import Quotation
@@ -40,6 +41,14 @@ async def shipments_page(
     db: Session = Depends(get_db)
 ):
 
+    user = role_required(
+        request,
+        ["admin", "despacho"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
+
     shipments = db.query(
         Shipment
     ).order_by(
@@ -68,6 +77,14 @@ async def new_shipment(
     request: Request,
     db: Session = Depends(get_db)
 ):
+
+    user = role_required(
+        request,
+        ["admin", "despacho"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     quotation = db.query(
         Quotation
@@ -195,6 +212,14 @@ async def shipment_label(
     request: Request,
     db: Session = Depends(get_db)
 ):
+
+    user = role_required(
+        request,
+        ["admin", "despacho"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     shipment = db.query(
         Shipment

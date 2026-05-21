@@ -3,12 +3,14 @@ from fastapi import Request
 from fastapi import Depends
 
 from fastapi.responses import HTMLResponse
+from fastapi.responses import RedirectResponse
 
 from fastapi.templating import Jinja2Templates
 
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.auth.auth_handler import login_required, role_required
 
 from app.models.inventory_movement import InventoryMovement
 
@@ -30,6 +32,14 @@ async def inventory_page(
     request: Request,
     db: Session = Depends(get_db)
 ):
+
+    user = role_required(
+        request,
+        ["admin"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     movements = db.query(
         InventoryMovement

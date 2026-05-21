@@ -19,6 +19,9 @@
 </div>
 
 <div class="grid grid-cols-3 gap-5">
+    <!-- LEFT -->
+
+<div class="col-span-2 space-y-5">
 
     <div class="col-span-2">
 
@@ -32,55 +35,115 @@
 
                 <thead class="bg-gray-100">
 
-                    <tr>
+    <tr>
 
-                        <th class="text-left p-4">
-                            Producto
-                        </th>
+        <th class="text-left p-4">
+            Producto
+        </th>
 
-                        <th class="text-left p-4">
-                            Cantidad
-                        </th>
+        <th class="text-left p-4">
+            Cantidad
+        </th>
 
-                        <th class="text-left p-4">
-                            Precio Unitario
-                        </th>
+        <th class="text-left p-4">
+            Medida
+        </th>
 
-                        <th class="text-left p-4">
-                            Total
-                        </th>
+        <th class="text-left p-4">
+            Color
+        </th>
 
-                    </tr>
+        <th class="text-left p-4">
+            Logo
+        </th>
 
-                </thead>
+        <th class="text-left p-4">
+            Forma
+        </th>
 
-                <tbody>
+    </tr>
 
-                    {% for item in order.quotation.items %}
+</thead>
 
-                    <tr class="border-t">
+<tbody>
 
-                        <td class="p-4">
-                            {{ item.detail }}
-                        </td>
+    {% for item in order.quotation.items %}
 
-                        <td class="p-4">
-                            {{ item.quantity }}
-                        </td>
+    <tr class="border-t hover:bg-gray-50 transition">
 
-                        <td class="p-4">
-                            ${{ "%.2f"|format(item.unit_price) }}
-                        </td>
+        <!-- PRODUCT -->
 
-                        <td class="p-4 font-bold text-purple-700">
-                            ${{ "%.2f"|format(item.total) }}
-                        </td>
+        <td class="p-4">
 
-                    </tr>
+            <div class="font-semibold">
 
-                    {% endfor %}
+                {{ item.detail }}
 
-                </tbody>
+            </div>
+
+        </td>
+
+        <!-- QUANTITY -->
+
+        <td class="p-4 font-bold text-purple-700">
+
+            {{ item.quantity }}
+
+        </td>
+
+        <!-- MEASURE -->
+
+        <td class="p-4">
+
+            {{ item.measure or '-' }}
+
+        </td>
+
+        <!-- COLOR -->
+
+        <td class="p-4">
+
+            {{ item.color or '-' }}
+
+        </td>
+
+        <!-- LOGO -->
+
+        <td class="p-4">
+
+            {% if item.logo %}
+
+            <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
+
+                Sí
+
+            </span>
+
+            {% else %}
+
+            <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+
+                No
+
+            </span>
+
+            {% endif %}
+
+        </td>
+
+        <!-- SHAPE -->
+
+        <td class="p-4">
+
+            {{ item.shape or '-' }}
+
+        </td>
+
+    </tr>
+
+    {% endfor %}
+
+</tbody>
 
             </table>
 

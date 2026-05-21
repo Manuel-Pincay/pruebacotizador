@@ -79,8 +79,24 @@ async def login(
     )
 
     response.set_cookie(
-        key="user",
-        value=user.username
+    key="user",
+    value=user.username,
+    httponly=True,
+    samesite="Lax"
+)
+
+    return response
+
+@router.get("/logout")
+async def logout():
+
+    response = RedirectResponse(
+        url="/login",
+        status_code=302
+    )
+
+    response.delete_cookie(
+        key="user"
     )
 
     return response

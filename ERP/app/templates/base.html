@@ -1,65 +1,238 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>INNOVA ARTE ERP</title>
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        INNOVA ARTE ERP
+    </title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+
 </head>
+
 <body class="bg-gray-100">
 
     <div class="flex min-h-screen">
 
-        <aside class="w-64 bg-purple-800 text-white p-5">
-            <h1 class="text-2xl font-bold mb-10">
-                ERP
-            </h1>
+        <!-- SIDEBAR -->
 
-            <nav class="space-y-3">
-                <a href="/quotations" class="block hover:bg-purple-700 p-2 rounded">
-                    Cotizaciones
-                </a>
+        <aside class="w-72 bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl">
 
-                <a href="/" class="block hover:bg-purple-700 p-2 rounded">
-                    Dashboard
-                </a>
+            <!-- LOGO -->
 
-                <a href="/clients" class="block hover:bg-purple-700 p-2 rounded">
-                    Clientes
-                </a>
-                <a href="/products" class="block hover:bg-purple-700 p-2 rounded">
-                    Productos
-                </a>
+            <div class="p-6 border-b border-purple-700">
 
-                <a href="/production" class="block hover:bg-purple-700 p-2 rounded">
-                    Producción
-                </a>
+                <h1 class="text-3xl font-bold tracking-wide">
+                    INNOVA
+                </h1>
 
-                <a href="/inventory/" class="block py-3 px-4 rounded-xl hover:bg-purple-700"
+                <div class="text-purple-200 text-sm mt-1">
+                    ERP Empresarial
+                </div>
+
+            </div>
+
+            <!-- NAVIGATION -->
+
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+
+                <!-- DASHBOARD -->
+
+                <a
+                    href="/"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
                 >
-                    Inventario
-                </a>
-                <a href="/shipments/" class="block py-3 px-4 rounded-xl hover:bg-purple-700"
-                >
-                    Envíos
-                </a>
-                <a href="/production/kanban" class="block py-3 px-4 rounded-xl hover:bg-purple-700"
-                >
-                    Kanban
+
+                    <span>
+                        📊
+                    </span>
+
+                    <span>
+                        Dashboard
+                    </span>
+
                 </a>
 
-                
+                <!-- QUOTATIONS -->
+
+                <a
+                    href="/quotations"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        📄
+                    </span>
+
+                    <span>
+                        Cotizaciones
+                    </span>
+
+                </a>
+
+                <!-- CLIENTS -->
+
+                <a
+                    href="/clients"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        👥
+                    </span>
+
+                    <span>
+                        Clientes
+                    </span>
+
+                </a>
+
+                <!-- PRODUCTS -->
+
+                <a
+                    href="/products"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        📦
+                    </span>
+
+                    <span>
+                        Productos
+                    </span>
+
+                </a>
+
+                <!-- PRODUCTION -->
+
+                <a
+                    href="/production"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        🏭
+                    </span>
+
+                    <span>
+                        Producción
+                    </span>
+
+                </a>
+
+                <!-- KANBAN -->
+
+                <a
+                    href="/production/kanban"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        🗂️
+                    </span>
+
+                    <span>
+                        Kanban
+                    </span>
+
+                </a>
+
+                <!-- INVENTORY -->
+
+                <a
+                    href="/inventory/"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        📚
+                    </span>
+
+                    <span>
+                        Inventario
+                    </span>
+
+                </a>
+
+                <!-- SHIPMENTS -->
+
+                <a
+                    href="/shipments/"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        🚚
+                    </span>
+
+                    <span>
+                        Envíos
+                    </span>
+
+                </a>
+
+                <!-- USERS -->
+
+                <a
+                    href="/users"
+                    class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+                >
+
+                    <span>
+                        🔐
+                    </span>
+
+                    <span>
+                        Usuarios
+                    </span>
+
+                </a>
+
             </nav>
+
+            <!-- FOOTER -->
+
+            <div class="p-4 border-t border-purple-700">
+
+                <a
+                    href="/logout"
+                    class="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl transition"
+                >
+
+                    <span>
+                        🚪
+                    </span>
+
+                    <span>
+                        Cerrar sesión
+                    </span>
+
+                </a>
+
+            </div>
+
         </aside>
 
-        <main class="flex-1 p-6">
+        <!-- MAIN -->
+
+        <main class="flex-1 p-8 overflow-auto">
+
             {% block content %}
             {% endblock %}
+
         </main>
 
     </div>
 
 </body>
+
 </html>

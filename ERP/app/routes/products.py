@@ -21,6 +21,8 @@ from app.database import get_db
 
 from app.models.product import Product
 
+from app.auth.auth_handler import login_required, role_required
+
 
 # =====================================
 # ROUTER
@@ -51,6 +53,14 @@ async def products_page(
     db: Session = Depends(get_db)
 ):
 
+    user = role_required(
+        request,
+        ["admin"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
+
     products = db.query(Product).all()
 
     return templates.TemplateResponse(
@@ -72,11 +82,20 @@ async def products_page(
 )
 async def new_product_page(request: Request):
 
+    user = role_required(
+        request,
+        ["admin"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
+
     return templates.TemplateResponse(
         request=request,
         name="product_new.html",
         context={}
     )
+
 
 
 # =====================================
@@ -109,20 +128,28 @@ def search_products(
 
     return [
 
-        {
-            "id": product.id,
+    {
+        "id": product.id,
 
-            "code": product.code,
+        "code": product.code,
 
-            "name": product.name,
+        "name": product.name,
 
-            "price": float(product.price or 0),
+        "price": float(product.price or 0),
 
-            "stock": float(product.stock or 0),
+        "stock": float(product.stock or 0),
 
-            "category": product.category or ""
+        "category": product.category or "",
 
-        }
+        "measure": product.size or "",
+
+        "shape": product.shape if hasattr(product, "shape") else "",
+
+        "color": product.color or "",
+
+        "logo": "Sí" if getattr(product, "custom", False) else "No"
+
+    }
 
         for product in products
 
@@ -135,6 +162,8 @@ def search_products(
 
 @router.post("/new")
 async def create_product(
+
+
 
     code: str = Form(...),
 
@@ -242,3 +271,188 @@ async def create_product(
         status_code=302
 
     )
+# =====================================
+    # editar PRODUCT
+    # =====================================
+@router.get(
+    "/{product_id}/edit",
+    response_class=HTMLResponse
+)
+async def edit_product_page(
+    product_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+
+    user = role_required(
+        request,
+        ["admin"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
+
+    product = db.query(
+        Product
+    ).filter(
+        Product.id == product_id
+    ).first()
+
+    if not product:
+
+        return RedirectResponse(
+            url="/products",
+            status_code=302
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="product_edit.html",
+        context={
+            "product": product
+        }
+    )
+
+# =====================================
+    # guardar editar PRODUCT
+    # =====================================
+
+@router.post("/{product_id}/edit")
+async def update_product(
+
+    product_id: int,
+
+    code: str = Form(...),
+
+    name: str = Form(...),
+
+    description: str = Form(""),
+
+    category: str = Form(""),
+
+    material: str = Form(""),
+
+    color: str = Form(""),
+
+    size: str = Form(""),
+
+    thickness: str = Form(""),
+
+    price: float = Form(...),
+
+    cost: float = Form(...),
+
+    stock: int = Form(0),
+
+    custom: str = Form("no"),
+
+    db: Session = Depends(get_db)
+
+):
+
+    try:
+
+        product = db.query(
+            Product
+        ).filter(
+            Product.id == product_id
+        ).first()
+
+        if not product:
+
+            return RedirectResponse(
+                url="/products",
+                status_code=302
+            )
+
+        product.code = code
+        product.name = name
+        product.description = description
+        product.category = category
+        product.material = material
+        product.color = color
+        product.size = size
+        product.thickness = thickness
+        product.price = price
+        product.cost = cost
+        product.stock = stock
+        product.custom = True if custom == "yes" else False
+
+        db.commit()
+
+        return RedirectResponse(
+            url="/products",
+            status_code=302
+        )
+
+    except Exception as e:
+
+        db.rollback()
+
+        print(
+            "ERROR UPDATE PRODUCT:",
+            str(e)
+        )
+
+        return HTMLResponse(
+            content=f"""
+            <h1>
+                Error actualizando producto
+            </h1>
+
+            <p>
+                {str(e)}
+            </p>
+            """,
+            status_code=500
+        )
+    # =====================================
+    # ELIMINAR PRODUCT
+    # =====================================
+@router.get("/{product_id}/delete")
+async def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+
+    try:
+
+        product = db.query(
+            Product
+        ).filter(
+            Product.id == product_id
+        ).first()
+
+        if product:
+
+            db.delete(product)
+
+            db.commit()
+
+        return RedirectResponse(
+            url="/products",
+            status_code=302
+        )
+
+    except Exception as e:
+
+        db.rollback()
+
+        print(
+            "ERROR DELETE PRODUCT:",
+            str(e)
+        )
+
+        return HTMLResponse(
+            content=f"""
+            <h1>
+                Error eliminando producto
+            </h1>
+
+            <p>
+                {str(e)}
+            </p>
+            """,
+            status_code=500
+        )
+    

@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.auth.auth_handler import login_required, role_required
 
 from app.models.production_order import ProductionOrder
 
@@ -36,6 +37,14 @@ async def production_page(
     request: Request,
     db: Session = Depends(get_db)
 ):
+
+    user = role_required(
+        request,
+        ["admin", "produccion"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     orders = db.query(
      ProductionOrder
@@ -64,6 +73,14 @@ async def production_kanban(
     request: Request,
     db: Session = Depends(get_db)
 ):
+
+    user = role_required(
+        request,
+        ["admin", "produccion"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     pending = db.query(
         ProductionOrder
@@ -122,6 +139,14 @@ async def production_detail(
     request: Request,
     db: Session = Depends(get_db)
 ):
+
+    user = role_required(
+        request,
+        ["admin", "produccion"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     order = db.query(
         ProductionOrder

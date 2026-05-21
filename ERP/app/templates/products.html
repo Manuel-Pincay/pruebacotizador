@@ -32,51 +32,134 @@
 
         {% endif %}
 
-        <div class="p-5">
+        <div class="p-5 flex flex-col h-full">
 
-            <div class="text-sm text-gray-500">
-                {{ product.code }}
-            </div>
+    <!-- CODE -->
 
-            <h2 class="text-2xl font-bold mt-1">
-                {{ product.name }}
-            </h2>
+    <div class="text-sm text-gray-500">
+        {{ product.code }}
+    </div>
 
-            <div class="mt-2 text-gray-600">
+    <!-- NAME -->
 
-                {{ product.material }}
+    <h2 class="text-2xl font-bold mt-1">
+        {{ product.name }}
+    </h2>
 
-                ·
+    <!-- CATEGORY -->
 
-                {{ product.size }}
+    <div class="mt-2">
 
-            </div>
+        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
 
-            <div class="mt-5">
+            {{ product.category or "Sin categoría" }}
 
-                <div class="text-3xl font-bold text-purple-700">
-                    ${{ product.price }}
-                </div>
+        </span>
 
-                <div class="text-sm text-gray-500 mt-1">
-                    Stock: {{ product.stock }}
-                </div>
+    </div>
 
-            </div>
+    <!-- DETAILS -->
 
-            {% if product.custom %}
+    <div class="mt-3 text-gray-600 text-sm">
 
-            <div class="mt-4">
+        {{ product.material }}
 
-                <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
-                    Personalizado
-                </span>
+        ·
 
-            </div>
+        {{ product.size }}
+
+        {% if product.thickness %}
+
+        ·
+
+        {{ product.thickness }}
+
+        {% endif %}
+
+    </div>
+
+    <!-- PRICE -->
+
+    <div class="mt-5">
+
+        <div class="text-3xl font-bold text-purple-700">
+            ${{ product.price }}
+        </div>
+
+        <!-- STOCK -->
+
+        <div class="mt-2">
+
+            {% if product.stock <= 0 %}
+
+            <span class="text-red-600 font-semibold">
+
+                Stock agotado
+
+            </span>
+
+            {% elif product.stock <= 5 %}
+
+            <span class="text-orange-500 font-semibold">
+
+                Stock bajo: {{ product.stock }}
+
+            </span>
+
+            {% else %}
+
+            <span class="text-gray-500 text-sm">
+
+                Stock: {{ product.stock }}
+
+            </span>
 
             {% endif %}
 
         </div>
+
+    </div>
+
+    <!-- CUSTOM -->
+
+    {% if product.custom %}
+
+    <div class="mt-4">
+
+        <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
+            Personalizado
+        </span>
+
+    </div>
+
+    {% endif %}
+
+    <!-- ACTIONS -->
+
+    <div class="mt-6 flex gap-2">
+
+        <!-- EDIT -->
+
+        <a
+            href="/products/{{ product.id }}/edit"
+            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-center px-4 py-2 rounded-xl text-sm transition"
+        >
+            Editar
+        </a>
+
+        <!-- DELETE -->
+
+        <a
+            href="/products/{{ product.id }}/delete"
+            onclick="return confirm('¿Eliminar producto?')"
+            class="flex-1 bg-red-500 hover:bg-red-600 text-white text-center px-4 py-2 rounded-xl text-sm transition"
+        >
+            Eliminar
+        </a>
+
+    </div>
+
+</div>
 
     </div>
 

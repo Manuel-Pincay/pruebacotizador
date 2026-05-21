@@ -21,6 +21,7 @@ from app.routes import quotations
 from app.routes import production
 from app.routes import inventory
 from app.routes import shipments
+from app.routes import users
 
 Base.metadata.create_all(bind=engine)
 
@@ -48,6 +49,8 @@ app.include_router(quotations.router)
 app.include_router(production.router)
 app.include_router(inventory.router)
 app.include_router(shipments.router)
+app.include_router(users.router)
+
 
 
 
