@@ -2,6 +2,8 @@ from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
 from fastapi import Form
+from datetime import date
+from collections import defaultdict
 
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
@@ -14,6 +16,7 @@ from app.database import get_db
 from app.auth.auth_handler import login_required, role_required
 
 from app.models.production_order import ProductionOrder
+from app.models.quotation import Quotation
 
 router = APIRouter(
     prefix="/production",
@@ -47,10 +50,13 @@ async def production_page(
         return user
 
     orders = db.query(
-     ProductionOrder
+    ProductionOrder
+    ).filter(
+        ProductionOrder.status != "enviado",
+        ProductionOrder.status != "entregado"
     ).order_by(
-       ProductionOrder.delivery_date.asc()
-     ).all()
+        ProductionOrder.delivery_date.asc()
+    ).all()
 
     return templates.TemplateResponse(
         request=request,
@@ -64,7 +70,6 @@ async def production_page(
 # =========================================
 # KANBAN
 # =========================================
-
 @router.get(
     "/kanban",
     response_class=HTMLResponse
@@ -73,14 +78,6 @@ async def production_kanban(
     request: Request,
     db: Session = Depends(get_db)
 ):
-
-    user = role_required(
-        request,
-        ["admin", "produccion"]
-    )
-
-    if isinstance(user, RedirectResponse):
-        return user
 
     pending = db.query(
         ProductionOrder
@@ -124,41 +121,41 @@ async def production_kanban(
         }
     )
 
-
-
 # =========================================
-# DETALLE ORDEN
+# CALENDARIO PRODUCCIÓN
 # =========================================
 
 @router.get(
-    "/{order_id}",
+    "/calendar",
     response_class=HTMLResponse
 )
-async def production_detail(
-    order_id: int,
+async def production_calendar(
     request: Request,
     db: Session = Depends(get_db)
 ):
 
-    user = role_required(
-        request,
-        ["admin", "produccion"]
-    )
-
-    if isinstance(user, RedirectResponse):
-        return user
-
-    order = db.query(
-        ProductionOrder
+    quotations = db.query(
+        Quotation
     ).filter(
-        ProductionOrder.id == order_id
-    ).first()
+        Quotation.delivery_date != None
+    ).order_by(
+        Quotation.delivery_date.asc()
+    ).all()
+
+    grouped_orders = defaultdict(list)
+
+    for quotation in quotations:
+
+        grouped_orders[
+            quotation.delivery_date
+        ].append(quotation)
 
     return templates.TemplateResponse(
         request=request,
-        name="production_detail.html",
+        name="production_calendar.html",
         context={
-            "order": order
+            "grouped_orders": dict(grouped_orders),
+            "today": date.today()
         }
     )
 
@@ -225,4 +222,41 @@ async def update_production(
     return RedirectResponse(
         url=f"/production/{order_id}",
         status_code=302
+    )
+
+
+# =========================================
+# DETALLE ORDEN
+# =========================================
+
+@router.get(
+    "/{order_id}",
+    response_class=HTMLResponse
+)
+async def production_detail(
+    order_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+
+    user = role_required(
+        request,
+        ["admin", "produccion"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
+
+    order = db.query(
+        ProductionOrder
+    ).filter(
+        ProductionOrder.id == order_id
+    ).first()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="production_detail.html",
+        context={
+            "order": order
+        }
     )

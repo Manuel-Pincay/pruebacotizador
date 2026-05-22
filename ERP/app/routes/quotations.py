@@ -1,9 +1,14 @@
 import json
 from urllib import request
-
+from datetime import datetime
 from datetime import date
 from datetime import timedelta
 
+from fastapi import UploadFile
+from fastapi import File
+
+import shutil
+import uuid
 from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
@@ -590,7 +595,7 @@ async def production_quotation(
 
             priority="media",
 
-            delivery_date=date.today() + timedelta(days=3)
+            delivery_date=quotation.delivery_date
 
         )
 
@@ -782,6 +787,7 @@ async def quotation_pdf(
             status_code=500
         )
     
+
 @router.post("/create")
 async def create_quotation(
 
@@ -791,15 +797,59 @@ async def create_quotation(
 
     discount: float = Form(...),
 
+    delivery_date: str = Form(None),
+
     iva: float = Form(...),
 
     total: float = Form(...),
 
     items: str = Form(...),
 
+    design_file: UploadFile = File(None),
+
     db: Session = Depends(get_db)
 
 ):
+
+    # =========================================
+    # PARSE DELIVERY DATE
+    # =========================================
+
+    parsed_delivery_date = None
+
+    if delivery_date:
+
+        parsed_delivery_date = datetime.strptime(
+            delivery_date,
+            "%Y-%m-%d"
+        ).date()
+
+    # =========================================
+    # CREATE QUOTATION
+    # =========================================
+
+    filename = None
+
+    if design_file:
+
+        extension = design_file.filename.split(".")[-1]
+
+        filename = f"{uuid.uuid4()}.{extension}"
+
+        with open(
+
+            f"uploads/designs/{filename}",
+
+            "wb"
+
+        ) as buffer:
+
+            shutil.copyfileobj(
+                design_file.file,
+                buffer
+        )
+        
+    """ dsa """
 
     quotation = Quotation(
 
@@ -809,9 +859,12 @@ async def create_quotation(
 
         discount=discount,
 
+        delivery_date=parsed_delivery_date,
+
         iva=iva,
 
         total=total,
+        design_file=filename,
 
         status="pendiente"
 
@@ -822,6 +875,10 @@ async def create_quotation(
     db.commit()
 
     db.refresh(quotation)
+
+    # =========================================
+    # ITEMS
+    # =========================================
 
     items_data = json.loads(items)
 
@@ -862,9 +919,9 @@ async def create_quotation(
             ),
 
             unit_price=item.get(
-    "price",
-    0.0
-),
+                "price",
+                0.0
+            ),
 
             total=item.get(
                 "total",

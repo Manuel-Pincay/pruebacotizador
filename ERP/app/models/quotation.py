@@ -4,6 +4,7 @@ from sqlalchemy import Float
 from sqlalchemy import String
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
+from sqlalchemy import Date
 
 from sqlalchemy.orm import relationship
 
@@ -22,16 +23,13 @@ class Quotation(Base):
         Integer,
         ForeignKey("clients.id")
     )
-
     subtotal = Column(Float)
-
     discount = Column(Float)
-
     iva = Column(Float)
-
     total = Column(Float)
-
     status = Column(String)
+    delivery_date = Column(Date)
+    design_file = Column(String)
 
     created_at = Column(
         DateTime,

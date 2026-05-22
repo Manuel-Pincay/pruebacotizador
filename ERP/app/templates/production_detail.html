@@ -23,7 +23,91 @@
 
 <div class="col-span-2 space-y-5">
 
-    <div class="col-span-2">
+    <!-- CLIENT INFO -->
+
+<div class="bg-white p-6 rounded-2xl shadow">
+
+    <div class="flex justify-between items-start">
+
+        <div>
+
+            <h2 class="text-2xl font-bold">
+                Cliente
+            </h2>
+
+            <div class="mt-4">
+
+                <div class="text-xl font-semibold">
+
+                    {{ order.quotation.client.name }}
+
+                </div>
+
+                {% if order.quotation.client.company %}
+
+                <div class="text-gray-500 mt-1">
+
+                    {{ order.quotation.client.company }}
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        <!-- DELIVERY -->
+
+        <div>
+
+            {% if order.delivery_date %}
+
+            <span class="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-semibold">
+
+                📅 {{ order.delivery_date.strftime('%d/%m/%Y') }}
+
+            </span>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-2 gap-5 mt-6">
+
+        <div>
+
+            <div class="text-gray-500 text-sm">
+                Teléfono
+            </div>
+
+            <div class="font-semibold mt-1">
+
+                {{ order.quotation.client.phone or '-' }}
+
+            </div>
+
+        </div>
+
+        <div>
+
+            <div class="text-gray-500 text-sm">
+                Email
+            </div>
+
+            <div class="font-semibold mt-1">
+
+                {{ order.quotation.client.email or '-' }}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
 
         <div class="bg-white p-6 rounded-2xl shadow">
 
@@ -200,23 +284,41 @@
                 </label>
 
                 <select
-                    name="priority"
-                    class="w-full border p-3 rounded-lg"
-                >
+    name="priority"
+    class="w-full border p-3 rounded-lg"
+>
 
-                    <option value="baja">
-                        Baja
-                    </option>
+    <option
+        value="baja"
 
-                    <option value="media">
-                        Media
-                    </option>
+        {% if order.priority == "baja" %}
+        selected
+        {% endif %}
+    >
+        🟢 Baja
+    </option>
 
-                    <option value="alta">
-                        Alta
-                    </option>
+    <option
+        value="media"
 
-                </select>
+        {% if order.priority == "media" %}
+        selected
+        {% endif %}
+    >
+        🟡 Media
+    </option>
+
+    <option
+        value="alta"
+
+        {% if order.priority == "alta" %}
+        selected
+        {% endif %}
+    >
+        🔴 Alta
+    </option>
+
+</select>
 
             </div>
 

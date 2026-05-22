@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="flex justify-between items-center mb-8">
+
+    <div>
+
+        <h1 class="text-3xl font-bold">
+            Calendario Producción
+        </h1>
+
+        <p class="text-gray-500 mt-1">
+            Organización de pedidos y entregas
+        </p>
+
+    </div>
+
+</div>
+
+<!-- EMPTY -->
+
+{% if not grouped_orders %}
+
+<div class="bg-white rounded-2xl shadow p-10 text-center">
+
+    <div class="text-6xl mb-4">
+        📅
+    </div>
+
+    <h2 class="text-2xl font-bold">
+        No hay pedidos agendados
+    </h2>
+
+    <p class="text-gray-500 mt-2">
+        Las órdenes aparecerán aquí cuando tengan fecha de entrega.
+    </p>
+
+</div>
+
+{% endif %}
+
+<!-- CALENDAR -->
+
+<div class="space-y-6">
+
+    {% for date, orders in grouped_orders.items() %}
+
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+        <!-- HEADER COLOR -->
+
+        {% if date < today %}
+
+        <div class="bg-red-600 text-white px-6 py-4">
+
+        {% elif date == today %}
+
+        <div class="bg-yellow-500 text-white px-6 py-4">
+
+        {% else %}
+
+        <div class="bg-purple-700 text-white px-6 py-4">
+
+        {% endif %}
+
+            <div class="flex justify-between items-center">
+
+                <!-- LEFT -->
+
+                <div class="flex items-center gap-3">
+
+                    <h2 class="text-2xl font-bold">
+
+                        📅 {{ date.strftime('%d/%m/%Y') }}
+
+                    </h2>
+
+                    <!-- ALERT -->
+
+                    {% if date < today %}
+
+                    <span class="bg-white text-red-600 px-3 py-1 rounded-full text-sm font-bold">
+
+                        ⚠️ ATRASADO
+
+                    </span>
+
+                    {% elif date == today %}
+
+                    <span class="bg-white text-yellow-700 px-3 py-1 rounded-full text-sm font-bold">
+
+                        🚨 HOY
+
+                    </span>
+
+                    {% endif %}
+
+                </div>
+
+                <!-- LOAD -->
+
+                {% if orders|length >= 10 %}
+
+                <div class="bg-red-100 text-red-700 px-4 py-1 rounded-full text-sm font-bold">
+
+                    ⚠️ {{ orders|length }} pedidos
+
+                </div>
+
+                {% elif orders|length >= 5 %}
+
+                <div class="bg-yellow-100 text-yellow-700 px-4 py-1 rounded-full text-sm font-bold">
+
+                    🟡 {{ orders|length }} pedidos
+
+                </div>
+
+                {% else %}
+
+                <div class="bg-green-100 text-green-700 px-4 py-1 rounded-full text-sm font-bold">
+
+                    🟢 {{ orders|length }} pedidos
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        <!-- ORDERS -->
+
+        <div class="divide-y">
+
+            {% for quotation in orders %}
+
+            <div class="p-6 hover:bg-gray-50 transition">
+
+                <div class="flex justify-between items-center">
+
+                    <!-- LEFT -->
+
+                    <div>
+
+                        <div class="flex items-center gap-3">
+
+                            <div class="text-xl font-bold text-purple-700">
+
+                                #{{ quotation.id }}
+
+                            </div>
+
+                            <div class="text-lg font-semibold">
+
+                                {{ quotation.client.name }}
+
+                            </div>
+
+                        </div>
+
+                        <div class="mt-2 text-gray-500">
+
+                            Cotización #{{ quotation.id }}
+
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT -->
+
+                    <div class="flex items-center gap-3">
+
+                        <!-- STATUS -->
+
+                        {% if quotation.status == 'pendiente' %}
+
+                        <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">
+
+                            Pendiente
+
+                        </span>
+
+                        {% elif quotation.status == 'aprobada' %}
+
+                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
+
+                            Aprobada
+
+                        </span>
+
+                        {% elif quotation.status == 'produccion' %}
+
+                        <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
+
+                            Producción
+
+                        </span>
+
+                        {% elif quotation.status == 'enviada' %}
+
+                        <span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm">
+
+                            Enviada
+
+                        </span>
+
+                        {% elif quotation.status == 'entregada' %}
+
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+
+                            Entregada
+
+                        </span>
+
+                        {% else %}
+
+                        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+
+                            {{ quotation.status }}
+
+                        </span>
+
+                        {% endif %}
+
+                        <!-- BUTTON -->
+
+                        <a
+                            href="/quotations/{{ quotation.id }}"
+                            class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg"
+                        >
+                            Ver
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}

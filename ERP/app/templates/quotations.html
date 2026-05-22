@@ -131,7 +131,7 @@
 
                 <td class="p-4">
 
-                    <div class="quotation-menu-container relative inline-block">
+                    <div class="quotation-menu-container relative">
 
                         <!-- BUTTON -->
 
@@ -145,10 +145,9 @@
                         <!-- MENU -->
 
                         <div
-                            id="menu-{{ quotation.id }}"
-                            class="hidden absolute right-0 mt-2 w-56 bg-white border rounded-2xl shadow-2xl z-50 overflow-hidden"
+                            id="quotation-menu-{{ quotation.id }}"
+class="hidden absolute right-0 mt-2 w-56 bg-white border rounded-2xl shadow-2xl z-50 overflow-hidden"                        
                         >
-
                             <!-- VIEW -->
 
                             <a
@@ -236,22 +235,25 @@
 // =====================================
 // TOGGLE MENU
 // =====================================
-
 function toggleMenu(event, id) {
 
-    // EVITAR CIERRE GLOBAL
+    event.preventDefault()
+
     event.stopPropagation()
 
     const menu = document.getElementById(
-        `menu-${id}`
+        `quotation-menu-${id}`
     )
 
     // CERRAR TODOS
+
     document.querySelectorAll(
-        "[id^='menu-']"
+        "[id^='quotation-menu-']"
     ).forEach(item => {
 
-        if (item.id !== `menu-${id}`) {
+        if (
+            item.id !== `quotation-menu-${id}`
+        ) {
 
             item.classList.add(
                 "hidden"
@@ -259,12 +261,12 @@ function toggleMenu(event, id) {
         }
     })
 
-    // TOGGLE ACTUAL
+    // TOGGLE
+
     menu.classList.toggle(
         "hidden"
     )
 }
-
 
 // =====================================
 // APPROVE
@@ -315,7 +317,7 @@ async function deleteQuotation(id) {
 // CLOSE MENU OUTSIDE CLICK
 // =====================================
 
-document.addEventListener(
+window.addEventListener(
     "click",
     function(event) {
 

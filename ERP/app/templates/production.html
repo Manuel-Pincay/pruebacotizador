@@ -93,13 +93,13 @@
 
                 <td class="p-4">
 
-                    {% if order.delivery_date %}
+                   {% if order.delivery_date %}
 
-                        {{ order.delivery_date }}
+                    {{ order.delivery_date.strftime('%d/%m/%Y') }}
 
                     {% else %}
 
-                        -
+                    -
 
                     {% endif %}
 
@@ -131,9 +131,63 @@
 
                 <td class="p-4">
 
-                    <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
-                        {{ order.status }}
-                    </span>
+                    {% if order.status == 'pendiente' %}
+
+<span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+
+    Pendiente
+
+</span>
+
+{% elif order.status == 'diseño' %}
+
+<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
+
+    Diseño
+
+</span>
+
+{% elif order.status == 'produccion' %}
+
+<span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">
+
+    Producción
+
+</span>
+
+{% elif order.status == 'empacado' %}
+
+<span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm">
+
+    Empacado
+
+</span>
+
+{% elif order.status == 'enviado' %}
+
+<span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
+
+    Enviado
+
+</span>
+
+{% elif order.status == 'entregado' %}
+
+<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+
+    Entregado
+
+</span>
+
+{% else %}
+
+<span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+
+    {{ order.status }}
+
+</span>
+
+{% endif %}
 
                 </td>
 

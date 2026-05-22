@@ -213,6 +213,45 @@
 
             </div>
 
+            {% if quotation.design_file %}
+
+<div class="bg-white rounded-2xl shadow p-6 mb-6">
+
+    <h2 class="text-2xl font-bold mb-4">
+
+        Diseño / Archivo
+
+    </h2>
+
+    <!-- IMAGE -->
+
+    {% if quotation.design_file.endswith(
+        ('.png', '.jpg', '.jpeg')
+    ) %}
+
+    <img
+        src="/uploads/designs/{{ quotation.design_file }}"
+        class="max-h-[500px] rounded-xl border"
+    >
+
+    {% else %}
+
+    <a
+        href="/uploads/designs/{{ quotation.design_file }}"
+        target="_blank"
+        class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl inline-block"
+    >
+
+        📎 Abrir Archivo
+
+    </a>
+
+    {% endif %}
+
+</div>
+
+{% endif %}
+
         </div>
 
         <div class="bg-white p-5 rounded-2xl shadow mt-5">

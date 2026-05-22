@@ -338,6 +338,57 @@
 
             </div>
 
+            <!-- DELIVERY DATE -->
+
+        <div class="bg-white rounded-2xl shadow p-6 mb-6">
+
+            <h2 class="text-2xl font-bold mb-4">
+                Entrega
+            </h2>
+
+            <div>
+
+                <label class="block text-sm font-semibold mb-2">
+                    Fecha de Entrega
+                </label>
+
+                <input
+                type="date"
+                id="delivery_date"
+                name="delivery_date"
+                required
+                class="w-full border rounded-xl p-3"
+            >
+
+            </div>
+
+        </div>
+
+    <!-- DESIGN FILE -->
+
+    <div class="mb-6">
+
+        <label class="block mb-2 font-semibold">
+
+            Diseño / Logo
+
+        </label>
+
+        <input
+            type="file"
+            id="design_file"
+            accept=".png,.jpg,.jpeg,.pdf,.svg"
+            class="w-full border rounded-xl p-3 bg-white"
+        >
+
+        <p class="text-sm text-gray-500 mt-2">
+
+            PNG, JPG, PDF o SVG
+
+        </p>
+
+    </div>
+
             <!-- IVA -->
 
             <div class="mb-6">
@@ -745,6 +796,18 @@ function addInventoryItem() {
     if (!productName) {
 
         alert("Selecciona un producto")
+
+        return
+    }
+
+    let exists = quotationItems.find(
+
+    item => item.product_id == productId
+    )
+
+    if (exists) {
+
+        alert("Este producto ya fue agregado")
 
         return
     }
@@ -1206,6 +1269,20 @@ async function saveQuotation() {
     let total = parseFloat(
         totalText.replace("$", "")
     )
+    let designFile = document.getElementById(
+    "design_file"
+    ).files[0]
+
+    let deliveryDate = document.getElementById(
+    "delivery_date"
+        ).value
+
+        if (!deliveryDate) {
+
+            alert("Selecciona fecha de entrega")
+
+            return
+}
 
     let formData = new FormData()
 
@@ -1227,6 +1304,11 @@ async function saveQuotation() {
     )
 
     formData.append(
+    "delivery_date",
+    deliveryDate
+    )
+
+    formData.append(
         "iva",
         iva
     )
@@ -1242,6 +1324,14 @@ async function saveQuotation() {
             quotationItems
         )
     )
+    if (designFile) {
+
+    formData.append(
+        "design_file",
+        designFile
+    )
+
+    }
 
     let url = "/quotations/create"
 
