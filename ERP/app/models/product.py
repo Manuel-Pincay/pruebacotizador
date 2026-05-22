@@ -30,7 +30,7 @@ class Product(Base):
     price = Column(Float)
 
     cost = Column(Float)
-
+    theme = Column(String)
     stock = Column(Integer)
 
     custom = Column(Boolean)

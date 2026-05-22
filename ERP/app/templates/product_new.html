@@ -2,7 +2,7 @@
 
 {% block content %}
 
-<h1 class="text-3xl font-bold mb-6">
+<h1 class="text-2xl md:text-3xl font-bold mb-6">
     Nuevo Producto
 </h1>
 
@@ -12,7 +12,7 @@
     class="bg-white p-8 rounded-xl shadow"
 >
 
-    <div class="grid grid-cols-3 gap-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
 
         <div>
 
@@ -113,6 +113,20 @@
             >
 
         </div>
+        <div>
+
+    <label class="block mb-2 font-medium">
+        Temática
+    </label>
+
+    <input
+        type="text"
+        name="theme"
+        class="w-full border rounded-xl p-3"
+        placeholder="Feliz Cumpleaños, Baby Shower..."
+    >
+
+</div>
 
         <div>
 

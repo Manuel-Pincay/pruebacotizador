@@ -143,7 +143,7 @@ def search_products(
 
         "measure": product.size or "",
 
-        "shape": product.shape if hasattr(product, "shape") else "",
+        "theme": product.theme or "",
 
         "color": product.color or "",
 
@@ -172,7 +172,7 @@ async def create_product(
     description: str = Form(""),
 
     category: str = Form(""),
-
+    theme: str = Form(""),
     material: str = Form(""),
 
     color: str = Form(""),
@@ -180,7 +180,6 @@ async def create_product(
     size: str = Form(""),
 
     thickness: str = Form(""),
-
     price: float = Form(...),
 
     cost: float = Form(...),
@@ -235,6 +234,7 @@ async def create_product(
         name=name,
 
         description=description,
+        theme=theme,
 
         category=category,
 
@@ -253,6 +253,7 @@ async def create_product(
         stock=stock,
 
         custom=True if custom == "yes" else False,
+        
 
         image=image_name
 
@@ -327,6 +328,7 @@ async def update_product(
     name: str = Form(...),
 
     description: str = Form(""),
+    theme: str = Form(""),
 
     category: str = Form(""),
 
@@ -368,6 +370,8 @@ async def update_product(
         product.code = code
         product.name = name
         product.description = description
+        product.material = material
+        product.theme = theme
         product.category = category
         product.material = material
         product.color = color
@@ -455,4 +459,24 @@ async def delete_product(
             """,
             status_code=500
         )
-    
+
+@router.get("/api/list")
+async def products_api(
+    db: Session = Depends(get_db)
+):
+
+    products = db.query(Product).all()
+
+    return [
+        {
+            "id": product.id,
+            "name": product.name,
+            "theme": product.theme,
+            "material": product.material,
+            "color": product.color,
+            "size": product.size,
+            "price": product.price,
+            "stock": product.stock
+        }
+        for product in products
+    ]

@@ -194,6 +194,7 @@ async def move_order(
 async def update_production(
     order_id: int,
     designer: str = Form(""),
+    
     fabricator: str = Form(""),
     priority: str = Form("media"),
     observations: str = Form(""),

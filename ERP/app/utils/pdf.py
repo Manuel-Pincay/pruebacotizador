@@ -153,7 +153,7 @@ def generate_quotation_pdf(
 
             item.measure or "-",
 
-            item.shape or "-",
+            item.theme or "-",
 
             item.color or "-",
 

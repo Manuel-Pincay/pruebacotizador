@@ -87,7 +87,7 @@
 
         <!-- HEADER -->
 
-        <div class="grid grid-cols-3 border-b-2 border-black">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 border-b-2 border-black">
 
             <!-- LOGO -->
 
@@ -115,7 +115,7 @@
                     DESTINATARIO:
                 </div>
 
-                <div class="text-3xl font-black uppercase">
+                <div class="text-2xl md:text-3xl font-black uppercase">
                     {{ shipment.customer_name }}
                 </div>
 
@@ -173,7 +173,7 @@
 
         <!-- CONTENT -->
 
-        <div class="grid grid-cols-2">
+        <div class="grid grid-cols-1 md:grid-cols-2">
 
             <!-- LEFT -->
 
@@ -187,7 +187,7 @@
                         GUÍA:
                     </div>
 
-                    <div class="text-3xl font-black mt-2">
+                    <div class="text-2xl md:text-3xl font-black mt-2">
 
                         {{ shipment.guide_number }}
 
@@ -215,7 +215,7 @@
                         BULTOS:
                     </div>
 
-                    <div class="text-3xl font-black mt-2">
+                    <div class="text-2xl md:text-3xl font-black mt-2">
 
                         {{ shipment.boxes }}
 

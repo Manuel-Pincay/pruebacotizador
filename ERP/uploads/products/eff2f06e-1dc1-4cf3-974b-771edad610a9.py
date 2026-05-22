@@ -31,7 +31,7 @@ if original is None:
 
 # ===== REDIMENSIONAR PARA VISUAL =====
 max_width = 900
-h, w = original.shape[:2]
+h, w = original.theme[:2]
 
 if w > max_width:
     scale = max_width / w
@@ -80,7 +80,7 @@ while True:
             print("⚠️ Primero selecciona una zona")
             continue
 
-        mask = np.zeros(original.shape[:2], np.uint8)
+        mask = np.zeros(original.theme[:2], np.uint8)
 
         # Convertir coordenadas a tamaño real
         x1 = int(min(ix, fx) / scale)
@@ -92,8 +92,8 @@ while True:
         padding = 30
         x1 = max(0, x1 - padding)
         y1 = max(0, y1 - padding)
-        x2 = min(original.shape[1], x2 + padding)
-        y2 = min(original.shape[0], y2 + padding)
+        x2 = min(original.theme[1], x2 + padding)
+        y2 = min(original.theme[0], y2 + padding)
 
         mask[y1:y2, x1:x2] = 255
 

@@ -2,11 +2,11 @@
 
 {% block content %}
 
-<div class="grid grid-cols-12 gap-6">
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
     <!-- LEFT -->
 
-    <div class="col-span-8">
+    <div class="xl:col-span-8 min-w-0">
 
         <!-- HEADER -->
 
@@ -87,11 +87,11 @@
 
             <!-- SEARCH -->
 
-            <div class="grid grid-cols-12 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
 
                 <!-- PRODUCT -->
 
-                <div class="col-span-6">
+                <div class="md:col-span-6">
 
                     <div class="relative">
 
@@ -119,9 +119,9 @@
                                         <!-- PRODUCT PARAMETERS -->
 
                     <div
-                        id="product_parameters"
-                        class="grid grid-cols-4 gap-4 mt-4 hidden"
-                    >
+    id="product_parameters"
+    class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4 hidden"
+>
 
                         <div>
 
@@ -146,7 +146,7 @@
 
                             <input
                                 type="text"
-                                id="shape"
+                                id="theme"
                                 class="w-full border rounded-xl p-3 bg-gray-100"
                                 readonly
                             >
@@ -193,7 +193,7 @@
 
                 <!-- QUANTITY -->
 
-                <div class="col-span-2">
+                <div class="md:col-span-2">
 
                     <input
                         type="number"
@@ -207,7 +207,7 @@
 
                 <!-- PRICE -->
 
-                <div class="col-span-2">
+                <div class="md:col-span-2">
 
                     <input
                         type="number"
@@ -220,7 +220,7 @@
 
                 <!-- BUTTON -->
 
-                <div class="col-span-2">
+                <div class="md:col-span-2">
 
                     <button
                         onclick="addInventoryItem()"
@@ -250,7 +250,9 @@
 
         <div class="bg-white rounded-2xl shadow overflow-hidden">
 
-            <table class="w-full">
+            <div class="overflow-x-auto">
+
+                 <table class="w-full min-w-[1000px]">
 
                 <thead class="bg-gray-100">
 
@@ -294,13 +296,14 @@
 
                 </tr>
 
-            </thead>
+                </thead>
 
                 <tbody id="quotation_items">
 
                 </tbody>
 
-            </table>
+                </table>
+            </div>
 
         </div>
 
@@ -308,9 +311,9 @@
 
     <!-- RIGHT -->
 
-    <div class="col-span-4">
+    <div class="xl:col-span-4">
 
-        <div class="bg-white rounded-2xl shadow p-6 sticky top-6">
+        <div class="bg-white rounded-2xl shadow p-4 md:p-6 xl:sticky xl:top-6">
 
             <h2 class="text-3xl font-bold mb-6">
 
@@ -496,7 +499,7 @@
     class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50"
 >
 
-    <div class="bg-white rounded-2xl p-8 w-[700px]">
+    <div class="bg-white rounded-2xl p-6 md:p-8 w-full max-w-[700px] mx-4">
 
         <div class="flex justify-between items-center mb-6">
 
@@ -538,7 +541,7 @@
             >
 
             <input
-                id="custom_shape"
+                id="custom_theme"
                 placeholder="Forma"
                 class="border rounded-xl p-3"
             >
@@ -751,8 +754,8 @@ function selectProduct(product) {
     ).value = product.measure || "-"
 
     document.getElementById(
-        "shape"
-    ).value = product.shape || "-"
+    "theme"
+    ).value = product.theme || "-"
 
     document.getElementById(
         "color"
@@ -826,8 +829,8 @@ function addInventoryItem() {
         "measure"
     ).value,
 
-    shape: document.getElementById(
-        "shape"
+    theme: document.getElementById(
+        "theme"
     ).value,
 
     color: document.getElementById(
@@ -893,8 +896,8 @@ function addCustomItem() {
         "custom_measure"
     ).value,
 
-    shape: document.getElementById(
-        "custom_shape"
+    theme: document.getElementById(
+        "custom_theme"
     ).value,
 
     color: document.getElementById(
@@ -967,7 +970,7 @@ function renderItems() {
 
                 <td class="p-4">
 
-                    ${item.shape || "-"}
+                    ${item.theme || "-"}
 
                 </td>
 
@@ -1195,7 +1198,7 @@ function clearInventoryFields() {
     ).value = ""
 
     document.getElementById(
-        "shape"
+        "theme"
     ).value = ""
 
     document.getElementById(
@@ -1221,7 +1224,7 @@ function clearCustomFields() {
     ).value = ""
 
     document.getElementById(
-        "custom_shape"
+        "custom_theme"
     ).value = ""
 
     document.getElementById(

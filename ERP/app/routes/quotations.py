@@ -903,8 +903,8 @@ async def create_quotation(
                 ""
             ),
 
-            shape=item.get(
-                "shape",
+            theme=item.get(
+                "theme",
                 ""
             ),
 

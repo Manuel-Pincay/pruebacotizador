@@ -41,7 +41,7 @@ class QuotationItem(Base):
     # PERSONALIZADOS
     measure = Column(String)
 
-    shape = Column(String)
+    theme = Column(String)
 
     color = Column(String)
 

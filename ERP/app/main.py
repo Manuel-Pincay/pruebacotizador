@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-
+import socket
 
 from app.database import Base, engine, SessionLocal
 
