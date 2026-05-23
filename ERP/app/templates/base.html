@@ -1,314 +1,261 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
+  <head>
+    {% set global_config = inject_global_config() %}
+    <meta charset="UTF-8" />
 
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>
-        INNOVA ARTE ERP
+      {{ global_config.config.company_name if global_config.config else "SISTEMA
+      ERP" }} ERP
     </title>
-
     <script src="https://cdn.tailwindcss.com"></script>
+    {% set _cfg = inject_global_config() %}
+    <style>
+      :root {
+        --primary: {{ _cfg.config.primary_color if _cfg.config else '#7C3AED' }};
+        --secondary: {{ _cfg.config.secondary_color if _cfg.config else '#E9D5FF' }};
+        --accent: {{ _cfg.config.accent_color if _cfg.config else '#4C1D95' }};
+        --font-color: {{ _cfg.config.font_color if _cfg.config else '#333333' }};
+      }
 
-</head>
+      /* Sidebar gradient */
+      #sidebar {
+        background: linear-gradient(to bottom, var(--primary), var(--secondary)) !important;
+      }
 
-<body class="bg-gray-100">
+      /* Override common Tailwind purple classes to use configured colors */
+      .bg-purple-700 { background-color: var(--primary) !important; }
+      .hover\:bg-purple-800:hover { background-color: var(--accent) !important; }
+      .text-purple-200 { color: var(--secondary) !important; }
+      .border-purple-700 { border-color: var(--primary) !important; }
+
+      /* Buttons */
+      .btn-primary { background-color: var(--primary) !important; color: white !important; }
+      .btn-primary:hover { filter: brightness(0.9); }
+      .btn-secondary { background-color: var(--secondary) !important; color: black !important; }
+
+      /* Links/Accent */
+      a { color: inherit; }
+      a:hover { color: var(--accent); }
+    </style>
+  </head>
+
+  <body class="bg-gray-100">
     <button
-    onclick="toggleSidebar()"
-    class="md:hidden fixed top-4 left-4 z-[9999] bg-purple-700 text-white w-12 h-12 rounded-xl shadow-xl"
->
-
-    ☰
-
-</button>
-
-    <div class="flex min-h-screen relative">
-
-        <!-- SIDEBAR -->
-
-        <aside id="sidebar" class="fixed md:relative z-50 md:z-auto w-72 h-full bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300">
-
-            <!-- LOGO -->
-
-            <div class="p-6 border-b border-purple-700">
-
-                <h1 class="text-2xl md:text-3xl font-bold tracking-wide">
-                    INNOVA
-                </h1>
-
-                <div class="text-purple-200 text-sm mt-1">
-                    ERP Empresarial
-                </div>
-
-            </div>
-
-            <!-- NAVIGATION -->
-
-            <nav class="flex-1 p-4 space-y-3 overflow-y-auto">
-
-    <!-- DASHBOARD -->
-
-    <a
-        href="/"
-        class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+      onclick="toggleSidebar()"
+      class="md:hidden fixed top-4 left-4 z-[9999] bg-purple-700 text-white w-12 h-12 rounded-xl shadow-xl flex items-center justify-center"
     >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 6h16M4 12h16M4 18h16"
+        />
+      </svg>
+    </button>
 
-        <span>
-            📊
-        </span>
+    <div class="flex min-h-screen w-full">
+      <!-- SIDEBAR -->
 
-        <span>
-            Dashboard
-        </span>
+      <aside
+        id="sidebar"
+        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-72 h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300"
+      >
+        <!-- LOGO -->
 
-    </a>
+        <div class="p-6 border-b border-purple-700">
+          <h1 class="text-2xl md:text-3xl font-bold tracking-wide">
+            {{ global_config.config.company_name if global_config.config else
+            "SISTEMA ERP" | truncate(10, True) }}
+          </h1>
 
-    <!-- COTIZACIONES -->
+          <div class="text-purple-200 text-sm mt-1">ERP Empresarial</div>
+        </div>
 
-    <a
-        href="/quotations"
-        class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-    >
+        <!-- NAVIGATION -->
 
-        <span>
-            📄
-        </span>
+        <nav class="flex-1 p-4 space-y-3 overflow-y-auto">
+          <!-- DASHBOARD -->
 
-        <span>
-            Cotizaciones
-        </span>
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
 
-    </a>
+            <span> Dashboard </span>
+          </a>
 
-    <!-- KANBAN -->
+          <!-- COTIZACIONES -->
 
-    <a
-        href="/production/kanban"
-        class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-    >
+          <a
+            href="/quotations"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📄 </span>
 
-        <span>
-            🗂️
-        </span>
+            <span> Cotizaciones </span>
+          </a>
 
-        <span>
-            Kanban
-        </span>
+          <!-- KANBAN -->
 
-    </a>
+          <a
+            href="/production/kanban"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 🗂️ </span>
 
-    <!-- BASE DE DATOS -->
+            <span> Kanban </span>
+          </a>
 
-    <div>
+          <!-- BASE DE DATOS -->
 
-        <button
-            onclick="toggleSidebarMenu('databaseMenu')"
-            class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-        >
+          <div>
+            <button
+              onclick="toggleSidebarMenu('databaseMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> 📚 </span>
 
-            <div class="flex items-center gap-3">
+                <span> Base de Datos </span>
+              </div>
 
-                <span>
-                    📚
-                </span>
+              <span> ▼ </span>
+            </button>
 
-                <span>
-                    Base de Datos
-                </span>
-
-            </div>
-
-            <span>
-                ▼
-            </span>
-
-        </button>
-
-        <div
-            id="databaseMenu"
-            class="hidden ml-6 mt-2 space-y-2"
-        >
-
-            <a
+            <div id="databaseMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
                 href="/clients"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-            >
+              >
                 👥 Clientes
-            </a>
+              </a>
 
-            <a
+              <a
                 href="/products"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-            >
+              >
                 📦 Productos
-            </a>
+              </a>
 
-        </div>
-
-    </div>
-
-    <!-- PRODUCCION -->
-
-    <div>
-
-        <button
-            onclick="toggleSidebarMenu('productionMenu')"
-            class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-        >
-
-            <div class="flex items-center gap-3">
-
-                <span>
-                    🏭
-                </span>
-
-                <span>
-                    Producción
-                </span>
-
+              <a
+                href="/imports"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                📥 Importaciones
+              </a>
             </div>
+          </div>
 
-            <span>
-                ▼
-            </span>
+          <!-- PRODUCCION -->
 
-        </button>
+          <div>
+            <button
+              onclick="toggleSidebarMenu('productionMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> 🏭 </span>
 
-        <div
-            id="productionMenu"
-            class="hidden ml-6 mt-2 space-y-2"
-        >
+                <span> Producción </span>
+              </div>
 
-            <a
+              <span> ▼ </span>
+            </button>
+
+            <div id="productionMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
                 href="/production"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-            >
+              >
                 🏭 Producción
-            </a>
+              </a>
 
-            <a
+              <a
                 href="/production/calendar"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-            >
+              >
                 📅 Calendario
-            </a>
+              </a>
 
-            <a
+              <a
                 href="/shipments/"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-            >
+              >
                 🚚 Envíos
-            </a>
-
-        </div>
-
-    </div>
-
-    <!-- SISTEMA -->
-
-    <div>
-
-        <button
-            onclick="toggleSidebarMenu('systemMenu')"
-            class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-        >
-
-            <div class="flex items-center gap-3">
-
-                <span>
-                    ⚙️
-                </span>
-
-                <span>
-                    Sistema
-                </span>
-
+              </a>
             </div>
+          </div>
 
-            <span>
-                ▼
-            </span>
+          <!-- SISTEMA -->
 
-        </button>
+          <div>
+            <button
+              onclick="toggleSidebarMenu('systemMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> ⚙️ </span>
 
-        <div
-            id="systemMenu"
-            class="hidden ml-6 mt-2 space-y-2"
-        >
+                <span> Sistema </span>
+              </div>
 
-            <a
+              <span> ▼ </span>
+            </button>
+
+            <div id="systemMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
                 href="/users"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-            >
+              >
                 🔐 Usuarios
-            </a>
-
-        </div>
-
-    </div>
-
-            </nav>
-            <!-- FOOTER -->
-
-            <div class="p-4 border-t border-purple-700">
-
-                <a
-                    href="/logout"
-                    class="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl transition"
-                >
-
-                    <span>
-                        🚪
-                    </span>
-
-                    <span>
-                        Cerrar sesión
-                    </span>
-
-                </a>
-
+              </a>
             </div>
+          </div>
+        </nav>
+        <!-- FOOTER -->
 
-        </aside>
+        <div class="p-4 border-t border-purple-700">
+          <a
+            href="/logout"
+            class="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl transition"
+          >
+            <span> 🚪 </span>
 
-        <!-- MAIN -->
+            <span> Cerrar sesión </span>
+          </a>
+        </div>
+      </aside>
 
-       <main class="flex-1 p-4 md:p-8 overflow-auto w-full">
+      <!-- MAIN -->
 
-            {% block content %}
-            {% endblock %}
-
-        </main>
-
+      <main class="flex-1 p-4 pt-24 md:pt-8 md:p-8 overflow-x-hidden">
+        {% block content %} {% endblock %}
+      </main>
     </div>
 
     <script>
+      function toggleSidebarMenu(id) {
+        const menu = document.getElementById(id);
 
-function toggleSidebarMenu(id) {
-    const menu = document.getElementById(id)
+        menu.classList.toggle("hidden");
+      }
 
-    menu.classList.toggle("hidden")    
+      function toggleSidebar() {
+        const sidebar = document.getElementById("sidebar");
 
-}
-
-function toggleSidebar() {
-
-    const sidebar = document.getElementById(
-        "sidebar"
-    )
-
-    sidebar.classList.toggle(
-        "-translate-x-full"
-    )
-}
-
-</script>
-</body>
-
+        sidebar.classList.toggle("-translate-x-full");
+      }
+    </script>
+  </body>
 </html>

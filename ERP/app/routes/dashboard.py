@@ -16,12 +16,16 @@ from app.models.client import Client
 from app.models.product import Product
 from app.models.quotation import Quotation
 from app.models.production_order import ProductionOrder
+from app.models.company_config import CompanyConfig
 
 router = APIRouter()
 
 templates = Jinja2Templates(
     directory="app/templates"
 )
+
+from app.utils.context import get_global_config
+templates.env.globals['inject_global_config'] = get_global_config
 
 
 @router.get(
@@ -60,6 +64,9 @@ async def dashboard(
         Quotation.id.desc()
     ).limit(5).all()
 
+    config = db.query(CompanyConfig).first()
+    company_name = config.company_name if config else "SISTEMA ERP"
+
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
@@ -68,6 +75,7 @@ async def dashboard(
             "total_products": total_products,
             "total_quotations": total_quotations,
             "production_pending": production_pending,
-            "recent_quotations": recent_quotations
+            "recent_quotations": recent_quotations,
+            "company_name": company_name
         }
     )

@@ -4,6 +4,7 @@ from datetime import datetime
 from datetime import date
 from datetime import timedelta
 
+
 from fastapi import UploadFile
 from fastapi import File
 
@@ -19,6 +20,7 @@ from datetime import timedelta
 
 from app.models import quotation
 from app.utils.pdf import generate_quotation_pdf
+from app.models.company_config import CompanyConfig
 
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
@@ -50,6 +52,9 @@ templates = Jinja2Templates(
     directory="app/templates"
 )
 
+from app.utils.context import get_global_config
+templates.env.globals['inject_global_config'] = get_global_config
+
 
 @router.get(
     "/new",
@@ -72,14 +77,20 @@ async def new_quotation(
 
     products = db.query(Product).all()
 
+    config = db.query(
+        CompanyConfig
+    ).first()
+
     return templates.TemplateResponse(
-    request=request,
-    name="quotation_new.html",
-    context={
-        "clients": clients,
-        "products": products
-    }
-)
+        request=request,
+        name="quotation_new.html",
+        context={
+            "clients": clients,
+            "products": products,
+            "config": config
+        }
+
+    )
 
 @router.get(
     "/",
@@ -265,13 +276,9 @@ async def delete_quotation(
     response_class=HTMLResponse
 )
 async def edit_quotation_page(
-
     quotation_id: int,
-
     request: Request,
-
     db: Session = Depends(get_db)
-
 ):
 
     user = role_required(
@@ -304,8 +311,10 @@ async def edit_quotation_page(
         )
 
     clients = db.query(Client).all()
-
     products = db.query(Product).all()
+    config = db.query(
+        CompanyConfig
+    ).first()
 
     items = db.query(
         QuotationItem
@@ -321,15 +330,10 @@ async def edit_quotation_page(
         items_json.append({
 
             "type": "inventory",
-
             "product_id": None,
-
             "quantity": item.quantity,
-
             "detail": item.detail,
-
             "price": item.unit_price,
-
             "total": item.total
 
         })
@@ -343,15 +347,11 @@ async def edit_quotation_page(
         context={
 
             "clients": clients,
-
             "products": products,
-
+            "config": config,
             "quotation": quotation,
-
             "items_json": json.dumps(items_json),
-
             "edit_mode": True
-
         }
 
     )
@@ -424,6 +424,9 @@ async def update_quotation(
         quotation_item = QuotationItem(
 
             quotation_id=quotation.id,
+            product_id=item.get(
+                "product_id"
+            ),
 
             quantity=item.get(
                 "quantity",
@@ -565,10 +568,9 @@ async def production_quotation(
 
                 movement_type="salida",
 
-                quantity=item.quantity,
+                quantity=-item.quantity,
 
-                previous_stock=previous_stock,
-
+                previous_stock = product.stock or 0,
                 new_stock=new_stock,
 
                 reason=f"Cotización #{quotation.id} → Producción"
@@ -581,25 +583,48 @@ async def production_quotation(
         # UPDATE QUOTATION
         # =====================================
 
+        if quotation.status == "produccion":
+
+            return RedirectResponse(
+                url="/production/",
+                status_code=302
+            )
+
+        # =====================================
+        # UPDATE QUOTATION STATUS
+        # =====================================
+
         quotation.status = "produccion"
 
         # =====================================
-        # CREATE PRODUCTION ORDER
+        # CHECK EXISTING ORDER
         # =====================================
 
-        production_order = ProductionOrder(
+        existing_order = db.query(
+            ProductionOrder
+        ).filter(
+            ProductionOrder.quotation_id == quotation.id
+        ).first()
 
-            quotation_id=quotation.id,
+        # =====================================
+        # CREATE ONLY IF NOT EXISTS
+        # =====================================
 
-            status="pendiente",
+        if not existing_order:
 
-            priority="media",
+            production_order = ProductionOrder(
 
-            delivery_date=quotation.delivery_date
+                quotation_id=quotation.id,
 
-        )
+                status="pendiente",
 
-        db.add(production_order)
+                priority="media",
+
+                delivery_date=quotation.delivery_date
+
+            )
+
+            db.add(production_order)
 
         # =====================================
         # SAVE
@@ -611,6 +636,7 @@ async def production_quotation(
             url="/production/",
             status_code=302
         )
+
 
     except Exception as e:
 
@@ -647,16 +673,16 @@ async def shipping_quotation(
         Quotation.id == quotation_id
     ).first()
 
-    quotation.status = "enviada"
-
-    db.commit()
-
     if quotation.status != "produccion":
 
         return RedirectResponse(
         url=f"/quotations/{quotation_id}",
         status_code=302
     )
+
+    quotation.status = "enviada"
+
+    db.commit()
 
 
 @router.get("/{quotation_id}/delivered")
@@ -754,7 +780,8 @@ async def quotation_pdf(
             quotation,
             items,
             client,
-            filename
+            filename,
+            db
         )
 
         # =====================================
@@ -888,6 +915,10 @@ async def create_quotation(
 
             quotation_id=quotation.id,
 
+            product_id=item.get(
+                "product_id"
+            ),
+
             quantity=item.get(
                 "quantity",
                 1
@@ -941,3 +972,17 @@ async def create_quotation(
         status_code=302
 
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+        

@@ -16,6 +16,7 @@ from app.auth.auth_handler import login_required, role_required
 from app.models.shipment import Shipment
 from app.models.quotation import Quotation
 from app.models.client import Client
+from app.models.company_config import CompanyConfig
 
 
 router = APIRouter(
@@ -26,6 +27,9 @@ router = APIRouter(
 templates = Jinja2Templates(
     directory="app/templates"
 )
+
+from app.utils.context import get_global_config
+templates.env.globals['inject_global_config'] = get_global_config
 
 
 # =========================================
@@ -234,11 +238,15 @@ async def shipment_label(
             status_code=302
         )
 
+    config = db.query(CompanyConfig).first()
+    company_name = config.company_name if config else "SISTEMA ERP"
+
     return templates.TemplateResponse(
         request=request,
         name="shipment_label.html",
         context={
-            "shipment": shipment
+            "shipment": shipment,
+            "company_name": company_name
         }
     )
 

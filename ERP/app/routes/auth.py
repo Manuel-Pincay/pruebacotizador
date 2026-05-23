@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 
 from app.models.user import User
+from app.models.company_config import CompanyConfig
 
 from app.auth.security import verify_password
 
@@ -22,17 +23,23 @@ templates = Jinja2Templates(
     directory="app/templates"
 )
 
+from app.utils.context import get_global_config
+templates.env.globals['inject_global_config'] = get_global_config
+
 
 @router.get(
     "/login",
     response_class=HTMLResponse
 )
-async def login_page(request: Request):
+async def login_page(request: Request, db: Session = Depends(get_db)):
+
+    config = db.query(CompanyConfig).first()
+    company_name = config.company_name if config else "SISTEMA ERP"
 
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={}
+        context={"company_name": company_name}
     )
 
 
@@ -50,11 +57,15 @@ async def login(
 
     if not user:
 
+        config = db.query(CompanyConfig).first()
+        company_name = config.company_name if config else "SISTEMA ERP"
+
         return templates.TemplateResponse(
             request=request,
             name="login.html",
             context={
-                "error": "Usuario incorrecto"
+                "error": "Usuario incorrecto",
+                "company_name": company_name
             }
         )
 
@@ -65,11 +76,15 @@ async def login(
 
     if not valid:
 
+        config = db.query(CompanyConfig).first()
+        company_name = config.company_name if config else "SISTEMA ERP"
+
         return templates.TemplateResponse(
             request=request,
             name="login.html",
             context={
-                "error": "Contraseña incorrecta"
+                "error": "Contraseña incorrecta",
+                "company_name": company_name
             }
         )
 

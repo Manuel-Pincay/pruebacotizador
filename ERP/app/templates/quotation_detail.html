@@ -1,398 +1,337 @@
-{% extends 'base.html' %}
-
-{% block content %}
+{% extends 'base.html' %} {% block content %}
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
 <div class="flex justify-between items-center mb-8">
+  <div>
+    <h1 class="text-2xl md:text-3xl font-bold">
+      Cotización #{{ quotation.id }}
+    </h1>
 
-    <div>
-
-        <h1 class="text-2xl md:text-3xl font-bold">
-            Cotización #{{ quotation.id }}
-        </h1>
-
-        <div class="text-gray-500 mt-1">
-            {{ quotation.created_at.strftime('%d/%m/%Y') }}
-        </div>
-
+    <div class="text-gray-500 mt-1">
+      {{ quotation.created_at.strftime('%d/%m/%Y') }}
     </div>
+  </div>
 
-    <div class="flex gap-3 flex-wrap">
+  <div class="flex gap-3 flex-wrap">
+    <!-- APROBAR -->
 
-        <!-- APROBAR -->
-
-        {% if quotation.status == 'pendiente' %}
-
-        <a
-            href="/quotations/{{ quotation.id }}/approve"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl transition"
-        >
-            Aprobar
-        </a>
-
-        {% endif %}
-
-        <!-- PRODUCCION -->
-
-        {% if quotation.status == 'aprobada' %}
-
-        <a
-            href="/quotations/{{ quotation.id }}/production"
-            class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl transition"
-        >
-            Producción
-        </a>
-
-        {% endif %}
-
-        <!-- ENVIAR -->
-
-        {% if quotation.status == 'produccion' %}
-
-        <a
-            href="/quotations/{{ quotation.id }}/shipping"
-            class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl transition"
-        >
-            Enviar
-        </a>
-
-        {% endif %}
-
-        <!-- ENTREGADA -->
-
-        {% if quotation.status == 'enviada' %}
-
-        <a
-            href="/quotations/{{ quotation.id }}/delivered"
-            class="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl transition"
-        >
-            Entregada
-        </a>
-
-        {% endif %}
-
-        <!-- PDF -->
-
-        <a
-            href="/quotations/{{ quotation.id }}/pdf"
-            class="bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-xl transition"
-        >
-            Descargar PDF
-        </a>
-
-        <!-- PRINT -->
-
-        <button
-            onclick="window.print()"
-            class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-3 rounded-xl transition"
-        >
-            Imprimir
-        </button>
-
-        <!-- COPY IMAGE -->
-
-        <button
-            onclick="copyQuotationImage()"
-            class="bg-green-500 hover:bg-green-600 text-white px-5 py-3 rounded-xl transition"
-        >
-            Copiar Imagen
-        </button>
-
-    </div>
-
-</div>
-
-<div
-    id="quotation_capture"
-    class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
->
-
-    <div class="col-span-2">
-
-        <div class="bg-white rounded-2xl shadow overflow-hidden">
-
-            <table class="w-full">
-
-                <thead class="bg-gray-100">
-
-                    <tr>
-
-                        <th class="text-left p-4">
-                            Producto
-                        </th>
-
-                        <th class="text-left p-4">
-                            Cantidad
-                        </th>
-
-                        <th class="text-left p-4">
-                            Precio
-                        </th>
-
-                        <th class="text-left p-4">
-                            Subtotal
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    {% for item in quotation.items %}
-
-                    <tr class="border-t">
-
-                        <td class="p-4">
-                            {{ item.detail }}
-                        </td>
-
-                        <td class="p-4">
-                            {{ item.quantity }}
-                        </td>
-
-                        <td class="p-4">
-                            ${{ "%.2f"|format(item.unit_price) }}
-                        </td>
-
-                        <td class="p-4 font-bold text-purple-700">
-                            ${{ "%.2f"|format(item.total) }}
-                        </td>
-
-                    </tr>
-
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
-
-    <div>
-
-        <div class="bg-white p-5 rounded-2xl shadow">
-
-            <h2 class="text-2xl font-bold mb-5">
-                Cliente
-            </h2>
-
-            <div class="space-y-3">
-
-                <div>
-                    <div class="text-sm text-gray-500">
-                        Nombre
-                    </div>
-
-                    <div class="font-semibold">
-                        {{ quotation.client.name }}
-                    </div>
-                </div>
-
-                <div>
-                    <div class="text-sm text-gray-500">
-                        Teléfono
-                    </div>
-
-                    <div class="font-semibold">
-                        {{ quotation.client.phone }}
-                    </div>
-                </div>
-
-                <div>
-                    <div class="text-sm text-gray-500">
-                        Dirección
-                    </div>
-
-                    <div class="font-semibold">
-                        {{ quotation.client.address }}
-                    </div>
-                </div>
-
-            </div>
-
-            {% if quotation.design_file %}
-
-
-
-    <h2 class="text-2xl font-bold mb-4">
-
-        Diseño / Archivo
-
-    </h2>
-
-    <!-- IMAGE -->
-
-    {% if quotation.design_file.endswith(
-        ('.png', '.jpg', '.jpeg')
-    ) %}
-
-    <img
-        src="/uploads/designs/{{ quotation.design_file }}"
-        class="max-h-[500px] rounded-xl border"
-    >
-
-    {% else %}
+    {% if quotation.status == 'pendiente' %}
 
     <a
-        href="/uploads/designs/{{ quotation.design_file }}"
-        target="_blank"
-        class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl inline-block"
+      href="/quotations/{{ quotation.id }}/approve"
+      class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl transition"
     >
-
-        📎 Abrir Archivo
-
+      Aprobar
     </a>
 
     {% endif %}
 
+    <!-- PRODUCCION -->
+
+    {% if quotation.status == 'aprobada' %}
+
+    <a
+      href="/quotations/{{ quotation.id }}/production"
+      class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl transition"
+    >
+      Producción
+    </a>
+
+    {% endif %}
+
+    <!-- ENVIAR -->
+
+    {% if quotation.status == 'produccion' %}
+
+    <a
+      href="/quotations/{{ quotation.id }}/shipping"
+      class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-3 rounded-xl transition"
+    >
+      Enviar
+    </a>
+
+    {% endif %}
+
+    <!-- ENTREGADA -->
+
+    {% if quotation.status == 'enviada' %}
+
+    <a
+      href="/quotations/{{ quotation.id }}/delivered"
+      class="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl transition"
+    >
+      Entregada
+    </a>
+
+    {% endif %}
+
+    <!-- PDF -->
+
+    <a
+      href="/quotations/{{ quotation.id }}/pdf"
+      class="bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-xl transition"
+    >
+      Descargar PDF
+    </a>
+
+    <!-- PRINT -->
+
+    <button
+      onclick="window.print()"
+      class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-3 rounded-xl transition"
+    >
+      Imprimir
+    </button>
+
+    <!-- COPY IMAGE -->
+
+    <button
+      onclick="copyQuotationImage()"
+      class="bg-green-500 hover:bg-green-600 text-white px-5 py-3 rounded-xl transition"
+    >
+      Copiar Imagen
+    </button>
+  </div>
 </div>
 
-{% endif %}
+<div id="quotation_capture" class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+  <div class="xl:col-span-8">
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[900px]">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="text-left p-4">Producto</th>
+              <th class="text-left p-4">Temática</th>
 
-        </div>
+              <th class="text-left p-4">Medida</th>
 
-        <div class="bg-white p-5 rounded-2xl shadow mt-5">
+              <th class="text-left p-4">Color</th>
 
-            <h2 class="text-2xl font-bold mb-5">
-                Resumen
-            </h2>
+              <th class="text-left p-4">Cantidad</th>
 
-            <div class="flex justify-between mb-3">
+              <th class="text-left p-4">Precio</th>
 
-                <span>
-                    Subtotal
-                </span>
+              <th class="text-left p-4">Subtotal</th>
+            </tr>
+          </thead>
 
-                <span>
-                    ${{ "%.2f"|format(quotation.subtotal) }}
-                </span>
+          <tbody>
+            {% for item in quotation.items %}
 
-            </div>
+            <tr class="border-t">
+              <td class="p-4">{{ item.detail }}</td>
+              <td class="p-4">{{ item.theme or '-' }}</td>
 
-            <div class="flex justify-between mb-3">
+              <td class="p-4">{{ item.measure or '-' }}</td>
 
-                <span>
-                    Descuento
-                </span>
+              <td class="p-4">{{ item.color or '-' }}</td>
 
-                <span>
-                    {{ quotation.discount }}%
-                </span>
+              <td class="p-4">{{ item.quantity }}</td>
 
-            </div>
+              <td class="p-4">${{ "%.2f"|format(item.unit_price) }}</td>
 
-            <div class="flex justify-between mb-3">
+              <td class="p-4 font-bold text-purple-700">
+                ${{ "%.2f"|format(item.total) }}
+              </td>
+            </tr>
 
-                <span>
-                    IVA
-                </span>
-
-                <span>
-                    {{ quotation.iva }}%
-                </span>
-
-            </div>
-
-            <div class="border-t pt-4 flex justify-between text-2xl font-bold">
-
-                <span>
-                    Total
-                </span>
-
-                <span class="text-purple-700">
-                    ${{ "%.2f"|format(quotation.total) }}
-                </span>
-
-            </div>
-
-            <div class="mt-5">
-
-                {% if quotation.status == 'pendiente' %}
-
-                <span class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded-full">
-                    Pendiente
-                </span>
-
-                {% elif quotation.status == 'aprobada' %}
-
-                <span class="bg-blue-100 text-blue-700 px-4 py-2 rounded-full">
-                    Aprobada
-                </span>
-
-                {% elif quotation.status == 'produccion' %}
-
-                <span class="bg-purple-100 text-purple-700 px-4 py-2 rounded-full">
-                    Producción
-                </span>
-
-                {% elif quotation.status == 'enviada' %}
-
-                <span class="bg-orange-100 text-orange-700 px-4 py-2 rounded-full">
-                    Enviada
-                </span>
-
-                {% elif quotation.status == 'entregada' %}
-
-                <span class="bg-green-100 text-green-700 px-4 py-2 rounded-full">
-                    Entregada
-                </span>
-
-                {% endif %}
-
-            </div>
-
-        </div>
-
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
+    <div class="xl:col-span-4">
+      <div class="bg-white p-5 rounded-2xl shadow sticky top-6">
+        <h2 class="text-2xl font-bold mb-5">Cliente</h2>
+
+        <div class="space-y-3">
+          <div>
+            <div class="text-sm text-gray-500">Nombre</div>
+
+            <div class="font-semibold">{{ quotation.client.name }}</div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">Teléfono</div>
+
+            <div class="font-semibold">{{ quotation.client.phone }}</div>
+          </div>
+
+          <div>
+            <div class="text-sm text-gray-500">Dirección</div>
+
+            <div class="font-semibold">{{ quotation.client.address }}</div>
+          </div>
+        </div>
+        <div>
+          <div class="text-sm text-gray-500">Entrega</div>
+
+          <div class="font-semibold">
+            {{ quotation.delivery_date.strftime('%d/%m/%Y') if
+            quotation.delivery_date else '-' }}
+          </div>
+        </div>
+
+        {% if quotation.design_file %}
+
+        <h2 class="text-2xl font-bold mb-4">Diseño / Archivo</h2>
+
+        <!-- IMAGE -->
+
+        {% if quotation.design_file.endswith( ('.png', '.jpg', '.jpeg') ) %}
+
+        <img
+          src="/uploads/designs/{{ quotation.design_file }}"
+          class="max-h-[500px] rounded-xl border"
+        />
+
+        {% else %}
+
+        <a
+          href="/uploads/designs/{{ quotation.design_file }}"
+          target="_blank"
+          class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl inline-block"
+        >
+          📎 Abrir Archivo
+        </a>
+
+        {% endif %}
+      </div>
+
+      {% endif %}
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl shadow mt-5">
+      <h2 class="text-2xl font-bold mb-5">Resumen</h2>
+
+      <div class="flex justify-between mb-3">
+        <span> Subtotal </span>
+
+        <span> ${{ "%.2f"|format(quotation.subtotal) }} </span>
+      </div>
+
+      <div class="flex justify-between mb-3">
+        <span> Descuento </span>
+
+        <span> {{ quotation.discount }}% </span>
+      </div>
+
+      <div class="flex justify-between mb-3">
+        <span> IVA </span>
+
+        <span> {{ quotation.iva }}% </span>
+      </div>
+
+      <div class="border-t pt-4 flex justify-between text-2xl font-bold">
+        <span> Total </span>
+
+        <span class="text-purple-700">
+          ${{ "%.2f"|format(quotation.total) }}
+        </span>
+      </div>
+
+      <div class="mt-5">
+        {% if quotation.status == 'pendiente' %}
+
+        <span class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded-full">
+          Pendiente
+        </span>
+
+        {% elif quotation.status == 'aprobada' %}
+
+        <span class="bg-blue-100 text-blue-700 px-4 py-2 rounded-full">
+          Aprobada
+        </span>
+
+        {% elif quotation.status == 'produccion' %}
+
+        <span class="bg-purple-100 text-purple-700 px-4 py-2 rounded-full">
+          Producción
+        </span>
+
+        {% elif quotation.status == 'enviada' %}
+
+        <span class="bg-orange-100 text-orange-700 px-4 py-2 rounded-full">
+          Enviada
+        </span>
+
+        {% elif quotation.status == 'entregada' %}
+
+        <span class="bg-green-100 text-green-700 px-4 py-2 rounded-full">
+          Entregada
+        </span>
+
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl shadow mt-5">
+      <h2 class="text-xl font-bold mb-5">Estado</h2>
+
+      <div class="space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-4 h-4 rounded-full bg-yellow-400"></div>
+          <span>Pendiente</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div
+            class="w-4 h-4 rounded-full {% if quotation.status in ['aprobada', 'produccion', 'enviada', 'entregada'] %}bg-blue-500{% else %}bg-gray-300{% endif %}"
+          ></div>
+          <span>Aprobada</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div
+            class="w-4 h-4 rounded-full {% if quotation.status in ['produccion', 'enviada', 'entregada'] %}bg-purple-500{% else %}bg-gray-300{% endif %}"
+          ></div>
+          <span>Producción</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div
+            class="w-4 h-4 rounded-full {% if quotation.status in ['enviada', 'entregada'] %}bg-orange-500{% else %}bg-gray-300{% endif %}"
+          ></div>
+          <span>Enviada</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div
+            class="w-4 h-4 rounded-full {% if quotation.status == 'entregada' %}bg-green-500{% else %}bg-gray-300{% endif %}"
+          ></div>
+          <span>Entregada</span>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-
-async function copyQuotationImage() {
-
+  async function copyQuotationImage() {
     try {
+      const element = document.getElementById("quotation_capture");
 
-        const element = document.getElementById(
-            "quotation_capture"
-        )
+      const canvas = await html2canvas(element, {
+        scale: 2,
+      });
 
-        const canvas = await html2canvas(
-            element,
-            {
-                scale: 2
-            }
-        )
+      canvas.toBlob(async (blob) => {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "image/png": blob,
+          }),
+        ]);
 
-        canvas.toBlob(async (blob) => {
+        alert("Cotización copiada como imagen");
+      });
+    } catch (error) {
+      console.error(error);
 
-            await navigator.clipboard.write([
-
-                new ClipboardItem({
-                    "image/png": blob
-                })
-
-            ])
-
-            alert(
-                "Cotización copiada como imagen"
-            )
-
-        })
-
-    } catch(error) {
-
-        console.error(error)
-
-        alert(
-            "Error copiando imagen"
-        )
+      alert("Error copiando imagen");
     }
-}
-
+  }
 </script>
 
 {% endblock %}

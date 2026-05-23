@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="max-w-5xl mx-auto">
+
+    <div class="mb-10">
+
+        <h1 class="text-3xl font-bold">
+            Importador ERP
+        </h1>
+
+        <p class="text-gray-500 mt-2">
+            Importación masiva de clientes y productos
+        </p>
+
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+
+        <!-- CLIENTS -->
+
+        <div class="bg-white rounded-2xl shadow p-6">
+
+            <h2 class="text-2xl font-bold mb-4">
+                Clientes
+            </h2>
+
+            <div class="space-y-4">
+
+                <a
+                    href="/imports/clients/template"
+                    class="block w-full bg-purple-700 hover:bg-purple-800 text-white text-center py-3 rounded-xl"
+                >
+                    Descargar plantilla
+                </a>
+
+                <form
+                    action="/imports/clients/upload"
+                    method="POST"
+                    enctype="multipart/form-data"
+                >
+
+                    <input
+                        type="file"
+                        name="file"
+                        required
+                        class="w-full border rounded-xl p-3 mb-4"
+                    >
+
+                    <button
+                        class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl"
+                    >
+                        Importar clientes
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+        <!-- PRODUCTS -->
+
+        <div class="bg-white rounded-2xl shadow p-6">
+
+            <h2 class="text-2xl font-bold mb-4">
+                Productos
+            </h2>
+
+            <div class="space-y-4">
+
+                <a
+                    href="/imports/products/template"
+                    class="block w-full bg-purple-700 hover:bg-purple-800 text-white text-center py-3 rounded-xl"
+                >
+                    Descargar plantilla
+                </a>
+
+                <form
+                    action="/imports/products/upload"
+                    method="POST"
+                    enctype="multipart/form-data"
+                >
+
+                    <input
+                        type="file"
+                        name="file"
+                        required
+                        class="w-full border rounded-xl p-3 mb-4"
+                    >
+
+                    <button
+                        class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl"
+                    >
+                        Importar productos
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

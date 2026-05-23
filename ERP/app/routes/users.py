@@ -28,6 +28,9 @@ templates = Jinja2Templates(
     directory="app/templates"
 )
 
+from app.utils.context import get_global_config
+templates.env.globals['inject_global_config'] = get_global_config
+
 
 # =========================================
 # USERS LIST
