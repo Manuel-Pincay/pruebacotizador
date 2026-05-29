@@ -95,22 +95,14 @@ async def edit_client_page(
 async def update_client(
 
     client_id: int,
-
     name: str = Form(...),
-
     phone: str = Form(""),
-
     email: str = Form(""),
-
     address: str = Form(""),
-
     ruc_ci: str = Form(""),
     company: str = Form(""),
-
-    client_type: str = Form("particular"),
-
+    client_type: str = Form("Minorista"),
     observations: str = Form(""),
-
     db: Session = Depends(get_db)
 
 ):
@@ -128,6 +120,31 @@ async def update_client(
             return RedirectResponse(
                 url="/clients",
                 status_code=302
+            )
+        # VALIDAR CÉDULA/RUC DUPLICADO
+
+        existing_client = db.query(
+            Client
+        ).filter(
+            Client.ruc_ci == ruc_ci,
+            Client.id != client_id
+        ).first()
+
+        if existing_client:
+
+            return HTMLResponse(
+                content=f"""
+                <script>
+
+                    alert(
+                        "Ya existe otro cliente con la cédula/RUC: {ruc_ci}"
+                    )
+
+                    window.history.back()
+
+                </script>
+                """,
+                status_code=400
             )
 
         client.name = name
@@ -212,32 +229,82 @@ async def delete_client(
 
 @router.post("/new")
 async def create_client(
+
     name: str = Form(...),
+
     company: str = Form(""),
+
     ruc_ci: str = Form(""),
+
     phone: str = Form(""),
+
     email: str = Form(""),
+
     address: str = Form(""),
+
     client_type: str = Form(...),
+
     observations: str = Form(""),
+
     db: Session = Depends(get_db)
+
 ):
 
+    # =====================================
+    # VALIDATE EXISTING CLIENT
+    # =====================================
+
+    existing_client = db.query(
+        Client
+    ).filter(
+        Client.ruc_ci == ruc_ci
+    ).first()
+    if existing_client:
+
+        return HTMLResponse(
+        content=f"""
+        <script>
+
+            alert(
+                "Ya existe un cliente con la cédula/RUC: {ruc_ci}"
+            )
+
+            window.location.href = "/clients/new"
+
+        </script>
+        """,
+        status_code=400
+    )
+    # =====================================
+    # CREATE CLIENT
+    # =====================================
+
     client = Client(
+
         name=name,
+
         company=company,
+
         ruc_ci=ruc_ci,
+
         phone=phone,
+
         email=email,
+
         address=address,
+
         client_type=client_type,
+
         observations=observations
+
     )
 
     db.add(client)
+
     db.commit()
 
     return RedirectResponse(
         url="/clients",
         status_code=302
     )
+

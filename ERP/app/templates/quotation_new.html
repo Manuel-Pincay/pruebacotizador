@@ -13,21 +13,34 @@
             </h1>
 
             <div>
-                <label class="block mb-2 font-semibold"> Cliente </label>
 
-                <select id="client_id" class="w-full border rounded-xl p-3">
-                    {% for client in clients %}
+    <label class="block mb-2 font-semibold">
+        Cliente
+    </label>
 
-                    <option value="{{ client.id }}" {% if edit_mode is defined and quotation.client_id==client.id %}
-                        selected {% endif %}>
+    <div class="relative">
 
-                        {{ client.name }}
+        <input
+            type="text"
+            id="client_search"
+            placeholder="🔍 Buscar cliente..."
+            class="w-full border rounded-xl p-3"
+            autocomplete="off"
+        >
 
-                    </option>
+        <div
+            id="client_results"
+            class="absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg hidden max-h-72 overflow-y-auto"
+        ></div>
 
-                    {% endfor %}
-                </select>
-            </div>
+    </div>
+
+    <input
+        type="hidden"
+        id="client_id"
+    >
+
+</div>
         </div>
 
         <!-- PRODUCTS -->

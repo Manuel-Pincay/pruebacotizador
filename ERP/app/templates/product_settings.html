@@ -1,0 +1,384 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center mb-8">
+
+        <div>
+
+            <h1 class="text-4xl font-bold text-gray-900">
+                Ajustes Productos
+            </h1>
+
+        </div>
+
+        <a href="/product-settings/init" onclick="return confirm('¿Deseas cargar los catálogos iniciales?')"
+            class="border border-green-400 text-green-600 hover:bg-green-50 px-5 py-3 rounded-xl font-medium transition">
+            ⚡ Inicializar Catálogos
+        </a>
+
+    </div>
+
+    <!-- CATEGORIAS -->
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="font-bold text-2xl flex items-center gap-3">
+                🏷️ Categorías
+            </h2>
+
+            <span
+                class="w-8 h-8 flex items-center justify-center bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
+                {{ categories|length }}
+            </span>
+
+        </div>
+
+        <form action="/product-settings/category/new" method="POST" class="flex gap-2 mb-4">
+
+            <input type="text" name="name" placeholder="Nueva categoría"
+                class="flex-1 border border-gray-200 px-4 py-3 rounded-xl" required>
+
+            <button
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition">
+                +
+            </button>
+
+        </form>
+
+        <div class="max-h-60 overflow-y-auto">
+
+            <div class="grid grid-cols-2 gap-2">
+
+                {% for item in categories %}
+
+                <div class="flex justify-between items-center border border-gray-200 rounded-xl px-4 py-3 bg-white">
+
+                    <span class="truncate">
+                        {{ item.name }}
+                    </span>
+
+                    <a href="/product-settings/category/{{ item.id }}/delete"
+                        onclick="return confirm('¿Eliminar categoría?')"
+                        class="text-purple-500 hover:text-red-500 transition">
+                        🗑️
+                    </a>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+    <!-- MATERIALES -->
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="font-bold text-2xl flex items-center gap-3">
+                📦 Materiales
+            </h2>
+
+            <span
+                class="w-8 h-8 flex items-center justify-center bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
+                {{ materials|length }}
+            </span>
+
+        </div>
+
+        <form action="/product-settings/material/new" method="POST" class="flex gap-2 mb-4">
+
+            <input type="text" name="name" placeholder="Nuevo material"
+                class="flex-1 border border-gray-200 px-4 py-3 rounded-xl" required>
+
+            <button
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition">
+                +
+            </button>
+
+        </form>
+
+        <div class="max-h-60 overflow-y-auto">
+
+            <div class="grid grid-cols-2 gap-2">
+
+                {% for item in materials %}
+
+                <div class="flex justify-between items-center border border-gray-200 rounded-xl px-4 py-3 bg-white">
+
+                    <span>{{ item.name }}</span>
+
+                    <a href="/product-settings/material/{{ item.id }}/delete"
+                        class="text-purple-500 hover:text-red-500 transition">
+                        🗑️
+                    </a>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- COLORES -->
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="font-bold text-2xl flex items-center gap-3">
+                🎨 Colores
+            </h2>
+
+            <span
+                class="w-8 h-8 flex items-center justify-center bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
+                {{ colors|length }}
+            </span>
+
+        </div>
+
+        <form action="/product-settings/color/new" method="POST" class="flex gap-2 mb-4">
+
+            <input type="text" name="name" placeholder="Nuevo color"
+                class="flex-1 border border-gray-200 px-4 py-3 rounded-xl" required>
+
+            <button
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition">
+                +
+            </button>
+
+        </form>
+
+        <div class="max-h-60 overflow-y-auto">
+
+            <div class="grid grid-cols-2 gap-2">
+
+                {% for item in colors %}
+
+                <div class="flex justify-between items-center border border-gray-200 rounded-xl px-4 py-3 bg-white">
+
+                    <span class="truncate">
+                        {{ item.name }}
+                    </span>
+
+                    <a href="/product-settings/color/{{ item.id }}/delete" onclick="return confirm('¿Eliminar color?')"
+                        class="text-purple-500 hover:text-red-500 transition">
+                        🗑️
+                    </a>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- TEMATICAS -->
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="font-bold text-2xl flex items-center gap-3">
+                🎉 Temáticas
+            </h2>
+
+            <span
+                class="w-8 h-8 flex items-center justify-center bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
+                {{ themes|length }}
+            </span>
+
+        </div>
+
+        <form action="/product-settings/theme/new" method="POST" class="flex gap-2 mb-4">
+
+            <input type="text" name="name" placeholder="Nueva temática"
+                class="flex-1 border border-gray-200 px-4 py-3 rounded-xl" required>
+
+            <button
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition">
+                +
+            </button>
+
+        </form>
+
+        <div class="max-h-60 overflow-y-auto">
+
+            <div class="grid grid-cols-2 gap-2">
+
+                {% for item in themes %}
+
+                <div class="flex justify-between items-center border border-gray-200 rounded-xl px-4 py-3 bg-white">
+
+                    <span class="truncate">
+                        {{ item.name }}
+                    </span>
+
+                    <a href="/product-settings/theme/{{ item.id }}/delete"
+                        onclick="return confirm('¿Eliminar temática?')"
+                        class="text-purple-500 hover:text-red-500 transition">
+                        🗑️
+                    </a>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ESPESORES -->
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="font-bold text-2xl flex items-center gap-3">
+                📏 Espesores
+            </h2>
+
+            <span
+                class="w-8 h-8 flex items-center justify-center bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
+                {{ thicknesses|length }}
+            </span>
+
+        </div>
+
+        <form action="/product-settings/thickness/new" method="POST" class="flex gap-2 mb-4">
+
+            <input type="text" name="name" placeholder="Nuevo espesor"
+                class="flex-1 border border-gray-200 px-4 py-3 rounded-xl" required>
+
+            <button
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition">
+                +
+            </button>
+
+        </form>
+
+        <div class="max-h-60 overflow-y-auto">
+
+            <div class="grid grid-cols-2 gap-2">
+
+                {% for item in thicknesses %}
+
+                <div class="flex justify-between items-center border border-gray-200 rounded-xl px-4 py-3 bg-white">
+
+                    <span class="truncate">
+                        {{ item.name }}
+                    </span>
+
+                    <a href="/product-settings/thickness/{{ item.id }}/delete"
+                        onclick="return confirm('¿Eliminar espesor?')"
+                        class="text-purple-500 hover:text-red-500 transition">
+                        🗑️
+                    </a>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- UNIDADES -->
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+        <div class="flex justify-between items-center mb-4">
+
+            <h2 class="font-bold text-2xl flex items-center gap-3">
+                📐 Unidades
+            </h2>
+
+            <span
+                class="w-8 h-8 flex items-center justify-center bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
+                {{ units|length }}
+            </span>
+
+        </div>
+
+        <form
+    action="/product-settings/unit/new"
+    method="POST"
+    class="flex gap-2 mb-4"
+>
+
+    <input
+        type="text"
+        name="name"
+        placeholder="Nombre"
+        class="flex-1 border border-gray-200 px-4 py-3 rounded-xl"
+        required
+    >
+
+    <input
+        type="text"
+        name="abbreviation"
+        placeholder="Abreviatura"
+        class="w-64 border border-gray-200 px-4 py-3 rounded-xl"
+        required
+    >
+
+    <button
+        type="submit"
+        class="bg-purple-600 hover:bg-purple-700
+               text-white
+               w-10 h-10
+               rounded-xl
+               flex items-center justify-center
+               transition"
+    >
+        +
+    </button>
+
+</form>
+
+        <div class="max-h-60 overflow-y-auto">
+
+            <div class="grid grid-cols-2 gap-2">
+
+                {% for item in units %}
+
+                <div class="flex justify-between items-center border border-gray-200 rounded-xl px-4 py-3 bg-white">
+
+                    <span class="truncate">
+                        {{ item.name }} ({{ item.abbreviation }})
+                    </span>
+
+                    <a href="/product-settings/unit/{{ item.id }}/delete" onclick="return confirm('¿Eliminar unidad?')"
+                        class="text-purple-500 hover:text-red-500 transition">
+                        🗑️
+                    </a>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

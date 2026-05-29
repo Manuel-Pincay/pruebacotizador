@@ -243,7 +243,7 @@ def import_clients(db, file_path):
     imported = 0
 
     for row in ws.iter_rows(
-        min_row=4,
+        min_row=3,
         values_only=True
     ):
 
@@ -285,7 +285,7 @@ def import_products(db, file_path):
     imported = 0
 
     for row in ws.iter_rows(
-        min_row=4,
+        min_row=3,
         values_only=True
     ):
 

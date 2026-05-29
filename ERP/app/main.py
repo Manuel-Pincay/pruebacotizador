@@ -13,6 +13,7 @@ from app.models.inventory_movement import InventoryMovement
 from app.models.shipment import Shipment
 from app.models.company_config import CompanyConfig
 
+
 from app.auth.security import hash_password
 
 from app.routes import auth
@@ -26,6 +27,7 @@ from app.routes import shipments
 from app.routes import users
 from app.routes import config
 from app.routes import imports
+from app.routes import product_settings
 
 Base.metadata.create_all(bind=engine)
 
@@ -61,6 +63,9 @@ app.include_router(shipments.router)
 app.include_router(users.router)
 app.include_router(config.router)
 app.include_router(imports.router)
+app.include_router(
+    product_settings.router
+)
 
 
 

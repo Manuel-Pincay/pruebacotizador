@@ -9,8 +9,10 @@ class Client(Base):
 
     name = Column(String)
     company = Column(String)
-    ruc_ci = Column(String)
-
+    ruc_ci = Column(
+        String,
+        unique=True
+    )
     phone = Column(String)
     email = Column(String)
     address = Column(Text)
