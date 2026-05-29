@@ -19,6 +19,7 @@ from sqlalchemy import or_
 
 from app.database import get_db
 
+from app.utils.activity import log_activity
 
 from app.models.productcategory import ProductCategory
 from app.models.productmaterial import ProductMaterial
@@ -237,6 +238,15 @@ async def create_product(
     db.commit()
 
     db.refresh(product)
+
+    try:
+        log_activity(
+            db,
+            "Producto creado",
+            product.name or "Producto"
+        )
+    except Exception:
+        pass
 
     return RedirectResponse(url="/products", status_code=302)
 

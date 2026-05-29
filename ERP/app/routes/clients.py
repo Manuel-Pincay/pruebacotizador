@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 
+from app.utils.activity import log_activity
+
 from app.models import client
 from app.models.client import Client
 
@@ -302,6 +304,15 @@ async def create_client(
     db.add(client)
 
     db.commit()
+
+    try:
+        log_activity(
+            db,
+            "Cliente creado",
+            client.name or "Cliente sin nombre"
+        )
+    except Exception:
+        pass
 
     return RedirectResponse(
         url="/clients",

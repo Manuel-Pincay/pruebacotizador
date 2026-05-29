@@ -30,6 +30,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.utils.activity import log_activity
 from app.auth.auth_handler import login_required, role_required
 
 from app.models.client import Client
@@ -115,11 +116,65 @@ async def quotations_page(
         Quotation.id.desc()
     ).all()
 
+    total_quotations = db.query(
+        Quotation
+    ).count()
+
+    pending_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "pendiente"
+    ).count()
+
+    approved_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "aprobada"
+    ).count()
+
+    production_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "produccion"
+    ).count()
+
+    delivered_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "entregada"
+    ).count()
+
+    cancelled_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "cancelada"
+    ).count()
+
+    clients = db.query(
+        Client
+    ).order_by(
+        Client.name
+    ).all()
+
     return templates.TemplateResponse(
         request=request,
         name="quotations.html",
         context={
-            "quotations": quotations
+            "quotations": quotations,
+
+            "clients": clients,
+
+            "total_quotations": total_quotations,
+
+            "pending_quotations": pending_quotations,
+
+            "approved_quotations": approved_quotations,
+
+            "production_quotations": production_quotations,
+
+            "delivered_quotations": delivered_quotations,
+
+            "cancelled_quotations": cancelled_quotations
         }
     )
 
@@ -632,6 +687,15 @@ async def production_quotation(
 
         db.commit()
 
+        try:
+            log_activity(
+                db,
+                "Enviado a producción",
+                f"Cotización #{quotation.id}"
+            )
+        except Exception:
+            pass
+
         return RedirectResponse(
             url="/production/",
             status_code=302
@@ -902,6 +966,16 @@ async def create_quotation(
     db.commit()
 
     db.refresh(quotation)
+
+    try:
+        description = f"Cotización #{quotation.id}" if getattr(quotation, 'id', None) else "Cotización creada"
+        log_activity(
+            db,
+            "Cotización creada",
+            description
+        )
+    except Exception:
+        pass
 
     # =========================================
     # ITEMS

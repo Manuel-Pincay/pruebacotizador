@@ -12,7 +12,7 @@ from app.models.production_order import ProductionOrder
 from app.models.inventory_movement import InventoryMovement
 from app.models.shipment import Shipment
 from app.models.company_config import CompanyConfig
-
+from app.models.activity_log import ActivityLog
 
 from app.auth.security import hash_password
 

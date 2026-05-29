@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 
+from app.utils.activity import log_activity
+
 from app.auth.auth_handler import role_required
 
 from app.services.excel_importer import (
@@ -135,10 +137,20 @@ async def upload_clients(
             buffer
         )
 
-    import_clients(
+    imported = import_clients(
         db,
         file_path
     )
+
+    try:
+        description = f"{imported} clientes importados" if imported and imported > 0 else "Ningún cliente importado"
+        log_activity(
+            db,
+            "Importación",
+            description
+        )
+    except Exception:
+        pass
 
     return RedirectResponse(
         url="/imports/?success=clients",
@@ -171,10 +183,20 @@ async def upload_products(
             buffer
         )
 
-    import_products(
+    imported = import_products(
         db,
         file_path
     )
+
+    try:
+        description = f"{imported} productos importados" if imported and imported > 0 else "Ningún producto importado"
+        log_activity(
+            db,
+            "Importación",
+            description
+        )
+    except Exception:
+        pass
 
     return RedirectResponse(
         url="/imports/?success=products",
