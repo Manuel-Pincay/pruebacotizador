@@ -8,7 +8,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from sqlalchemy.orm import Session
-
+from datetime import date, datetime, timedelta
+from sqlalchemy import func
 from app.database import get_db
 from app.auth.auth_handler import login_required
 
@@ -147,6 +148,33 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         {"title": "Nueva Cotización", "url": "/quotations/new", "icon": "📄"},
         {"title": "Producción", "url": "/production/", "icon": "🏭"},
     ]
+    # =====================================
+# CHART LAST 30 DAYS
+# =====================================
+
+    last_30_days = []
+
+    chart_labels = []
+
+    chart_values = []
+
+    for i in range(29, -1, -1):
+
+        day = date.today() - timedelta(days=i)
+
+        total = db.query(
+            Quotation
+        ).filter(
+            func.date(
+                Quotation.created_at
+            ) == day
+        ).count()
+
+        chart_labels.append(
+            day.strftime("%d/%m")
+        )
+
+        chart_values.append(total)
 
     return templates.TemplateResponse(
         request=request,
@@ -164,5 +192,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             "recent_products": recent_products,
             "recent_production": recent_production,
             "recent_activity": recent_activity,
+            "chart_labels": chart_labels,
+            "chart_values": chart_values,
         },
     )

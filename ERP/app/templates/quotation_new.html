@@ -13,34 +13,20 @@
             </h1>
 
             <div>
+                <label class="block mb-2 font-semibold"> Cliente </label>
 
-    <label class="block mb-2 font-semibold">
-        Cliente
-    </label>
+                <div class="relative">
+                    <input type="text" id="client_search" placeholder="🔍 Buscar cliente..."
+                        class="w-full border rounded-xl p-3" autocomplete="off" />
 
-    <div class="relative">
+                    <div id="client_results"
+                        class="absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg hidden max-h-72 overflow-y-auto">
+                    </div>
+                </div>
 
-        <input
-            type="text"
-            id="client_search"
-            placeholder="🔍 Buscar cliente..."
-            class="w-full border rounded-xl p-3"
-            autocomplete="off"
-        >
-
-        <div
-            id="client_results"
-            class="absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg hidden max-h-72 overflow-y-auto"
-        ></div>
-
-    </div>
-
-    <input
-        type="hidden"
-        id="client_id"
-    >
-
-</div>
+                <input type="hidden" id="client_id" />
+                <div id="selected_client_info" class="mt-2 text-sm text-green-600"></div>
+            </div>
         </div>
 
         <!-- PRODUCTS -->
@@ -49,8 +35,7 @@
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">Productos</h2>
 
-                <button onclick="openCustomModal()"
-                    class="btn-primary text-white px-5 py-2 rounded-xl">
+                <button onclick="openCustomModal()" class="btn-primary text-white px-5 py-2 rounded-xl">
                     + Personalizado
                 </button>
             </div>
@@ -96,9 +81,11 @@
                         </div>
 
                         <div>
-                            <label class="text-sm text-gray-500"> Logo </label>
+                            <label class="text-sm text-gray-500"> Incluye Logo </label>
 
-                            <input type="text" id="logo" class="w-full border rounded-xl p-3 bg-gray-100" readonly />
+                            <div id="logo_indicator" class="w-full border rounded-xl p-3 bg-gray-100 text-center">
+                                No
+                            </div>
                         </div>
                     </div>
 
@@ -205,20 +192,12 @@
                 <p class="text-sm text-gray-500 mt-2">PNG, JPG, PDF o SVG</p>
             </div>
 
-          <!-- IVA -->
+            <!-- IVA -->
 
-<div class="mb-6">
+            <div class="mb-6">
+                <label class="block mb-2 font-semibold"> IVA % </label>
 
-    <label class="block mb-2 font-semibold">
-        IVA %
-    </label>
-
-    <input
-        type="number"
-        id="iva"
-        name="iva"
-
-        value="{{
+                <input type="number" id="iva" name="iva" value="{{
             quotation.iva
             if edit_mode
             else (
@@ -226,14 +205,8 @@
                 if config and config.iva_default is not none
                 else 15
             )
-        }}"
-
-        class="w-full border rounded-xl p-3"
-
-        oninput="calculateTotals()"
-    >
-
-</div>
+        }}" class="w-full border rounded-xl p-3" oninput="calculateTotals()" />
+            </div>
             <!-- TOTALS -->
 
             <div class="space-y-4 border-t pt-6">
@@ -294,8 +267,11 @@
 
             <input id="custom_theme" placeholder="Forma" class="border rounded-xl p-3" />
 
-            <input id="custom_logo" placeholder="Logo" class="border rounded-xl p-3" />
+            <label class="flex items-center gap-3 col-span-2">
+                <input type="checkbox" id="custom_logo" />
 
+                Incluye logo del cliente
+            </label>
             <input type="number" id="custom_price" placeholder="Precio" class="border rounded-xl p-3" />
         </div>
 
@@ -360,13 +336,13 @@
 
                     resultsBox.innerHTML = `
 
-                      <div class="p-4 text-red-500">
+                  <div class="p-4 text-red-500">
 
-                          ❌ Producto no encontrado
+                      ❌ Producto no encontrado
 
-                      </div>
+                  </div>
 
-                  `
+              `
 
                     resultsBox.classList.remove(
                         "hidden"
@@ -384,34 +360,34 @@
 
                     div.innerHTML = `
 
-                      <div class="font-semibold">
+                  <div class="font-semibold">
 
-                          ${product.code || ""}
+                      ${product.code || ""}
 
-                          ${product.name}
+                      ${product.name}
 
-                      </div>
+                  </div>
 
-                      <div class="text-sm text-gray-500">
+                  <div class="text-sm text-gray-500">
 
-                          Categoría:
-                          ${product.category || "-"}
+                      Categoría:
+                      ${product.category || "-"}
 
-                      </div>
+                  </div>
 
-                      <div class="text-sm text-gray-500">
+                  <div class="text-sm text-gray-500">
 
-                          Stock:
-                          ${product.stock}
+                      Stock:
+                      ${product.stock}
 
-                          |
+                      |
 
-                          Precio:
-                          $${product.price}
+                      Precio:
+                      $${product.price}
 
-                      </div>
+                  </div>
 
-                  `
+              `
 
                     div.addEventListener(
                         "click",
@@ -464,14 +440,14 @@
             "product_stock"
         ).innerHTML = `
 
-          <span class="text-green-600">
+      <span class="text-green-600">
 
-              ✅ Stock disponible:
-              <strong>${product.stock}</strong>
+          ✅ Stock disponible:
+          <strong>${product.stock}</strong>
 
-          </span>
+      </span>
 
-      `
+  `
 
         // SHOW PARAMETERS
         document.getElementById(
@@ -494,8 +470,11 @@
         ).value = product.color || "-"
 
         document.getElementById(
-            "logo"
-        ).value = product.logo || "-"
+            "logo_indicator"
+        ).innerHTML =
+            product.logo
+                ? "Sí"
+                : "No"
 
         // CLOSE RESULTS
         resultsBox.classList.add(
@@ -569,9 +548,10 @@
                 "color"
             ).value,
 
-            logo: document.getElementById(
-                "logo"
-            ).value,
+            logo:
+                document.getElementById(
+                    "logo_indicator"
+                ).innerText === "Sí",
 
             price: price,
 
@@ -638,8 +618,7 @@
 
             logo: document.getElementById(
                 "custom_logo"
-            ).value,
-
+            ).checked,
             price: price,
 
             total: price
@@ -674,83 +653,113 @@
 
             tbody.innerHTML += `
 
-              <tr class="border-t hover:bg-gray-50">
+          <tr class="border-t hover:bg-gray-50">
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      <input
-                          type="number"
-                          min="1"
-                          value="${item.quantity}"
-                          onchange="updateQuantity(${index}, this.value)"
-                          class="w-20 border rounded-lg p-2"
-                      >
+                  <input
+                      type="number"
+                      min="1"
+                      value="${item.quantity}"
+                      onchange="updateQuantity(${index}, this.value)"
+                      class="w-20 border rounded-lg p-2"
+                  >
 
-                  </td>
+              </td>
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      ${item.detail}
+                  ${item.detail}
 
-                  </td>
+              </td>
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      ${item.measure || "-"}
+                  ${item.measure || "-"}
 
-                  </td>
+              </td>
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      ${item.theme || "-"}
+                  ${item.theme || "-"}
 
-                  </td>
+              </td>
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      ${item.color || "-"}
+                  ${item.color || "-"}
 
-                  </td>
+              </td>
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      ${item.logo || "-"}
+                    ${
+                        item.logo
+                        ? `
+                        <span
+                            class="
+                            bg-green-100
+                            text-green-700
+                            px-2
+                            py-1
+                            rounded-full
+                            text-xs
+                            "
+                        >
+                            Sí
+                        </span>
+                        `
+                        : `
+                        <span
+                            class="
+                            bg-gray-100
+                            text-gray-500
+                            px-2
+                            py-1
+                            rounded-full
+                            text-xs
+                            "
+                        >
+                            No
+                        </span>
+                        `
+                    }
 
-                  </td>
+                </td>
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      <input
-                          type="number"
-                          value="${item.price}"
-                          onchange="updatePrice(${index}, this.value)"
-                          class="w-32 border rounded-lg p-2"
-                      >
+                  <input
+                      type="number"
+                      value="${item.price}"
+                      onchange="updatePrice(${index}, this.value)"
+                      class="w-32 border rounded-lg p-2"
+                  >
 
-                  </td>
+              </td>
 
-                  <td class="p-4 font-bold">
+              <td class="p-4 font-bold">
 
-                      $${item.total.toFixed(2)}
+                  $${item.total.toFixed(2)}
 
-                  </td>
+              </td>
 
-                  <td class="p-4">
+              <td class="p-4">
 
-                      <button
-                          onclick="removeItem(${index})"
-                          class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
-                      >
+                  <button
+                      onclick="removeItem(${index})"
+                      class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+                  >
 
-                          ✕
+                      ✕
 
-                      </button>
+                  </button>
 
-                  </td>
+              </td>
 
-              </tr>
+          </tr>
 
-          `
+      `
         })
     }
 
@@ -938,8 +947,8 @@
         ).value = ""
 
         document.getElementById(
-            "logo"
-        ).value = ""
+            "logo_indicator"
+        ).innerHTML = "No"
     }
     function clearCustomFields() {
 
@@ -961,7 +970,7 @@
 
         document.getElementById(
             "custom_logo"
-        ).value = ""
+        ).checked = false
 
         document.getElementById(
             "custom_price"
@@ -974,8 +983,44 @@
     // =====================================
 
     async function saveQuotation() {
+        if (!document.getElementById("client_id").value) {
 
+            alert(
+                "Selecciona un cliente"
+            )
+
+            return
+        }
         if (quotationItems.length === 0) {
+            for (const item of quotationItems){
+
+            if(
+                !item.quantity ||
+                item.quantity <= 0
+            ){
+
+                alert(
+                    "Existe un producto con cantidad inválida"
+                )
+
+                return
+
+            }
+
+            if(
+                !item.price ||
+                item.price <= 0
+            ){
+
+                alert(
+                    "Existe un producto con precio inválido"
+                )
+
+                return
+
+            }
+
+        }
 
             alert("Agrega productos")
 
@@ -1098,6 +1143,132 @@
     renderItems()
 
     calculateTotals()
+
+
+    // =====================================
+    // SEARCH CLIENT
+    // =====================================
+
+    const clientSearchInput =
+        document.getElementById(
+            "client_search"
+        )
+
+    const clientResultsBox =
+        document.getElementById(
+            "client_results"
+        )
+
+    clientSearchInput.addEventListener(
+        "input",
+        async function () {
+
+            const query =
+                this.value.trim()
+
+            if (query.length < 1) {
+
+                clientResultsBox.innerHTML = ""
+
+                clientResultsBox.classList.add(
+                    "hidden"
+                )
+
+                return
+            }
+
+            const response = await fetch(
+                `/clients/search?q=${encodeURIComponent(query)}`
+            )
+
+            const data =
+                await response.json()
+
+            clientResultsBox.innerHTML = ""
+
+            if (data.length === 0) {
+
+                clientResultsBox.innerHTML = `
+
+            <div class="p-3 text-red-500">
+
+                Cliente no encontrado
+
+            </div>
+
+        `
+
+                clientResultsBox.classList.remove(
+                    "hidden"
+                )
+
+                return
+            }
+
+            data.forEach(client => {
+
+                const div =
+                    document.createElement("div")
+
+                div.className =
+                    "p-3 hover:bg-gray-100 cursor-pointer border-b"
+
+                div.innerHTML = `
+
+            <div class="font-semibold">
+
+                ${client.name}
+
+            </div>
+
+            <div class="text-sm text-gray-500">
+
+                ${client.ruc_ci || "-"}
+
+            </div>
+
+        `
+
+                div.addEventListener(
+                    "click",
+                    function () {
+
+                        selectClient(client)
+
+                    }
+                )
+
+                clientResultsBox.appendChild(div)
+            })
+
+            clientResultsBox.classList.remove(
+                "hidden"
+            )
+        }
+    )
+    // =====================================
+    // SELECT CLIENT
+    // =====================================
+
+    function selectClient(client) {
+
+        document.getElementById(
+            "client_search"
+        ).value = client.name
+
+        document.getElementById(
+            "client_id"
+        ).value = client.id
+
+        document.getElementById(
+            "selected_client_info"
+        ).innerHTML =
+            `✅ Cliente seleccionado: <strong>${client.name}</strong>`
+
+        clientResultsBox.classList.add(
+            "hidden"
+        )
+    }
 </script>
 
 {% endblock %}

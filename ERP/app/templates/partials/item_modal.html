@@ -1,0 +1,113 @@
+<form
+    action="/quotations/quotation-items/{{ item.id }}/edit"
+    method="POST"
+>
+
+    <div class="space-y-5">
+
+        <div>
+
+            <label
+                class="block mb-2 font-medium"
+            >
+                Cantidad
+            </label>
+
+            <input
+                type="number"
+                name="quantity"
+                value="{{ item.quantity }}"
+                class="w-full border rounded-xl p-3"
+            >
+
+        </div>
+
+        <div>
+
+            <label
+                class="block mb-2 font-medium"
+            >
+                Temática
+            </label>
+
+            <input
+                type="text"
+                name="theme"
+                value="{{ item.theme }}"
+                class="w-full border rounded-xl p-3"
+            >
+
+        </div>
+
+        <div>
+
+            <label
+                class="block mb-2 font-medium"
+            >
+                Medida
+            </label>
+
+            <input
+                type="text"
+                name="measure"
+                value="{{ item.measure }}"
+                class="w-full border rounded-xl p-3"
+            >
+
+        </div>
+
+        <div>
+
+            <label
+                class="block mb-2 font-medium"
+            >
+                Color
+            </label>
+
+            <input
+                type="text"
+                name="color"
+                value="{{ item.color }}"
+                class="w-full border rounded-xl p-3"
+            >
+
+        </div>
+
+        <div>
+
+            <label
+                class="flex items-center gap-3"
+            >
+
+                <input
+                    type="checkbox"
+                    name="logo"
+                    value="true"
+
+                    {% if item.logo %}
+                    checked
+                    {% endif %}
+                >
+
+                Lleva logo personalizado
+
+            </label>
+
+        </div>
+
+        <button
+            class="
+            bg-purple-600
+            hover:bg-purple-700
+            text-white
+            px-6
+            py-3
+            rounded-xl
+            "
+        >
+            Guardar Cambios
+        </button>
+
+    </div>
+
+</form>

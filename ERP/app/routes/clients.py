@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
 from fastapi import Form
+from fastapi.responses import JSONResponse
 
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
@@ -318,4 +319,26 @@ async def create_client(
         url="/clients",
         status_code=302
     )
+@router.get("/search")
+async def search_clients(
+    q: str = "",
+    db: Session = Depends(get_db)
+):
 
+    clients = db.query(
+        Client
+    ).filter(
+        Client.name.ilike(f"%{q}%")
+    ).limit(10).all()
+
+    return [
+
+        {
+            "id": client.id,
+            "name": client.name,
+            "phone": client.phone,
+            "ruc_ci": client.ruc_ci
+        }
+
+        for client in clients
+    ]

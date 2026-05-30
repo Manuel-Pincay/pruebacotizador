@@ -39,4 +39,8 @@ class Quotation(Base):
     client = relationship("Client")
     items = relationship(
     "QuotationItem"
+    )
+    items = relationship(
+    "QuotationItem",
+    back_populates="quotation"
 )
