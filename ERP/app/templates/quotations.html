@@ -12,34 +12,18 @@
     </div>
 
     <div class="flex items-center gap-3">
-       <form
-    method="GET"
-    class="flex items-center gap-3"
->
+        <form method="GET" class="flex items-center gap-3">
+            <div class="relative">
+                <input type="text" name="search" value="{{ search or '' }}" placeholder="Buscar cotización..."
+                    class="w-72 border border-gray-200 rounded-xl px-4 py-3 pl-10" />
 
-    <div class="relative">
+                <span class="absolute left-3 top-3.5"> 🔍 </span>
+            </div>
 
-        <input
-            type="text"
-            name="search"
-            value="{{ search or '' }}"
-            placeholder="Buscar cotización..."
-            class="w-72 border border-gray-200 rounded-xl px-4 py-3 pl-10"
-        >
-
-        <span class="absolute left-3 top-3.5">
-            🔍
-        </span>
-
-    </div>
-
-    <button
-        class="bg-purple-700 text-white px-5 py-3 rounded-xl"
-    >
-        Buscar
-    </button>
-
-</form>
+            <button class="bg-purple-700 text-white px-5 py-3 rounded-xl">
+                Buscar
+            </button>
+        </form>
         <a href="/quotations/new"
             class="bg-purple-700 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-medium transition">
             + Nueva Cotización
@@ -74,79 +58,160 @@
 </div>
 <!-- FILTROS -->
 
-<div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8">
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
-        <!-- CLIENTE -->
+<form method="GET">
 
-        <div>
-            <label class="block text-sm text-gray-500 mb-2"> Cliente </label>
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8">
 
-            <select class="w-full border border-gray-200 rounded-xl px-4 py-3">
-                <option>Todos los clientes</option>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
 
-                {% for client in clients %}
 
-                <option value="{{ client.id }}">{{ client.name }}</option>
+            
+            <!-- CLIENTE -->
 
-                {% endfor %}
-            </select>
+            <div>
+
+                <label class="block text-sm text-gray-500 mb-2">
+                    Cliente
+                </label>
+
+                <select name="client_id" class="w-full border border-gray-200 rounded-xl px-4 py-3">
+
+                    <option value="">
+                        Todos los clientes
+                    </option>
+
+                    {% for client in clients %}
+
+                    <option
+    value="{{ client.id }}"
+    {% if client_id == client.id %}
+    selected
+    {% endif %}
+>
+    {{ client.name }}
+</option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <!-- ESTADO -->
+
+            <div>
+
+                <label class="block text-sm text-gray-500 mb-2">
+                    Estado
+                </label>
+
+                <select
+    name="status"
+    class="w-full border border-gray-200 rounded-xl px-4 py-3"
+>
+
+    <option value="">
+        Todos los estados
+    </option>
+
+    <option
+        value="pendiente"
+        {% if status == "pendiente" %}selected{% endif %}
+    >
+        Pendiente
+    </option>
+
+    <option
+        value="aprobada"
+        {% if status == "aprobada" %}selected{% endif %}
+    >
+        Aprobada
+    </option>
+
+    <option
+        value="produccion"
+        {% if status == "produccion" %}selected{% endif %}
+    >
+        Producción
+    </option>
+
+    <option
+        value="entregada"
+        {% if status == "entregada" %}selected{% endif %}
+    >
+        Entregada
+    </option>
+
+    <option
+        value="cancelada"
+        {% if status == "cancelada" %}selected{% endif %}
+    >
+        Cancelada
+    </option>
+
+</select>
+
+            </div>
+
+            <!-- FECHA INICIO -->
+
+            <div>
+
+                <label class="block text-sm text-gray-500 mb-2">
+                    Fecha inicio
+                </label>
+
+                <input
+    type="date"
+    name="start_date"
+    value="{{ start_date }}"
+    class="w-full border border-gray-200 rounded-xl px-4 py-3"
+>
+            </div>
+
+            <!-- FECHA FIN -->
+
+            <div>
+
+                <label class="block text-sm text-gray-500 mb-2">
+                    Fecha fin
+                </label>
+
+                <input
+    type="date"
+    name="end_date"
+    value="{{ end_date }}"
+    class="w-full border border-gray-200 rounded-xl px-4 py-3"
+>
+
+            </div>
+
+            <!-- BUSCAR -->
+
+            <div class="flex items-end">
+
+                <button type="submit" class="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded-xl">
+                    Buscar
+                </button>
+
+            </div>
+
+            <!-- LIMPIAR -->
+
+            <div class="flex items-end">
+
+                <a href="/quotations"
+                    class="w-full border border-gray-200 hover:bg-gray-50 py-3 rounded-xl text-center">
+                    Limpiar
+                </a>
+
+            </div>
+
         </div>
 
-        <!-- ESTADO -->
-
-        <div>
-            <label class="block text-sm text-gray-500 mb-2"> Estado </label>
-
-            <select class="w-full border border-gray-200 rounded-xl px-4 py-3">
-                <option>Todos los estados</option>
-
-                <option>Pendiente</option>
-
-                <option>Aprobada</option>
-
-                <option>Producción</option>
-
-                <option>Enviada</option>
-
-                <option>Entregada</option>
-
-                <option>Cancelada</option>
-            </select>
-        </div>
-
-        <!-- FECHA INICIO -->
-
-        <div>
-            <label class="block text-sm text-gray-500 mb-2"> Fecha inicio </label>
-
-            <input type="date" class="w-full border border-gray-200 rounded-xl px-4 py-3" />
-        </div>
-
-        <!-- FECHA FIN -->
-
-        <div>
-            <label class="block text-sm text-gray-500 mb-2"> Fecha fin </label>
-
-            <input type="date" class="w-full border border-gray-200 rounded-xl px-4 py-3" />
-        </div>
-
-        <!-- BUSCAR -->
-
-        <div class="flex items-end">
-            <button class="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded-xl">
-                Buscar
-            </button>
-        </div>
-
-        <!-- LIMPIAR -->
-
-        <div class="flex items-end">
-            <button class="w-full border border-gray-200 hover:bg-gray-50 py-3 rounded-xl">
-                Limpiar
-            </button>
-        </div>
     </div>
-</div>
+
+</form>
 
 <!-- TABLA CONTENEDOR -->
 
@@ -253,20 +318,21 @@
                                 📄
                             </a>
                             {% if quotation.status == "pendiente" %}
-                            <a href="/quotations/{{ quotation.id }}/edit"
+                            <a href="/quotations/{{ quotation.id }}/edit" title="Editar"
                                 class="w-10 h-10 flex items-center justify-center bg-blue-100 hover:bg-blue-200 rounded-xl">
                                 ✏️
                             </a>
-                            <button onclick="approveQuotation('{{ quotation.id }}')"
-                                class="w-10 h-10 bg-green-100 hover:bg-green-200 rounded-xl"> ✅
+                            <button onclick="approveQuotation('{{ quotation.id }}')" title="Aprobar"
+                                class="w-10 h-10 bg-green-100 hover:bg-green-200 rounded-xl">
+                                ✅
                             </button>
                             <button onclick="cancelQuotation('{{ quotation.id }}')"
-                                class="w-10 h-10 bg-yellow-100 hover:bg-yellow-200 rounded-xl">
+                                class="w-10 h-10 bg-yellow-100 hover:bg-yellow-200 rounded-xl" title="Cancelar">
                                 ❌
                             </button>
 
                             <button onclick="deleteQuotation('{{ quotation.id }}')"
-                                class="w-10 h-10 bg-red-100 hover:bg-red-200 rounded-xl">
+                                class="w-10 h-10 bg-red-100 hover:bg-red-200 rounded-xl" title="Eliminar">
                                 🗑️
                             </button>
 
@@ -299,20 +365,10 @@
         Total: {{ total_quotations }} cotizaciones
     </span>
     <div class="flex gap-2">
+        <button class="w-10 h-10 border rounded-xl">‹</button>
 
-    <button
-        class="w-10 h-10 border rounded-xl"
-    >
-        ‹
-    </button>
-
-    <button
-        class="w-10 h-10 bg-purple-700 text-white rounded-xl"
-    >
-        1
-    </button>
-
-</div>
+        <button class="w-10 h-10 bg-purple-700 text-white rounded-xl">1</button>
+    </div>
 </div>
 
 <script>

@@ -145,30 +145,19 @@
           <tr class="border-t">
             <td class="p-4">{{ loop.index }}</td>
             <td class="p-4">
-              {% if item.product %}
 
-              <div class="font-semibold">{{ item.product.name }}</div>
+                <div class="font-semibold">
+                    {{ item.detail or (item.product.name if item.product else "-") }}
+                </div>
 
-              <div class="text-xs text-gray-500">
-                {{ item.product.material or '-' }} • {{ item.product.thickness
-                or '-' }}
-              </div>
+                {% if item.product %}
 
-              {% else %}
+                <div class="text-xs text-gray-500">
+                    {{ item.product.material }} • {{ item.product.thickness }}
+                </div>
 
-              <div class="flex items-center gap-2">
-                <span class="font-semibold"> {{ item.detail }} </span>
+                {% endif %}
 
-                <span class="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs">
-                  Personalizado
-                </span>
-              </div>
-
-              <div class="text-xs text-gray-500">
-                Producto creado en la cotización
-              </div>
-
-              {% endif %}
             </td>
             <td class="p-4">
               {% if item.theme %} {{ item.theme }} {% else %}
@@ -186,7 +175,19 @@
             </td>
             <td class="p-4">{{ item.measure or '-' }}</td>
             <td class="p-4">{{ item.customized or '-' }}</td>
-            <td class="p-4">{{ item.quantity }}</td>
+           <td class="p-4">
+              <input
+                  type="number"
+                  min="1"
+                  value="{{ item.quantity }}"
+                  class="w-16 border rounded-lg p-1 text-center"
+                  onchange="updateQuantity(
+                      {{ item.id }},
+                      this.value
+                  )"
+              >
+
+          </td>
 
             <td class="p-4">${{ "%.2f"|format(item.unit_price) }}</td>
 
@@ -307,10 +308,6 @@
     <!-- FIN RESUMEN -->
   </div>
 
-  <!-- imamgen referecnia diseño -->
-   <p class="text-red-500">
-    {{ quotation.design_file }}
-</p>
 
   <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mt-6">
     <div class="flex items-center justify-between mb-4">
@@ -323,7 +320,7 @@
 
     {% if quotation.design_file %}
 
-    <img src="/static/uploads/designs/{{ quotation.design_file }}" class="max-w-full rounded-2xl border" />
+    <img src="/uploads/designs/{{ quotation.design_file }}" class="max-w-full rounded-2xl border" />
 
     {% else %}
 
@@ -425,7 +422,7 @@
 </div>
 
 <script>
-async function openAddProductModal() {
+async function openAddProductModal(){
 
     const quotationId =
         {{ quotation.id }}
@@ -438,29 +435,103 @@ async function openAddProductModal() {
     const html =
         await response.text()
 
-    document
-        .getElementById(
-            "modalTitle"
-        )
-        .innerText =
+    document.getElementById(
+        "modalTitle"
+    ).innerText =
         "Agregar Producto"
 
-    document
-        .getElementById(
-            "modalContent"
-        )
-        .innerHTML =
+    document.getElementById(
+        "modalContent"
+    ).innerHTML =
         html
 
-    document
-        .getElementById(
-            "itemModal"
-        )
-        .classList.remove(
-            "hidden"
+    document.getElementById(
+        "itemModal"
+    ).classList.remove(
+        "hidden"
+    )
+
+    initializeProductSearch()
+  }
+
+  function initializeProductSearch(){
+
+    const searchInput =
+        document.getElementById(
+            "product_search_modal"
         )
 
+    const resultsBox =
+        document.getElementById(
+            "product_results_modal"
+        )
+
+    if(!searchInput){
+        return
+    }
+
+    searchInput.addEventListener(
+        "input",
+        async function(){
+
+            const query =
+                this.value.trim()
+
+            if(query.length < 1){
+
+                resultsBox.innerHTML = ""
+
+                resultsBox.classList.add(
+                    "hidden"
+                )
+
+                return
+            }
+
+            const response =
+                await fetch(
+                    `/products/search?q=${encodeURIComponent(query)}`
+                )
+
+            const products =
+                await response.json()
+
+            resultsBox.innerHTML = ""
+
+            products.forEach(product=>{
+
+                const div =
+                    document.createElement("div")
+
+                div.className =
+                    "p-3 border-b hover:bg-gray-100 cursor-pointer"
+
+                div.innerHTML = `
+                    <div class="font-semibold">
+                        ${product.name}
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        $${product.price}
+                    </div>
+                `
+
+                div.onclick = () => selectModalProduct(product)
+
+                resultsBox.appendChild(
+                    div
+                )
+
+            })
+
+            resultsBox.classList.remove(
+                "hidden"
+            )
+
+        }
+    )
+
 }
+
   function closeIfBackdrop(event) {
 
     if (
@@ -534,6 +605,87 @@ async function openAddProductModal() {
       )
 
   }
+
+
+function selectModalProduct(product){
+
+    console.log(product)
+
+    document.getElementById(
+        "product_search_modal"
+    ).value =
+        product.name
+
+    document.getElementById(
+        "product_id_modal"
+    ).value =
+        product.id
+
+    document.getElementById(
+        "theme_modal"
+    ).value =
+        product.theme || ""
+
+    document.getElementById(
+        "measure_modal"
+    ).value =
+        product.measure || ""
+
+    document.getElementById(
+        "color_modal"
+    ).value =
+        product.color || ""
+
+    document.getElementById(
+        "product_results_modal"
+    ).classList.add(
+        "hidden"
+    )
+}
+
+async function updateQuantity(
+    itemId,
+    quantity
+){
+
+    const formData =
+        new FormData()
+
+    formData.append(
+        "quantity",
+        quantity
+    )
+
+    const response =
+        await fetch(
+
+            `/quotations/quotation-items/${itemId}/update-quantity`,
+
+            {
+                method: "POST",
+                body: formData
+            }
+
+        )
+
+    const result =
+        await response.json()
+
+    if(result.success){
+
+        location.reload()
+
+    }else{
+
+        alert(
+            "No se pudo actualizar"
+        )
+
+    }
+
+}
+
+
 </script>
 
 {% endblock %}

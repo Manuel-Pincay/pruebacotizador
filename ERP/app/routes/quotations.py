@@ -1,7 +1,7 @@
 from fileinput import filename
 import json
 from datetime import datetime
-
+from typing import Optional
 import os
 import uuid
 import shutil
@@ -79,38 +79,129 @@ async def new_quotation(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_class=HTMLResponse)
-async def quotations_page(request: Request, db: Session = Depends(get_db)):
+async def quotations_page(
+    request: Request,
+    search: str = "",
+    client_id: Optional[str] = None,
+    status: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    db: Session = Depends(get_db)
+):
 
-    user = role_required(request, ["admin", "ventas"])
+    user = role_required(
+        request,
+        ["admin", "ventas"]
+    )
 
-    if isinstance(user, RedirectResponse):
+    if isinstance(
+        user,
+        RedirectResponse
+    ):
         return user
 
-    quotations = db.query(Quotation).order_by(Quotation.id.desc()).all()
-
-    total_quotations = db.query(Quotation).count()
-
-    pending_quotations = (
-        db.query(Quotation).filter(Quotation.status == "pendiente").count()
+    query = db.query(
+        Quotation
     )
 
-    approved_quotations = (
-        db.query(Quotation).filter(Quotation.status == "aprobada").count()
-    )
+    # ==========================
+    # BUSQUEDA GENERAL
+    # ==========================
 
-    production_quotations = (
-        db.query(Quotation).filter(Quotation.status == "produccion").count()
-    )
+    if search:
 
-    delivered_quotations = (
-        db.query(Quotation).filter(Quotation.status == "entregada").count()
-    )
+        query = query.join(
+            Client
+        ).filter(
+            Client.name.ilike(
+                f"%{search}%"
+            )
+        )
 
-    cancelled_quotations = (
-        db.query(Quotation).filter(Quotation.status == "cancelada").count()
-    )
+    # ==========================
+    # CLIENTE
+    # ==========================
 
-    clients = db.query(Client).order_by(Client.name).all()
+   # CLIENTE
+
+    if client_id and client_id.strip():
+
+        query = query.filter(
+            Quotation.client_id == int(client_id)
+        )
+    # ==========================
+    # ESTADO
+    # ==========================
+
+    if status:
+
+        query = query.filter(
+            Quotation.status == status
+        )
+
+    # ==========================
+    # FECHA INICIO
+    # ==========================
+
+    if start_date:
+
+        query = query.filter(
+            Quotation.created_at >= start_date
+        )
+
+    # ==========================
+    # FECHA FIN
+    # ==========================
+
+    if end_date:
+
+        query = query.filter(
+            Quotation.created_at <= end_date
+        )
+
+    quotations = query.order_by(
+        Quotation.id.desc()
+    ).all()
+
+    total_quotations = db.query(
+        Quotation
+    ).count()
+
+    pending_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "pendiente"
+    ).count()
+
+    approved_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "aprobada"
+    ).count()
+
+    production_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "produccion"
+    ).count()
+
+    delivered_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "entregada"
+    ).count()
+
+    cancelled_quotations = db.query(
+        Quotation
+    ).filter(
+        Quotation.status == "cancelada"
+    ).count()
+
+    clients = db.query(
+        Client
+    ).order_by(
+        Client.name
+    ).all()
 
     return templates.TemplateResponse(
         request=request,
@@ -118,6 +209,12 @@ async def quotations_page(request: Request, db: Session = Depends(get_db)):
         context={
             "quotations": quotations,
             "clients": clients,
+            "search": search,
+            "client_id": client_id,
+            "status": status,
+            "start_date": start_date,
+            "end_date": end_date,
+
             "total_quotations": total_quotations,
             "pending_quotations": pending_quotations,
             "approved_quotations": approved_quotations,
@@ -126,7 +223,6 @@ async def quotations_page(request: Request, db: Session = Depends(get_db)):
             "cancelled_quotations": cancelled_quotations,
         },
     )
-
 
 @router.get("/{quotation_id}", response_class=HTMLResponse)
 async def quotation_detail(
@@ -609,6 +705,7 @@ async def quotation_pdf(quotation_id: int, db: Session = Depends(get_db)):
             status_code=500,
         )
 
+
 @router.post("/create")
 async def create_quotation(
     client_id: int = Form(...),
@@ -628,52 +725,31 @@ async def create_quotation(
 
         if delivery_date:
 
-            parsed_delivery_date = datetime.strptime(
-                delivery_date,
-                "%Y-%m-%d"
-            ).date()
+            parsed_delivery_date = datetime.strptime(delivery_date, "%Y-%m-%d").date()
 
         filename = None
 
         if design_file and design_file.filename:
 
-            os.makedirs(
-                "uploads/designs",
-                exist_ok=True
-            )
+            os.makedirs("uploads/designs", exist_ok=True)
 
             extension = design_file.filename.split(".")[-1]
 
             filename = f"{uuid.uuid4()}.{extension}"
 
-            with open(
-                f"uploads/designs/{filename}",
-                "wb"
-            ) as buffer:
+            with open(f"uploads/designs/{filename}", "wb") as buffer:
 
-                shutil.copyfileobj(
-                    design_file.file,
-                    buffer
-                )
+                shutil.copyfileobj(design_file.file, buffer)
 
         quotation = Quotation(
-
             client_id=client_id,
-
             subtotal=subtotal,
-
             discount=discount,
-
             delivery_date=parsed_delivery_date,
-
             iva=iva,
-
             total=total,
-
             design_file=filename,
-
-            status="pendiente"
-
+            status="pendiente",
         )
 
         db.add(quotation)
@@ -685,77 +761,31 @@ async def create_quotation(
         for item in items_data:
 
             quotation_item = QuotationItem(
-
                 quotation_id=quotation.id,
-
-                product_id=item.get(
-                    "product_id"
-                ),
-
-                quantity=item.get(
-                    "quantity",
-                    1
-                ),
-
-                detail=item.get(
-                    "detail",
-                    ""
-                ),
-
-                measure=item.get(
-                    "measure",
-                    ""
-                ),
-
-                theme=item.get(
-                    "theme",
-                    ""
-                ),
-
-                color=item.get(
-                    "color",
-                    ""
-                ),
-
-                logo=item.get(
-                    "logo",
-                    False
-                ),
-
-                unit_price=item.get(
-                    "price",
-                    0
-                ),
-
-                total=item.get(
-                    "total",
-                    0
-                )
-
+                product_id=item.get("product_id"),
+                quantity=item.get("quantity", 1),
+                detail=item.get("detail", ""),
+                measure=item.get("measure", ""),
+                theme=item.get("theme", ""),
+                color=item.get("color", ""),
+                logo=item.get("logo", False),
+                unit_price=item.get("price", 0),
+                total=item.get("total", 0),
             )
 
-            db.add(
-                quotation_item
-            )
+            db.add(quotation_item)
 
         db.commit()
 
         try:
 
-            log_activity(
-                db,
-                "Cotización creada",
-                f"Cotización #{quotation.id}"
-            )
+            log_activity(db, "Cotización creada", f"Cotización #{quotation.id}")
 
         except Exception:
 
             pass
 
-        return RedirectResponse(
-            url=f"/quotations/{quotation.id}",
-            status_code=302
-        )
+        return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
 
     except Exception as e:
 
@@ -779,8 +809,9 @@ async def create_quotation(
 
             </div>
             """,
-            status_code=500
+            status_code=500,
         )
+
 
 @router.get("/quotation-items/{item_id}/edit", response_class=HTMLResponse)
 async def edit_quotation_item(
@@ -900,6 +931,7 @@ async def add_product_to_quotation(
         item = QuotationItem(
             quotation_id=quotation.id,
             product_id=product.id,
+            detail=product.name,
             quantity=quantity,
             theme=theme,
             measure=measure,
@@ -911,10 +943,12 @@ async def add_product_to_quotation(
 
     else:
 
+        print("DETAIL RECIBIDO:", detail)
+
         item = QuotationItem(
             quotation_id=quotation.id,
             product_id=None,
-            detail=detail,
+            detail=detail.strip(),
             quantity=quantity,
             theme=theme,
             measure=measure,
@@ -930,3 +964,46 @@ async def add_product_to_quotation(
 
     recalculate_quotation(quotation, db)
     return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
+
+@router.post(
+    "/quotation-items/{item_id}/update-quantity"
+)
+async def update_quantity(
+
+    item_id: int,
+
+    quantity: int = Form(...),
+
+    db: Session = Depends(get_db)
+
+):
+
+    item = db.query(
+        QuotationItem
+    ).filter(
+        QuotationItem.id == item_id
+    ).first()
+
+    if not item:
+
+        return {
+            "success": False
+        }
+
+    item.quantity = quantity
+
+    item.total = (
+        item.quantity *
+        item.unit_price
+    )
+
+    db.commit()
+
+    recalculate_quotation(
+        item.quotation,
+        db
+    )
+
+    return {
+        "success": True
+    }

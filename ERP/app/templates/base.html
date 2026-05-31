@@ -27,6 +27,26 @@ lucide.createIcons();
         --font-color: {{ _cfg.config.font_color if _cfg.config else '#333333' }};
       }
 
+      html {
+    font-size: 14px;
+}
+
+@media (min-width: 1600px) {
+
+    .erp-container {
+
+        max-width: 1800px;
+
+        margin: 0 auto;
+
+    }
+
+}
+
+body {
+    font-size: 0.95rem;
+}
+
       /* Sidebar gradient */
       #sidebar {
         background: linear-gradient(to bottom, var(--primary)) !important;
@@ -46,6 +66,7 @@ lucide.createIcons();
       /* Links/Accent */
       a { color: inherit; }
       a:hover { color: var(--accent); }
+
     </style>
   </head>
 
@@ -75,7 +96,7 @@ lucide.createIcons();
 
       <aside
         id="sidebar"
-        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-72 h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300"
+        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-64 h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300"
       >
         <!-- LOGO -->
 
@@ -292,9 +313,10 @@ lucide.createIcons();
 
       <!-- MAIN -->
 
-      <main class="flex-1 p-4 pt-24 md:pt-8 md:p-8 overflow-x-hidden">
-        {% block content %} {% endblock %}
-      </main>
+      <main class="flex-1 p-6 max-w-[1800px] mx-auto">
+    {% block content %}
+    {% endblock %}
+</main>
     </div>
 
     <script>

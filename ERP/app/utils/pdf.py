@@ -192,10 +192,12 @@ def generate_quotation_pdf(quotation, items, client, filename, db=None):
 
     for item in items:
 
+        product_name = item.detail or (item.product.name if getattr(item, "product", None) else "-")
+
         data.append(
             [
                 str(item.quantity),
-                item.detail or "-",
+                product_name,
                 item.measure or "-",
                 item.theme or "-",
                 item.color or "-",
