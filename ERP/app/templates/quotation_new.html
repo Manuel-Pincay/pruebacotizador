@@ -1,116 +1,175 @@
 {% extends 'base.html' %} {% block content %}
 
-<div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
     <!-- LEFT -->
 
-    <div class="xl:col-span-8 min-w-0">
+    <div class="lg:col-span-8 min-w-0">
         <!-- HEADER -->
 
         <div class="bg-white rounded-2xl shadow p-6 mb-6">
-            <h1 class="text-3xl font-bold mb-6">
-                {% if edit_mode is defined and edit_mode %} Editar Cotización #{{
-                quotation.id }} {% else %} Nueva Cotización {% endif %}
-            </h1>
 
-            <div>
-                <label class="block mb-2 font-semibold"> Cliente </label>
+    <div class="flex justify-between items-center mb-4">
 
-                <div class="relative">
-                    <input type="text" id="client_search" placeholder="🔍 Buscar cliente..."
-                        class="w-full border rounded-xl p-3" autocomplete="off" />
+        <h2 class="text-xl font-bold">
+            Cliente
+        </h2>
 
-                    <div id="client_results"
-                        class="absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg hidden max-h-72 overflow-y-auto">
-                    </div>
-                </div>
+        <div class="flex gap-2">
 
-                <input type="hidden" id="client_id" />
-                <div id="selected_client_info" class="mt-2 text-sm text-green-600"></div>
-            </div>
+            <button
+                type="button"
+                onclick="openClientModal()"
+                class="btn-primary px-4 py-2 rounded-xl"
+            >
+                👥 Clientes
+            </button>
+
+            <button
+                type="button"
+                onclick="openNewClientModal()"
+                class="border px-4 py-2 rounded-xl"
+            >
+                + Nuevo
+            </button>
+
         </div>
+
+    </div>
+
+    <!-- BUSQUEDA RAPIDA -->
+
+    <div class="relative">
+
+        <input
+            type="text"
+            id="client_search"
+            placeholder="Buscar cliente..."
+            autocomplete="off"
+            class="w-full border rounded-xl p-3"
+        >
+
+        <div
+            id="client_results"
+            class="hidden absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg max-h-72 overflow-y-auto"
+        ></div>
+
+    </div>
+
+    <input
+        type="hidden"
+        id="selected_client_id"
+        name="client_id"
+    >
+
+    <div id="selected_client_info" class="mt-3 text-sm text-green-600"></div>
+
+</div>
 
         <!-- PRODUCTS -->
 
-        <div class="bg-white rounded-2xl shadow p-6 mb-6">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold">Productos</h2>
+        <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-6">
+            <!-- HEADER -->
 
-                <button onclick="openCustomModal()" class="btn-primary text-white px-5 py-2 rounded-xl">
-                    + Personalizado
-                </button>
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold">Productos</h2>
+
+                    <p class="text-sm text-gray-500">
+                        Agrega productos rápidamente o selecciónalos desde el catálogo.
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" onclick="openProductCatalog()"
+                        class="btn-primary px-5 py-3 rounded-xl flex items-center gap-2">
+                        🔍 Seleccionar catálogo
+                    </button>
+
+                    <button type="button" onclick="openCustomModal()"
+                        class="border border-gray-200 hover:bg-gray-50 px-5 py-3 rounded-xl">
+                        + Personalizado
+                    </button>
+                </div>
             </div>
 
-            <!-- SEARCH -->
+            <!-- BUSQUEDA RAPIDA -->
 
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <!-- PRODUCT -->
+            <div class="bg-gray-50 rounded-2xl p-4 border mb-6">
+                <h3 class="font-semibold mb-4">Búsqueda rápida</h3>
 
-                <div class="md:col-span-6">
-                    <div class="relative">
-                        <input type="text" id="product_search" placeholder="🔍 Buscar producto..."
-                            class="w-full border rounded-xl p-3" autocomplete="off" />
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- PRODUCTO -->
 
-                        <div id="search_results"
-                            class="absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg hidden max-h-72 overflow-y-auto">
-                        </div>
-                    </div>
+                    <div class="md:col-span-6">
+                        <div class="relative">
+                            <input type="text" id="product_search"
+                                placeholder="Buscar por nombre, código o categoría..."
+                                class="w-full border rounded-xl p-3" autocomplete="off" />
 
-                    <div id="product_stock" class="text-sm text-gray-500 mt-2"></div>
-
-                    <!--datos de porducto  -->
-                    <!-- PRODUCT PARAMETERS -->
-
-                    <div id="product_parameters"
-                        class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4 hidden">
-                        <div>
-                            <label class="text-sm text-gray-500"> Medida </label>
-
-                            <input type="text" id="measure" class="w-full border rounded-xl p-3 bg-gray-100" readonly />
-                        </div>
-
-                        <div>
-                            <label class="text-sm text-gray-500"> Forma </label>
-
-                            <input type="text" id="theme" class="w-full border rounded-xl p-3 bg-gray-100" readonly />
-                        </div>
-
-                        <div>
-                            <label class="text-sm text-gray-500"> Color </label>
-
-                            <input type="text" id="color" class="w-full border rounded-xl p-3 bg-gray-100" readonly />
-                        </div>
-
-                        <div>
-                            <label class="text-sm text-gray-500"> Incluye Logo </label>
-
-                            <div id="logo_indicator" class="w-full border rounded-xl p-3 bg-gray-100 text-center">
-                                No
+                            <div id="search_results"
+                                class="absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg hidden max-h-72 overflow-y-auto">
                             </div>
                         </div>
+
+                        <div id="product_stock" class="text-sm text-gray-500 mt-2"></div>
                     </div>
 
-                    <!-- fin -->
+                    <!-- CANTIDAD -->
+
+                    <div class="md:col-span-2">
+                        <label class="text-sm text-gray-500"> Cantidad </label>
+
+                        <input type="number" id="quantity" value="1" min="1" class="w-full border rounded-xl p-3" />
+                    </div>
+
+                    <!-- PRECIO -->
+
+                    <div class="md:col-span-2">
+                        <label class="text-sm text-gray-500"> Precio unitario </label>
+
+                        <input type="number" id="price" class="w-full border rounded-xl p-3" />
+                    </div>
+
+                    <!-- AGREGAR -->
+
+                    <div class="md:col-span-2">
+                        <label class="text-sm text-transparent"> Acción </label>
+
+                        <button onclick="addInventoryItem()"
+                            class="w-full bg-purple-700 hover:bg-purple-800 text-white p-3 rounded-xl">
+                            Agregar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARAMETROS PRODUCTO -->
+
+            <div id="product_parameters" class="grid grid-cols-2 lg:grid-cols-4 gap-4 hidden">
+                <div>
+                    <label class="text-sm text-gray-500"> Medida </label>
+
+                    <input type="text" id="measure" class="w-full border rounded-xl p-3 bg-gray-50" readonly />
                 </div>
 
-                <!-- QUANTITY -->
+                <div>
+                    <label class="text-sm text-gray-500"> Forma </label>
 
-                <div class="md:col-span-2">
-                    <input type="number" id="quantity" value="1" min="1" class="w-full border rounded-xl p-3" />
+                    <input type="text" id="theme" class="w-full border rounded-xl p-3 bg-gray-50" readonly />
                 </div>
 
-                <!-- PRICE -->
+                <div>
+                    <label class="text-sm text-gray-500"> Color </label>
 
-                <div class="md:col-span-2">
-                    <input type="number" id="price" placeholder="Precio" class="w-full border rounded-xl p-3" />
+                    <input type="text" id="color" class="w-full border rounded-xl p-3 bg-gray-50" readonly />
                 </div>
 
-                <!-- BUTTON -->
+                <div>
+                    <label class="text-sm text-gray-500"> Logo </label>
 
-                <div class="md:col-span-2">
-                    <button onclick="addInventoryItem()"
-                        class="w-full bg-purple-700 hover:bg-purple-800 text-white p-3 rounded-xl">
-                        Agregar
-                    </button>
+                    <div id="logo_indicator" class="w-full border rounded-xl p-3 bg-gray-50 text-center">
+                        No
+                    </div>
                 </div>
             </div>
 
@@ -152,8 +211,8 @@
 
     <!-- RIGHT -->
 
-    <div class="xl:col-span-4">
-        <div class="bg-white rounded-2xl shadow p-4 md:p-6 xl:sticky xl:top-6">
+    <div class="lg:col-span-4">
+        <div class="bg-white rounded-2xl shadow p-4 md:p-6 lg:sticky lg:top-6">
             <h2 class="text-3xl font-bold mb-6">Resumen</h2>
 
             <!-- DISCOUNT -->
@@ -280,9 +339,331 @@
             Agregar Personalizado
         </button>
     </div>
+
+</div>
+<!-- CUSTOM MODAL -->
+<div id="catalogModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-6">
+
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden">
+
+        <!-- HEADER -->
+
+        <div class="flex justify-between items-center p-6 border-b">
+
+            <div>
+
+                <h2 class="text-2xl font-bold">
+                    Catálogo de Productos
+                </h2>
+
+                <p class="text-gray-500 text-sm">
+                    Seleccione un producto del catálogo
+                </p>
+
+            </div>
+
+            <button onclick="closeProductCatalog()" class="text-2xl">
+                ✕
+            </button>
+
+        </div>
+
+        <!-- BODY -->
+
+        <div class="p-6">
+
+            <!-- BUSCADOR -->
+
+            <input type="text" id="catalog_search" placeholder="Buscar producto..."
+                class="w-full border rounded-xl p-3 mb-4">
+
+            <!-- FILTROS -->
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+
+                <select id="filter_category" class="border rounded-xl p-3">
+                    <option value="">
+                        Todas las categorías
+                    </option>
+                </select>
+
+                <select id="filter_material" class="border rounded-xl p-3">
+                    <option value="">
+                        Todos los materiales
+                    </option>
+                </select>
+
+                <select id="filter_color" class="border rounded-xl p-3">
+                    <option value="">
+                        Todos los colores
+                    </option>
+                </select>
+
+                <select id="filter_shape" class="border rounded-xl p-3">
+                    <option value="">
+                        Todas las formas
+                    </option>
+                </select>
+
+            </div>
+
+            <!-- TABLA -->
+
+            <div id="catalog_table_container">
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div id="client_modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 md:p-8 w-full max-w-3xl mx-auto overflow-hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold">Seleccionar Cliente</h2>
+            <button onclick="closeClientModal()" class="text-2xl">✕</button>
+        </div>
+
+        <div class="mb-4">
+            <input
+                id="client_modal_search"
+                type="text"
+                placeholder="Buscar cliente..."
+                autocomplete="off"
+                class="w-full border rounded-xl p-3"
+            />
+        </div>
+
+        <div id="client_modal_results" class="max-h-72 overflow-y-auto border rounded-xl bg-white"></div>
+
+        <div class="mt-5 flex justify-between items-center gap-3">
+            <button type="button" onclick="closeClientModal()" class="border px-4 py-2 rounded-xl">Cerrar</button>
+            <button type="button" onclick="openNewClientModal()" class="bg-purple-700 text-white px-4 py-2 rounded-xl">Nuevo cliente</button>
+        </div>
+    </div>
+</div>
+
+<div id="new_client_modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl p-6 md:p-8 w-full max-w-2xl mx-auto">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold">Nuevo Cliente</h2>
+            <button onclick="closeNewClientModal()" class="text-2xl">✕</button>
+        </div>
+
+        <form id="new_client_form" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+                <label class="block mb-2">Nombre</label>
+                <input id="new_client_name" name="name" type="text" class="w-full border rounded-xl p-3" required />
+            </div>
+            <div>
+                <label class="block mb-2">Empresa</label>
+                <input id="new_client_company" name="company" type="text" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block mb-2">RUC / CI</label>
+                <input id="new_client_ruc" name="ruc_ci" type="text" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block mb-2">Teléfono</label>
+                <input id="new_client_phone" name="phone" type="text" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block mb-2">Correo</label>
+                <input id="new_client_email" name="email" type="email" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block mb-2">Tipo Cliente</label>
+                <select id="new_client_type" name="client_type" class="w-full border rounded-xl p-3">
+                    <option value="minorista">Minorista</option>
+                    <option value="empresa">Mayorista</option>
+                    <option value="frecuente">Frecuente</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block mb-2">Dirección</label>
+                <textarea id="new_client_address" name="address" class="w-full border rounded-xl p-3" rows="3"></textarea>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block mb-2">Observaciones</label>
+                <textarea id="new_client_observations" name="observations" class="w-full border rounded-xl p-3" rows="3"></textarea>
+            </div>
+        </form>
+
+        <div class="mt-6 flex justify-end gap-3">
+            <button type="button" onclick="closeNewClientModal()" class="border px-4 py-2 rounded-xl">Cancelar</button>
+            <button type="button" onclick="submitNewClient()" class="bg-purple-700 text-white px-4 py-2 rounded-xl">Guardar Cliente</button>
+        </div>
+    </div>
 </div>
 
 <script>
+    // FUNCIONES CLIENTES
+    function openClientModal() {
+        const modal = document.getElementById("client_modal")
+        modal.classList.remove("hidden")
+        modal.classList.add("flex")
+        loadClientModalList("")
+    }
+
+    function closeClientModal() {
+        const modal = document.getElementById("client_modal")
+        modal.classList.add("hidden")
+        modal.classList.remove("flex")
+    }
+
+    function openNewClientModal() {
+        closeClientModal()
+        const modal = document.getElementById("new_client_modal")
+        modal.classList.remove("hidden")
+        modal.classList.add("flex")
+        document.getElementById("new_client_form").reset()
+    }
+
+    function closeNewClientModal() {
+        const modal = document.getElementById("new_client_modal")
+        modal.classList.add("hidden")
+        modal.classList.remove("flex")
+    }
+
+    async function loadClientModalList(query = "") {
+        const resultsContainer = document.getElementById("client_modal_results")
+        resultsContainer.innerHTML = ""
+
+        try {
+            const response = await fetch(
+                `/clients/search?q=${encodeURIComponent(query)}`
+            )
+            const clients = await response.json()
+
+            if (!clients.length) {
+                resultsContainer.innerHTML = `
+                    <div class="p-4 text-gray-500">
+                        No se encontraron clientes
+                    </div>
+                `
+                return
+            }
+
+            clients.forEach(client => {
+                const div = document.createElement("div")
+                div.className = "p-3 border-b hover:bg-gray-100 cursor-pointer"
+                div.innerHTML = `
+                    <div class="font-semibold">${client.name}</div>
+                    <div class="text-sm text-gray-500">${client.ruc_ci || client.phone || "-"}</div>
+                `
+                div.addEventListener("click", () => {
+                    selectClient(client)
+                    closeClientModal()
+                })
+                resultsContainer.appendChild(div)
+            })
+        } catch (error) {
+            console.error(error)
+            resultsContainer.innerHTML = `
+                <div class="p-4 text-red-500">
+                    Error cargando clientes
+                </div>
+            `
+        }
+    }
+
+    async function submitNewClient() {
+        const form = document.getElementById("new_client_form")
+        const formData = new FormData(form)
+        const clientName = formData.get("name")?.toString().trim()
+
+        if (!clientName) {
+            alert("Ingresa el nombre del cliente")
+            return
+        }
+
+        const response = await fetch("/clients/new", {
+            method: "POST",
+            body: formData
+        })
+
+        if (!response.ok) {
+            alert("No se pudo crear el cliente")
+            return
+        }
+
+        closeNewClientModal()
+
+        const searchQuery = formData.get("ruc_ci")?.toString().trim() || clientName
+        const searchResponse = await fetch(
+            `/clients/search?q=${encodeURIComponent(searchQuery)}`
+        )
+        const searchResults = await searchResponse.json()
+        const createdClient = searchResults.find(
+            client => client.name === clientName
+        ) || searchResults[0]
+
+        if (createdClient) {
+            selectClient(createdClient)
+            alert("Cliente creado y seleccionado")
+        }
+    }
+
+    document.getElementById("client_modal_search").addEventListener(
+        "input",
+        function () {
+            loadClientModalList(this.value.trim())
+        }
+    )
+
+    function openProductCatalog() {
+
+        document
+            .getElementById("catalogModal")
+            .classList.remove("hidden")
+
+        loadCatalogProducts()
+
+    }
+
+    async function loadCatalogProducts() {
+
+        const response =
+            await fetch(
+                "/products/catalog/modal"
+            )
+
+        const html =
+            await response.text()
+
+        document
+            .getElementById(
+                "catalog_table_container"
+            )
+            .innerHTML = html
+
+    }
+
+    function closeProductCatalog() {
+
+        document
+            .getElementById("catalogModal")
+            .classList.add("hidden")
+
+    }
+    async function selectCatalogProduct(productId) {
+
+        const response =
+            await fetch(
+                `/products/${productId}/json`
+            )
+
+        const product =
+            await response.json()
+
+        selectProduct(product)
+
+        closeProductCatalog()
+
+    }
+
 
     let quotationItems = []
 
@@ -693,9 +1074,8 @@
 
               <td class="p-4">
 
-                    ${
-                        item.logo
-                        ? `
+                    ${item.logo
+                    ? `
                         <span
                             class="
                             bg-green-100
@@ -709,7 +1089,7 @@
                             Sí
                         </span>
                         `
-                        : `
+                    : `
                         <span
                             class="
                             bg-gray-100
@@ -723,7 +1103,7 @@
                             No
                         </span>
                         `
-                    }
+                }
 
                 </td>
 
@@ -762,6 +1142,8 @@
       `
         })
     }
+
+
 
 
     // =====================================
@@ -983,7 +1365,7 @@
     // =====================================
 
     async function saveQuotation() {
-        if (!document.getElementById("client_id").value) {
+        if (!document.getElementById("selected_client_id").value) {
 
             alert(
                 "Selecciona un cliente"
@@ -992,35 +1374,35 @@
             return
         }
         if (quotationItems.length === 0) {
-            for (const item of quotationItems){
+            for (const item of quotationItems) {
 
-            if(
-                !item.quantity ||
-                item.quantity <= 0
-            ){
+                if (
+                    !item.quantity ||
+                    item.quantity <= 0
+                ) {
 
-                alert(
-                    "Existe un producto con cantidad inválida"
-                )
+                    alert(
+                        "Existe un producto con cantidad inválida"
+                    )
 
-                return
+                    return
+
+                }
+
+                if (
+                    !item.price ||
+                    item.price <= 0
+                ) {
+
+                    alert(
+                        "Existe un producto con precio inválido"
+                    )
+
+                    return
+
+                }
 
             }
-
-            if(
-                !item.price ||
-                item.price <= 0
-            ){
-
-                alert(
-                    "Existe un producto con precio inválido"
-                )
-
-                return
-
-            }
-
-        }
 
             alert("Agrega productos")
 
@@ -1069,7 +1451,7 @@
         formData.append(
             "client_id",
             document.getElementById(
-                "client_id"
+                "selected_client_id"
             ).value
         )
 
@@ -1257,7 +1639,7 @@
         ).value = client.name
 
         document.getElementById(
-            "client_id"
+            "selected_client_id"
         ).value = client.id
 
         document.getElementById(

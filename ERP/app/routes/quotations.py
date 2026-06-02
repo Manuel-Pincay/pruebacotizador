@@ -3,29 +3,17 @@ import json
 from datetime import datetime
 from typing import Optional
 import os
+from urllib import request
 import uuid
 import shutil
 
 from fastapi import UploadFile
 from fastapi import File
-
-import shutil
-import uuid
 from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
 from fastapi import Form
 from fastapi.responses import FileResponse
-from fastapi import File
-from fastapi import UploadFile
-from fastapi import Form
-
-from app.models import quotation
-from app.models import quotation_item
-from app.services.quotation_service import recalculate_quotation
-from app.utils.pdf import generate_quotation_pdf
-from app.models.company_config import CompanyConfig
-
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
 
@@ -35,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.utils.activity import log_activity
+from app.utils.pdf import generate_quotation_pdf
 from app.auth.auth_handler import login_required, role_required
 
 from app.models.client import Client
@@ -43,10 +32,7 @@ from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.models.production_order import ProductionOrder
 from app.models.inventory_movement import InventoryMovement
-from app.models.quotation import Quotation
-from app.models.quotation_item import QuotationItem
-from app.models.product import Product
-from app.models.inventory_movement import InventoryMovement
+from app.models.company_config import CompanyConfig
 
 router = APIRouter(prefix="/quotations", tags=["quotations"])
 
@@ -94,10 +80,7 @@ async def quotations_page(
         ["admin", "ventas"]
     )
 
-    if isinstance(
-        user,
-        RedirectResponse
-    ):
+    if isinstance(user, RedirectResponse):
         return user
 
     query = db.query(
@@ -122,22 +105,29 @@ async def quotations_page(
     # CLIENTE
     # ==========================
 
-   # CLIENTE
-
     if client_id and client_id.strip():
 
         query = query.filter(
             Quotation.client_id == int(client_id)
         )
+
     # ==========================
     # ESTADO
     # ==========================
 
     if status:
+        statuses = [s.strip().lower() for s in status.split(",") if s.strip()]
 
-        query = query.filter(
-            Quotation.status == status
-        )
+        expanded = set()
+        for s in statuses:
+            if s in ("enviada", "enviado"):
+                expanded.update(["enviada", "enviado"])
+            elif s in ("entregada", "entregado"):
+                expanded.update(["entregada", "entregado"])
+            else:
+                expanded.add(s)
+
+        query = query.filter(Quotation.status.in_(list(expanded)))
 
     # ==========================
     # FECHA INICIO
@@ -185,10 +175,12 @@ async def quotations_page(
         Quotation.status == "produccion"
     ).count()
 
-    delivered_quotations = db.query(
-        Quotation
-    ).filter(
-        Quotation.status == "entregada"
+    sent_quotations = db.query(Quotation).filter(
+        Quotation.status.in_(["enviada", "enviado"])
+    ).count()
+
+    delivered_quotations = db.query(Quotation).filter(
+        Quotation.status.in_(["entregada", "entregado"])
     ).count()
 
     cancelled_quotations = db.query(
@@ -219,10 +211,12 @@ async def quotations_page(
             "pending_quotations": pending_quotations,
             "approved_quotations": approved_quotations,
             "production_quotations": production_quotations,
+            "sent_quotations": sent_quotations,
             "delivered_quotations": delivered_quotations,
             "cancelled_quotations": cancelled_quotations,
         },
     )
+
 
 @router.get("/{quotation_id}", response_class=HTMLResponse)
 async def quotation_detail(
@@ -238,6 +232,22 @@ async def quotation_detail(
 
     return templates.TemplateResponse(
         request=request, name="quotation_detail.html", context={"quotation": quotation}
+    )
+
+
+@router.get("/completed", response_class=HTMLResponse)
+async def completed_quotations_page(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    return await quotations_page(
+        request=request,
+        search="",
+        client_id=None,
+        status="produccion,enviada,enviado,entregada,entregado",
+        start_date="",
+        end_date="",
+        db=db
     )
 
 
@@ -257,6 +267,24 @@ async def approve_quotation(quotation_id: int, db: Session = Depends(get_db)):
 
     # APROBAR
     quotation.status = "aprobada"
+
+    existing_order = (
+        db.query(ProductionOrder)
+        .filter(ProductionOrder.quotation_id == quotation.id)
+        .first()
+    )
+
+    if not existing_order:
+
+        production_order = ProductionOrder(
+            quotation_id=quotation.id,
+            delivery_date=quotation.delivery_date,
+            priority="media",
+            status="pendiente",
+            observations=""
+        )
+
+        db.add(production_order)
 
     db.commit()
 
@@ -965,6 +993,7 @@ async def add_product_to_quotation(
     recalculate_quotation(quotation, db)
     return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
 
+
 @router.post(
     "/quotation-items/{item_id}/update-quantity"
 )
@@ -1007,3 +1036,42 @@ async def update_quantity(
     return {
         "success": True
     }
+
+
+# PARA MODAL CATALOGO
+@router.get("/catalog")
+async def product_catalog(
+    q: str = "",
+    page: int = 1,
+    db: Session = Depends(get_db)
+):
+
+    per_page = 10
+
+    query = db.query(Product)
+
+    if q:
+
+        query = query.filter(
+            Product.name.ilike(f"%{q}%")
+        )
+
+    total = query.count()
+
+    products = (
+        query
+        .offset(
+            (page - 1) * per_page
+        )
+        .limit(per_page)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "partials/catalog_table.html",
+        {
+            "products": products,
+            "page": page,
+            "total": total
+        }
+    )

@@ -480,3 +480,52 @@ async def products_api(db: Session = Depends(get_db)):
         }
         for product in products
     ]
+
+# CATALOGO
+@router.get("/catalog/modal")
+async def catalog_modal(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+
+    products = (
+        db.query(Product)
+        .order_by(Product.name.asc())
+        .limit(20)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/catalog_table.html",
+        context={
+            "products": products
+        }
+    )
+
+@router.get("/{product_id}/json")
+async def product_json(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id)
+        .first()
+    )
+
+    if not product:
+        return {"error": "Producto no encontrado"}
+
+    return {
+        "id": product.id,
+        "name": product.name,
+        "code": product.code,
+        "price": float(product.price or 0),
+        "stock": float(product.stock or 0),
+        "measure": product.size or "",
+        "theme": product.theme or "",
+        "color": product.color or "",
+        "logo": getattr(product, "logo", False)
+    }

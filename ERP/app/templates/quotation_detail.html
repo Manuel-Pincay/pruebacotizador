@@ -343,64 +343,50 @@
 
       <!-- PASOS -->
 
-      <div class="relative flex flex-col md:flex-row md:justify-between gap-8">
-        <!-- PENDIENTE -->
+        <div class="relative flex flex-col md:flex-row md:justify-between gap-8">
+          {% set st = (quotation.status or '')|lower|trim %}
 
-        <div class="flex flex-col items-center">
-          <div
-            class="w-12 h-12 rounded-full flex items-center justify-center {% if quotation.status in ['pendiente','aprobada','produccion','enviada','entregada'] %} bg-yellow-400 text-white {% else %} bg-gray-200 {% endif %}">
-            ⏰
+          <!-- PENDIENTE -->
+          <div class="flex flex-col items-center">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center {% if st in ['pendiente','aprobada','produccion','enviada','enviado','entregada','entregado'] %} bg-yellow-400 text-white {% else %} bg-gray-200 {% endif %}">
+              ⏰
+            </div>
+            <span class="mt-3 font-semibold"> Pendiente </span>
+            <span class="text-xs text-gray-500"> Actual </span>
           </div>
 
-          <span class="mt-3 font-semibold"> Pendiente </span>
-
-          <span class="text-xs text-gray-500"> Actual </span>
-        </div>
-
-        <!-- APROBADA -->
-
-        <div class="flex flex-col items-center">
-          <div
-            class="w-12 h-12 rounded-full flex items-center justify-center {% if quotation.status in ['aprobada','produccion','enviada','entregada'] %} bg-blue-500 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
-            ✓
+          <!-- APROBADA -->
+          <div class="flex flex-col items-center">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center {% if st in ['aprobada','produccion','enviada','enviado','entregada','entregado'] %} bg-blue-500 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
+              ✓
+            </div>
+            <span class="mt-3 font-semibold"> Aprobada </span>
           </div>
 
-          <span class="mt-3 font-semibold"> Aprobada </span>
-        </div>
-
-        <!-- PRODUCCION -->
-
-        <div class="flex flex-col items-center">
-          <div
-            class="w-12 h-12 rounded-full flex items-center justify-center {% if quotation.status in ['produccion','enviada','entregada'] %} bg-purple-600 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
-            ⚙
+          <!-- PRODUCCION -->
+          <div class="flex flex-col items-center">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center {% if st in ['produccion','enviada','enviado','entregada','entregado'] %} bg-purple-600 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
+              ⚙
+            </div>
+            <span class="mt-3 font-semibold"> Producción </span>
           </div>
 
-          <span class="mt-3 font-semibold"> Producción </span>
-        </div>
-
-        <!-- ENVIADA -->
-
-        <div class="flex flex-col items-center">
-          <div
-            class="w-12 h-12 rounded-full flex items-center justify-center {% if quotation.status in ['enviada','entregada'] %} bg-orange-500 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
-            🚚
+          <!-- ENVIADA -->
+          <div class="flex flex-col items-center">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center {% if st in ['enviada','enviado','entregada','entregado'] %} bg-orange-500 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
+              🚚
+            </div>
+            <span class="mt-3 font-semibold"> Enviada </span>
           </div>
 
-          <span class="mt-3 font-semibold"> Enviada </span>
-        </div>
-
-        <!-- ENTREGADA -->
-
-        <div class="flex flex-col items-center">
-          <div
-            class="w-12 h-12 rounded-full flex items-center justify-center {% if quotation.status == 'entregada' %} bg-green-600 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
-            📦
+          <!-- ENTREGADA -->
+          <div class="flex flex-col items-center">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center {% if st in ['entregada','entregado'] %} bg-green-600 text-white {% else %} bg-gray-200 text-gray-500 {% endif %}">
+              📦
+            </div>
+            <span class="mt-3 font-semibold"> Entregada </span>
           </div>
-
-          <span class="mt-3 font-semibold"> Entregada </span>
         </div>
-      </div>
     </div>
   </div>
   <!-- FIN -->

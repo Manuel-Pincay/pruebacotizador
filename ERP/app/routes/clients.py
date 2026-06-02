@@ -342,3 +342,50 @@ async def search_clients(
 
         for client in clients
     ]
+
+## clientes busqueda 
+@router.get("/search")
+async def search_clients(
+    q: str = "",
+    db: Session = Depends(get_db)
+):
+
+    clients = (
+        db.query(Client)
+        .filter(
+            Client.name.ilike(f"%{q}%")
+        )
+        .limit(10)
+        .all()
+    )
+
+    return [
+        {
+            "id": client.id,
+            "name": client.name,
+            "phone": client.phone,
+            "email": client.email,
+            "address": client.address
+        }
+        for client in clients
+    ]
+@router.get("/catalog/modal")
+async def client_catalog_modal(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+
+    clients = (
+        db.query(Client)
+        .order_by(Client.name.asc())
+        .limit(20)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/client_catalog_table.html",
+        context={
+            "clients": clients
+        }
+    )

@@ -52,6 +52,11 @@
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm p-6">
+        <p class="text-blue-600 text-sm">Enviadas</p>
+        <h2 class="text-4xl font-bold mt-2">{{ sent_quotations }}</h2>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm p-6">
         <p class="text-green-700 text-sm">Entregadas</p>
         <h2 class="text-4xl font-bold mt-2">{{ delivered_quotations }}</h2>
     </div>
@@ -133,6 +138,13 @@
         {% if status == "produccion" %}selected{% endif %}
     >
         Producción
+    </option>
+
+    <option
+        value="enviada"
+        {% if status == "enviada" %}selected{% endif %}
+    >
+        Enviada
     </option>
 
     <option
@@ -275,22 +287,35 @@
                         </span>
                     </td>
                     <td class="p-5">
-                        {% if quotation.status == "pendiente" %}
+                        {% set st = (quotation.status or "")|lower|trim %}
+                        {% if st == "pendiente" %}
 
                         <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs">
                             Pendiente
                         </span>
 
-                        {% elif quotation.status == "aprobada" %}
+                        {% elif st == "aprobada" %}
 
                         <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs">
                             Aprobada
                         </span>
 
-                        {% elif quotation.status == "produccion" %}
+                        {% elif st == "produccion" %}
 
                         <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs">
                             Producción
+                        </span>
+
+                        {% elif st == "enviada" or st == "enviado" %}
+
+                        <span class="bg-sky-100 text-sky-700 px-3 py-1 rounded-full text-xs">
+                            Enviada
+                        </span>
+
+                        {% elif st == "entregada" or st == "entregado" %}
+
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs">
+                            Entregada
                         </span>
 
                         {% endif %}

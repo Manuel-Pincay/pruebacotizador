@@ -26,7 +26,7 @@ class ProductionOrder(Base):
         ForeignKey("quotations.id")
     )
 
-    delivery_date = Column(Date)
+    delivery_date = Column(DateTime)
 
     priority = Column(
         String,
@@ -37,13 +37,12 @@ class ProductionOrder(Base):
 
     fabricator = Column(String)
 
-    priority = Column(String)
-
-    status = Column(String)
+    status = Column(
+        String,
+        default="pendiente"
+    )
 
     observations = Column(String)
-
-    delivery_date = Column(DateTime)
 
     created_at = Column(
         DateTime,
