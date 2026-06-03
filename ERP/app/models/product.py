@@ -22,5 +22,5 @@ class Product(Base):
     cost = Column(Float)
     theme = Column(String)
     stock = Column(Integer)
-    custom = Column(Boolean)
+    custom = Column(Boolean, default=False, nullable=False)
     image = Column(String)

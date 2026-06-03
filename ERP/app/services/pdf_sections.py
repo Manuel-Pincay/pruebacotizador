@@ -1,9 +1,11 @@
 from reportlab.platypus import Table, TableStyle, Paragraph, Image, Spacer
 
 from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
 
 from reportlab.platypus.flowables import HRFlowable
-from reportlab.lib.styles import getSampleStyleSheet
+
 import os
 
 
@@ -122,13 +124,6 @@ def build_header(quotation, config, styles):
     return header
 
 
-from reportlab.platypus import Table
-from reportlab.platypus import TableStyle
-from reportlab.platypus import Paragraph
-
-from reportlab.lib import colors
-
-
 def build_client_section(quotation, config, styles):
 
     client = quotation.client
@@ -245,19 +240,21 @@ def build_design_totals_section(quotation, config, image_path=None):
 
     styles = getSampleStyleSheet()
 
-    # ==========================
-    # IMAGEN
-    # ==========================
+    # ===================================
+    # IMAGEN DE REFERENCIA
+    # ===================================
 
     if image_path:
 
         try:
 
-            design_image = Image(image_path, width=260, height=200)
+            design_image = Image(image_path)
+
+            design_image._restrictSize(240, 160)
 
         except:
 
-            design_image = Paragraph("Sin imagen", styles["Normal"])
+            design_image = Paragraph("Sin imagen disponible", styles["Normal"])
 
     else:
 
@@ -273,24 +270,26 @@ def build_design_totals_section(quotation, config, image_path=None):
             ],
             [design_image],
             [Paragraph("Referencia enviada por el cliente.", styles["BodyText"])],
-        ]
+        ],
+        colWidths=[350],
     )
 
     image_card.setStyle(
         TableStyle(
             [
                 ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E5E7EB")),
-                ("ROUNDEDCORNERS", [10, 10, 10, 10]),
                 ("BACKGROUND", (0, 0), (-1, 0), colors.white),
-                ("TOPPADDING", (0, 0), (-1, -1), 14),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
             ]
         )
     )
 
-    # ==========================
-    # TOTALES
-    # ==========================
+    # ===================================
+    # RESUMEN
+    # ===================================
 
     subtotal = quotation.subtotal or 0
 
@@ -304,22 +303,28 @@ def build_design_totals_section(quotation, config, image_path=None):
             ["DESCUENTO", f"{discount:.2f}%"],
             [f"IVA ({quotation.iva:.2f}%)", f"${iva_amount:.2f}"],
         ],
-        colWidths=[120, 80],
+        colWidths=[90, 60],
     )
 
     summary_table.setStyle(
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.HexColor("#E5E7EB")),
                 ("LINEBELOW", (0, 1), (-1, 1), 0.5, colors.HexColor("#E5E7EB")),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ]
         )
     )
 
-    total_box = Table([["TOTAL", f"${quotation.total:.2f}"]], colWidths=[120, 100])
+    # ===================================
+    # TOTAL
+    # ===================================
+
+    total_box = Table([["TOTAL", f"${quotation.total:.2f}"]], colWidths=[70, 70])
 
     total_box.setStyle(
         TableStyle(
@@ -327,43 +332,255 @@ def build_design_totals_section(quotation, config, image_path=None):
                 ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(config.primary_color)),
                 ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 14),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("FONTSIZE", (0, 0), (-1, -1), 11),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ("ALIGN", (1, 0), (1, 0), "RIGHT"),
             ]
         )
     )
 
-    totals_card = Table([[summary_table], [total_box]])
+    totals_card = Table([[summary_table], [Spacer(1, 5)], [total_box]], colWidths=[150])
 
     totals_card.setStyle(
         TableStyle(
             [
                 ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E5E7EB")),
-                ("TOPPADDING", (0, 0), (-1, -1), 12),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]
         )
     )
-    # ==========================
-    # CONTENEDOR
-    # ==========================
 
-    layout = Table(
-    [[
-        image_card,
-        totals_card
-    ]],
-    colWidths=[280,140]
-)
+    # ===================================
+    # CONTENEDOR FINAL
+    # ===================================
+
+    layout = Table([[image_card, totals_card]], colWidths=[380, 150])
 
     layout.setStyle(
-        TableStyle([
-            ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),
-        ])
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
     )
 
     return layout
+
+
+def build_benefits_section(config):
+
+    styles = getSampleStyleSheet()
+
+    card_color = colors.HexColor("#FAF8FF")
+
+    border_color = colors.HexColor("#E9D5FF")
+
+    benefits = [
+        [
+            Paragraph(
+                f"""
+                <font size="18" color="{config.primary_color}">
+                🛡
+                </font>
+                """,
+                styles["Normal"],
+            ),
+            Paragraph(
+                f"""
+                <font size="10">
+                <b>CALIDAD GARANTIZADA</b>
+                </font>
+                <br/>
+                <font size="8" color="#666666">
+                Materiales de primera calidad y acabados profesionales.
+                </font>
+                """,
+                styles["Normal"],
+            ),
+        ],
+        [
+            Paragraph(
+                f"""
+                <font size="18" color="{config.primary_color}">
+                ⏰
+                </font>
+                """,
+                styles["Normal"],
+            ),
+            Paragraph(
+                """
+                <font size="10">
+                <b>ENTREGA PUNTUAL</b>
+                </font>
+                <br/>
+                <font size="8" color="#666666">
+                Cumplimos con las fechas acordadas.
+                </font>
+                """,
+                styles["Normal"],
+            ),
+        ],
+        [
+            Paragraph(
+                f"""
+                <font size="18" color="{config.primary_color}">
+                ✏
+                </font>
+                """,
+                styles["Normal"],
+            ),
+            Paragraph(
+                """
+                <font size="10">
+                <b>DISEÑO PERSONALIZADO</b>
+                </font>
+                <br/>
+                <font size="8" color="#666666">
+                Adaptado a tus necesidades y estilo.
+                </font>
+                """,
+                styles["Normal"],
+            ),
+        ],
+        [
+            Paragraph(
+                f"""
+                <font size="18" color="{config.primary_color}">
+                ☎
+                </font>
+                """,
+                styles["Normal"],
+            ),
+            Paragraph(
+                """
+                <font size="10">
+                <b>ATENCIÓN AL CLIENTE</b>
+                </font>
+                <br/>
+                <font size="8" color="#666666">
+                Siempre estamos para ayudarte.
+                </font>
+                """,
+                styles["Normal"],
+            ),
+        ],
+    ]
+
+    table = Table([benefits], colWidths=[135, 135, 135, 135])
+
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), card_color),
+                ("BOX", (0, 0), (-1, -1), 1, border_color),
+                ("LINEAFTER", (0, 0), (2, 0), 1, border_color),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 14),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ]
+        )
+    )
+
+    return table
+
+def build_notes_section(config):
+
+    styles = getSampleStyleSheet()
+
+    notes = Paragraph(
+        f"""
+        <font size="9">
+
+        <b>CONDICIONES COMERCIALES</b>
+
+        <br/><br/>
+
+        • La presente cotización tiene una vigencia de
+        <b>{config.quotation_validity_days} días</b>
+        a partir de la fecha de emisión.
+
+        <br/>
+
+        • Los tiempos de producción comienzan una vez aprobado el diseño y confirmado el pago.
+
+        <br/>
+
+        • Los valores indicados están expresados en dólares americanos.
+
+        <br/>
+
+        • Los precios pueden variar si se modifican cantidades, materiales o especificaciones.
+
+        <br/><br/>
+
+        <font color="{config.primary_color}">
+        <i>{config.quotation_footer_text}</i>
+        </font>
+
+        </font>
+        """,
+        styles["BodyText"]
+    )
+
+    table = Table(
+        [[notes]],
+        colWidths=[530]
+    )
+
+    table.setStyle(
+        TableStyle([
+
+            (
+                "BOX",
+                (0,0),
+                (-1,-1),
+                1,
+                colors.HexColor("#E5E7EB")
+            ),
+
+            (
+                "BACKGROUND",
+                (0,0),
+                (-1,-1),
+                colors.HexColor("#FAFAFA")
+            ),
+
+            (
+                "LEFTPADDING",
+                (0,0),
+                (-1,-1),
+                12
+            ),
+
+            (
+                "RIGHTPADDING",
+                (0,0),
+                (-1,-1),
+                12
+            ),
+
+            (
+                "TOPPADDING",
+                (0,0),
+                (-1,-1),
+                10
+            ),
+
+            (
+                "BOTTOMPADDING",
+                (0,0),
+                (-1,-1),
+                10
+            )
+
+        ])
+    )
+
+    return table

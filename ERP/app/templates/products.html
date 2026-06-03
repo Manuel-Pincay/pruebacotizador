@@ -122,17 +122,13 @@
 
     <!-- CUSTOM -->
 
-    {% if product.custom %}
-
     <div class="mt-4">
 
-        <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
-            Personalizado
+        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+            Personalizado: {{ "Sí" if product.custom else "No" }}
         </span>
 
     </div>
-
-    {% endif %}
 
     <!-- ACTIONS -->
 
