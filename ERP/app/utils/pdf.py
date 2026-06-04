@@ -20,16 +20,17 @@ import os
 from app.models.company_config import CompanyConfig
 
 from app.services.pdf_sections import (
-    build_benefits_section,
     build_header,
     build_client_section,
     build_products_table,
     build_design_totals_section,
     build_notes_section,
 )
+from io import BytesIO
+from fastapi.responses import StreamingResponse
 
 
-def generate_quotation_pdf(quotation, items, client, filename, db=None):
+def generate_quotation_pdf(quotation, items, client, db=None):
 
     # ====================================
     # GET COMPANY CONFIG
@@ -58,8 +59,10 @@ def generate_quotation_pdf(quotation, items, client, filename, db=None):
     # DOCUMENT
     # ====================================
 
+    buffer = BytesIO()
+
     doc = SimpleDocTemplate(
-        filename,
+        buffer,
         pagesize=A4,
         rightMargin=28,
         leftMargin=28,
@@ -97,13 +100,10 @@ def generate_quotation_pdf(quotation, items, client, filename, db=None):
 
     elements.append(Spacer(1, 20))
 
-    elements.append(Spacer(1, 20))
     # ====================================
     # TABLE
     # ====================================
     elements.append(build_products_table(items, config))
-
-    elements.append(Spacer(1, 18))
 
     elements.append(Spacer(1, 18))
 
@@ -114,14 +114,13 @@ def generate_quotation_pdf(quotation, items, client, filename, db=None):
 
     if quotation.design_file:
 
-        image_path = os.path.join(
-            "uploads",
-            "products",
-            quotation.design_file
-        )
+        image_path = os.path.join("uploads", "designs", quotation.design_file)
 
         print("IMAGE PATH:", image_path)
+
         print("EXISTS:", os.path.exists(image_path))
+
+        print("DESIGN FILE:", quotation.design_file)
 
     elements.append(build_design_totals_section(quotation, config, image_path))
 
@@ -173,4 +172,9 @@ def generate_quotation_pdf(quotation, items, client, filename, db=None):
     # GENERAR PDF
     # ====================================
 
-    doc.build(elements, onFirstPage=draw_footer, onLaterPages=draw_footer)
+    doc.build(elements, 
+              onFirstPage=draw_footer, 
+              onLaterPages=draw_footer)
+    buffer.seek(0)
+
+    return buffer

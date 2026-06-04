@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime, timedelta
 from sqlalchemy import func
 from app.database import get_db
-from app.auth.auth_handler import login_required
+from app.auth.auth_handler import login_required, role_required
 
 from app.models.client import Client
 from app.models.product import Product
@@ -32,7 +32,7 @@ templates.env.globals["inject_global_config"] = get_global_config
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
 
-    user = login_required(request)
+    user = role_required(request, ["admin", "ventas", "produccion"])
 
     if isinstance(user, RedirectResponse):
         return user
@@ -117,37 +117,75 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         print("DASHBOARD ERROR recent_activity:", str(e))
         recent_activity = []
 
-    # =====================================
-    # DASHBOARD CARDS
-    # =====================================
+    role = (user.role or "").lower()
 
-    dashboard_cards = [
-        {"title": "Clientes", "value": total_clients, "icon": "👥", "color": "purple"},
-        {"title": "Productos", "value": total_products, "icon": "📦", "color": "blue"},
-        {
-            "title": "Cotizaciones",
-            "value": total_quotations,
-            "icon": "📄",
-            "color": "green",
-        },
-        {
-            "title": "Producción",
-            "value": production_pending,
-            "icon": "🏭",
-            "color": "red",
-        },
-    ]
+    if role == "ventas":
+        approved_quotations = db.query(Quotation).filter(Quotation.status == "aprobada").count()
+        estimated_sales = db.query(Quotation).filter(
+            Quotation.status.in_(
+                ["aprobada", "produccion", "enviada", "enviado", "entregada", "entregado"]
+            )
+        ).all()
+        estimated_value = sum(q.total or 0 for q in estimated_sales)
 
-    # =====================================
-    # QUICK ACTIONS
-    # =====================================
+        dashboard_cards = [
+            {"title": "Clientes", "value": total_clients, "icon": "👥", "color": "purple"},
+            {"title": "Cotizaciones", "value": total_quotations, "icon": "📄", "color": "green"},
+            {"title": "Ventas estimadas", "value": estimated_value, "icon": "💰", "color": "blue"},
+            {"title": "Cotizaciones aprobadas", "value": approved_quotations, "icon": "✅", "color": "teal"},
+        ]
 
-    quick_actions = [
-        {"title": "Nuevo Cliente", "url": "/clients/new", "icon": "👤"},
-        {"title": "Nuevo Producto", "url": "/products/new", "icon": "📦"},
-        {"title": "Nueva Cotización", "url": "/quotations/new", "icon": "📄"},
-        {"title": "Producción", "url": "/production/", "icon": "🏭"},
-    ]
+        quick_actions = [
+            {"title": "Nuevo Cliente", "url": "/clients/new", "icon": "👤"},
+            {"title": "Nueva Cotización", "url": "/quotations/new", "icon": "📄"},
+            {"title": "Productos", "url": "/products", "icon": "📦"},
+            {"title": "Cotizaciones", "url": "/quotations", "icon": "📑"},
+        ]
+    elif role == "produccion":
+        pending_count = db.query(ProductionOrder).filter(ProductionOrder.status == "pendiente").count()
+        in_production_count = db.query(ProductionOrder).filter(
+            ProductionOrder.status.in_(["diseño", "produccion"])
+        ).count()
+        finished_count = db.query(ProductionOrder).filter(ProductionOrder.status == "empacado").count()
+        delivered_count = db.query(ProductionOrder).filter(ProductionOrder.status == "entregado").count()
+
+        dashboard_cards = [
+            {"title": "Pendientes", "value": pending_count, "icon": "⏳", "color": "purple"},
+            {"title": "En Producción", "value": in_production_count, "icon": "🏭", "color": "blue"},
+            {"title": "Terminadas", "value": finished_count, "icon": "✅", "color": "green"},
+            {"title": "Entregadas", "value": delivered_count, "icon": "🚚", "color": "red"},
+        ]
+
+        quick_actions = [
+            {"title": "Órdenes de Producción", "url": "/production/", "icon": "🗂️"},
+            {"title": "Kanban", "url": "/production/kanban", "icon": "📋"},
+            {"title": "Calendario", "url": "/production/calendar", "icon": "🗓️"},
+            {"title": "Últimos pedidos", "url": "/production/", "icon": "📦"},
+        ]
+    else:
+        dashboard_cards = [
+            {"title": "Clientes", "value": total_clients, "icon": "👥", "color": "purple"},
+            {"title": "Productos", "value": total_products, "icon": "📦", "color": "blue"},
+            {
+                "title": "Cotizaciones",
+                "value": total_quotations,
+                "icon": "📄",
+                "color": "green",
+            },
+            {
+                "title": "Producción",
+                "value": production_pending,
+                "icon": "🏭",
+                "color": "red",
+            },
+        ]
+
+        quick_actions = [
+            {"title": "Nuevo Cliente", "url": "/clients/new", "icon": "👤"},
+            {"title": "Nuevo Producto", "url": "/products/new", "icon": "📦"},
+            {"title": "Nueva Cotización", "url": "/quotations/new", "icon": "📄"},
+            {"title": "Producción", "url": "/production/", "icon": "🏭"},
+        ]
     # =====================================
 # CHART LAST 30 DAYS
 # =====================================

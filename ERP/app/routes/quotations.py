@@ -1,6 +1,7 @@
 from fileinput import filename
 import json
 from datetime import datetime
+import re
 from typing import Optional
 import os
 from urllib import request
@@ -13,7 +14,7 @@ from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
 from fastapi import Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
 
@@ -695,25 +696,39 @@ async def quotation_pdf(quotation_id: int, db: Session = Depends(get_db)):
                 """,
                 status_code=404,
             )
-
-        # =====================================
-        # FILENAME
-        # =====================================
-
-        filename = f"quotation_{quotation_id}.pdf"
-
         # =====================================
         # GENERATE PDF
         # =====================================
 
-        generate_quotation_pdf(quotation, items, client, filename, db)
-
+        pdf_buffer = generate_quotation_pdf(
+            quotation,
+            items,
+            client,
+            db
+        )
         # =====================================
-        # RETURN FILE
+        # CLIENTE 
         # =====================================
+        client_name = client.name or "Cliente"
 
-        return FileResponse(
-            path=filename, media_type="application/pdf", filename=filename
+        # Limpiar caracteres inválidos para Windows
+        client_name = re.sub(
+            r'[<>:"/\\|?*]',
+            '',
+            client_name
+        )
+
+        pdf_name = (
+            f'Cotizacion {quotation.id} - {client_name}.pdf'
+        )
+
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition":
+                f'attachment; filename="{pdf_name}"'
+            }
         )
 
     except Exception as e:

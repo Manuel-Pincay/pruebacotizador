@@ -43,11 +43,11 @@
 
     {% for card in dashboard_cards %}
 
-        {{ stat_card(
-            card.title,
-            card.value,
-            card.icon
-        ) }}
+    {{ stat_card(
+    card.title,
+    card.value,
+    card.icon
+    ) }}
 
     {% endfor %}
 
@@ -83,11 +83,11 @@
 
             {% for action in quick_actions %}
 
-                {{ quick_action(
-                    action.title,
-                    action.url,
-                    action.icon
-                ) }}
+            {{ quick_action(
+            action.title,
+            action.url,
+            action.icon
+            ) }}
 
             {% endfor %}
 
@@ -118,7 +118,7 @@
                 </span>
 
                 {{ status_badge(
-                    quotation.status
+                quotation.status
                 ) }}
 
             </div>
@@ -194,33 +194,33 @@
 
     {% if recent_activity %}
 
-        <div class="space-y-5">
+    <div class="space-y-5">
 
-            {% for activity in recent_activity %}
+        {% for activity in recent_activity %}
 
-            <div class="border-b pb-3">
+        <div class="border-b pb-3">
 
-                <div class="font-medium">
-                    {{ activity.action }}
-                </div>
-
-                <div class="text-sm text-gray-500">
-                    {{ activity.description }}
-                </div>
-
+            <div class="font-medium">
+                {{ activity.action }}
             </div>
 
-            {% endfor %}
+            <div class="text-sm text-gray-500">
+                {{ activity.description }}
+            </div>
 
         </div>
+
+        {% endfor %}
+
+    </div>
 
     {% else %}
 
-        <div class="text-center py-8 text-gray-500">
+    <div class="text-center py-8 text-gray-500">
 
-            No existe actividad registrada.
+        No existe actividad registrada.
 
-        </div>
+    </div>
 
     {% endif %}
 
@@ -228,33 +228,33 @@
 
 <script>
 
-var options = {
+    var options = {
 
-    chart: {
+        chart: {
 
-        type: 'area',
+            type: 'area',
 
-        height: 320,
+            height: 320,
 
-        toolbar: {
+            toolbar: {
 
-            show: false
+                show: false
 
-        }
+            }
 
-    },
+        },
 
-    series: [{
+        series: [{
 
-        name: 'Cotizaciones',
+            name: 'Cotizaciones',
 
-        data: {{ chart_values|tojson }}
+            data: {{ chart_values| tojson }}
 
     }],
 
     xaxis: {
 
-        categories: {{ chart_labels|tojson }}
+        categories: { { chart_labels | tojson } }
 
     },
 
@@ -262,7 +262,7 @@ var options = {
 
         curve: 'smooth',
 
-        width: 3
+            width: 3
 
     },
 
@@ -276,13 +276,13 @@ var options = {
 
         type: 'gradient',
 
-        gradient: {
+            gradient: {
 
             shadeIntensity: 1,
 
-            opacityFrom: 0.4,
+                opacityFrom: 0.4,
 
-            opacityTo: 0.05
+                    opacityTo: 0.05
 
         }
 
@@ -292,15 +292,15 @@ var options = {
 
 };
 
-var chart = new ApexCharts(
+    var chart = new ApexCharts(
 
-    document.querySelector("#quotationChart"),
+        document.querySelector("#quotationChart"),
 
-    options
+        options
 
-);
+    );
 
-chart.render();
+    chart.render();
 
 </script>
 

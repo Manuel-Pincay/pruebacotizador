@@ -54,7 +54,7 @@ UPLOAD_DIR = "uploads/products"
 @router.get("/", response_class=HTMLResponse)
 async def products_page(request: Request, db: Session = Depends(get_db)):
 
-    user = role_required(request, ["admin"])
+    user = role_required(request, ["admin", "ventas"])
 
     if isinstance(user, RedirectResponse):
         return user
@@ -62,7 +62,9 @@ async def products_page(request: Request, db: Session = Depends(get_db)):
     products = db.query(Product).all()
 
     return templates.TemplateResponse(
-        request=request, name="products.html", context={"products": products}
+        request=request,
+        name="products.html",
+        context={"products": products, "user": user},
     )
 
 

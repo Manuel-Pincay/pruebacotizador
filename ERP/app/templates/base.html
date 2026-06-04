@@ -152,8 +152,28 @@ body {
         <!-- NAVIGATION -->
 
         <nav class="flex-1 p-4 space-y-3 overflow-y-auto">
-          <!-- DASHBOARD -->
+          {% set current_role = user.role if user is defined and user else '' %}
 
+          {% if current_role == 'produccion' %}
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
+
+            <span> Dashboard Producción </span>
+          </a>
+
+          <a
+            href="/production/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 🗂️ </span>
+
+            <span> Órdenes de Producción </span>
+          </a>
+
+          {% elif current_role == 'ventas' %}
           <a
             href="/"
             class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
@@ -162,8 +182,6 @@ body {
 
             <span> Dashboard </span>
           </a>
-
-          <!-- COTIZACIONES -->
 
           <a
             href="/quotations"
@@ -174,7 +192,55 @@ body {
             <span> Cotizaciones </span>
           </a>
 
-          <!-- KANBAN -->
+          <div>
+            <button
+              onclick="toggleSidebarMenu('databaseMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> 📚 </span>
+
+                <span> Base de Datos </span>
+              </div>
+
+              <span> ▼ </span>
+            </button>
+
+            <div id="databaseMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
+                href="/clients"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                👥 Clientes
+              </a>
+
+              <a
+                href="/products"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                📦 Productos
+              </a>
+            </div>
+          </div>
+
+          {% elif current_role == 'admin' %}
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
+
+            <span> Dashboard </span>
+          </a>
+
+          <a
+            href="/quotations"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📄 </span>
+
+            <span> Cotizaciones </span>
+          </a>
 
           <a
             href="/production/kanban"
@@ -184,8 +250,6 @@ body {
 
             <span> Kanban </span>
           </a>
-
-          <!-- BASE DE DATOS -->
 
           <div>
             <button
@@ -216,22 +280,13 @@ body {
                 📦 Productos
               </a>
               <a
-                  href="/product-settings"
-                  class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                  ⚙️ Ajustes Productos
-              </a>
-
-              <a
-                href="/imports"
+                href="/product-settings"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
               >
-                📥 Importaciones
+                ⚙️ Configuración de productos
               </a>
             </div>
           </div>
-
-          <!-- PRODUCCION -->
 
           <div>
             <button
@@ -249,29 +304,25 @@ body {
 
             <div id="productionMenu" class="hidden ml-6 mt-2 space-y-2">
               <a
-                href="/production"
+                href="/production/"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
               >
-                🏭 Producción
+                📝 Ordenes
               </a>
-
+              <a
+                href="/production/kanban"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                📋 Kanban
+              </a>
               <a
                 href="/production/calendar"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
               >
-                📅 Calendario
-              </a>
-
-              <a
-                href="/shipments/"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                🚚 Envíos
+                🗓️ Calendario
               </a>
             </div>
           </div>
-
-          <!-- SISTEMA -->
 
           <div>
             <button
@@ -279,7 +330,7 @@ body {
               class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
             >
               <div class="flex items-center gap-3">
-                <span> ⚙️ </span>
+                <span> 🛠️ </span>
 
                 <span> Sistema </span>
               </div>
@@ -289,14 +340,38 @@ body {
 
             <div id="systemMenu" class="hidden ml-6 mt-2 space-y-2">
               <a
+                href="/shipments"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                🚚 Despachos
+              </a>
+              <a
                 href="/users"
                 class="block px-4 py-2 rounded-lg hover:bg-purple-700"
               >
-                🔐 Usuarios
+                👤 Usuarios
+              </a>
+              <a
+                href="/secretadmin/config"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                ⚙️ Configuración
               </a>
             </div>
           </div>
+          {% else %}
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
+
+            <span> Dashboard </span>
+          </a>
+          {% endif %}
         </nav>
+
+        <!-- FOOTER -->
         <!-- FOOTER -->
 
         <div class="p-4 border-t border-purple-700">

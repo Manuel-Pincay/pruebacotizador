@@ -37,12 +37,20 @@ class ProductionOrder(Base):
 
     fabricator = Column(String)
 
+    assigned_to = Column(String)
+
+    started_at = Column(DateTime)
+
+    completed_at = Column(DateTime)
+
     status = Column(
         String,
         default="pendiente"
     )
 
     observations = Column(String)
+
+    notes = Column(String)
 
     created_at = Column(
         DateTime,

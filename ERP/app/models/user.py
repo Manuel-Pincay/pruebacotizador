@@ -9,5 +9,5 @@ class User(Base):
     username = Column(String, unique=True)
     full_name = Column(String)
     password = Column(String)
-    role = Column(String)
+    role = Column(String, default="ventas")
     active = Column(Boolean, default=True)

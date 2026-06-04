@@ -8,6 +8,8 @@ from app.database import SessionLocal
 
 from app.models.user import User
 
+from app.auth.permissions import role_required as permissions_role_required
+
 
 # =========================================
 # LOGIN REQUIRED
@@ -46,21 +48,4 @@ def login_required(request: Request):
 # ROLE REQUIRED
 # =========================================
 
-def role_required(
-    request: Request,
-    allowed_roles: list
-):
-
-    user = login_required(request)
-
-    if isinstance(user, RedirectResponse):
-        return user
-
-    if user.role not in allowed_roles:
-
-        return RedirectResponse(
-            url="/",
-            status_code=302
-        )
-
-    return user
+role_required = permissions_role_required
