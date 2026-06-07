@@ -131,11 +131,12 @@
 
 {% else %}
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
+<div class="erp-kanban-scroll">
+<div class="erp-kanban-columns">
     {% for column in status_columns %}
     {% if hide_delivered and column.status == 'entregado' %}
     {% else %}
-    <div class="flex flex-col min-h-[20rem]">
+    <div class="flex flex-col min-h-[20rem] w-72 xl:w-auto shrink-0">
         <div class="rounded-t-2xl px-4 py-3 flex items-center justify-between text-white
             {% if column.accent == 'slate' %}bg-slate-700
             {% elif column.accent == 'indigo' %}bg-indigo-600
@@ -159,6 +160,7 @@
     </div>
     {% endif %}
     {% endfor %}
+</div>
 </div>
 
 {% endif %}

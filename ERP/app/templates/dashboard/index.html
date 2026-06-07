@@ -6,14 +6,14 @@
 
 {% block content %}
 
-<div class="mb-8">
-    <div class="flex justify-between items-center">
+<div class="mb-6 sm:mb-8">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-            <p class="text-purple-600 font-semibold">👋 Bienvenido de vuelta</p>
-            <h1 class="text-4xl font-bold mt-2">Dashboard</h1>
-            <p class="text-gray-500 mt-2">Aquí tienes un resumen general de tu negocio.</p>
+            <p class="text-purple-600 font-semibold text-sm sm:text-base">👋 Bienvenido de vuelta</p>
+            <h1 class="erp-page-title mt-2">Dashboard</h1>
+            <p class="text-gray-500 mt-2 text-sm sm:text-base">Aquí tienes un resumen general de tu negocio.</p>
         </div>
-        <div class="text-right">
+        <div class="sm:text-right">
             <div class="text-sm text-gray-500">{{ company_name }}</div>
             <div class="font-semibold">{{ user.full_name }}</div>
         </div>
@@ -51,7 +51,7 @@
 <!-- GRAFICO Y ACCIONES -->
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
     <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <div class="flex flex-wrap justify-between items-start gap-3 mb-5">
+        <div class="flex flex-col sm:flex-row flex-wrap justify-between items-start gap-3 mb-5">
             <div>
                 <h2 class="font-bold text-xl">Resumen de Cotizaciones</h2>
                 <p class="text-sm text-gray-500 mt-1">Últimos 30 días · {{ chart_total }} cotización{{ 'es' if chart_total != 1 else '' }}</p>

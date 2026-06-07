@@ -2,63 +2,60 @@
 
 <!-- HEADER -->
 
-<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
+<div class="erp-page-header lg:items-center">
     <div>
-        <h1 class="text-4xl font-bold text-slate-800">Cotizaciones</h1>
-
+        <h1 class="erp-page-title text-slate-800">Cotizaciones</h1>
         <p class="text-gray-500 mt-2">
             Administra y consulta todas las cotizaciones de tu negocio.
         </p>
     </div>
 
-    <div class="flex items-center gap-3">
-        <form method="GET" class="flex items-center gap-3">
-            <div class="relative">
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+        <form method="GET" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div class="relative w-full sm:w-auto">
                 <input type="text" name="search" value="{{ search or '' }}" placeholder="Buscar cotización..."
-                    class="w-72 border border-gray-200 rounded-xl px-4 py-3 pl-10" />
-
+                    class="w-full sm:w-64 lg:w-72 border border-gray-200 rounded-xl px-4 py-3 pl-10" />
                 <span class="absolute left-3 top-3.5"> 🔍 </span>
             </div>
-
-            <button class="bg-purple-700 text-white px-5 py-3 rounded-xl">
+            <button class="bg-purple-700 text-white px-5 py-3 rounded-xl w-full sm:w-auto">
                 Buscar
             </button>
         </form>
         <a href="/quotations/new"
-            class="bg-purple-700 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-medium transition">
+            class="text-center bg-purple-700 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-medium transition w-full sm:w-auto shrink-0">
             + Nueva Cotización
         </a>
     </div>
 </div>
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <p class="text-gray-500 text-sm">Total</p>
-        <h2 class="text-4xl font-bold mt-2">{{ total_quotations }}</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6 mb-8">
+    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+        <p class="text-gray-500 text-xs sm:text-sm">Total</p>
+        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ total_quotations }}</h2>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <p class="text-green-600 text-sm">Aprobadas</p>
-        <h2 class="text-4xl font-bold mt-2">{{ approved_quotations }}</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+        <p class="text-green-600 text-xs sm:text-sm">Aprobadas</p>
+        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ approved_quotations }}</h2>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <p class="text-yellow-600 text-sm">Pendientes</p>
-        <h2 class="text-4xl font-bold mt-2">{{ pending_quotations }}</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+        <p class="text-yellow-600 text-xs sm:text-sm">Pendientes</p>
+        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ pending_quotations }}</h2>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <p class="text-purple-600 text-sm">Producción</p>
-        <h2 class="text-4xl font-bold mt-2">{{ production_quotations }}</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+        <p class="text-purple-600 text-xs sm:text-sm">Producción</p>
+        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ production_quotations }}</h2>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <p class="text-blue-600 text-sm">Enviadas</p>
-        <h2 class="text-4xl font-bold mt-2">{{ sent_quotations }}</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+        <p class="text-blue-600 text-xs sm:text-sm">Enviadas</p>
+        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ sent_quotations }}</h2>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm p-6">
-        <p class="text-green-700 text-sm">Entregadas</p>
-        <h2 class="text-4xl font-bold mt-2">{{ delivered_quotations }}</h2>
+    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+        <p class="text-green-700 text-xs sm:text-sm">Entregadas</p>
+        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ delivered_quotations }}</h2>
     </div>
 </div>
 <!-- FILTROS -->
@@ -240,8 +237,8 @@
         </div>
     </div>
 
-    <div class="overflow-x-auto">
-        <table class="w-full">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="p-5 text-left">#</th>

@@ -2,14 +2,14 @@
 
 {% block content %}
 
-<div class="flex justify-between items-start mb-8">
+<div class="erp-page-header">
     <div>
-        <h1 class="text-4xl font-bold text-slate-900">Clientes</h1>
+        <h1 class="erp-page-title text-slate-900">Clientes</h1>
         <p class="text-slate-500 mt-2">Administración de clientes ERP</p>
     </div>
 
     <a href="/clients/new"
-        class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition">
+        class="erp-full-mobile sm:w-auto text-center bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition shrink-0">
         + Nuevo Cliente
     </a>
 </div>
@@ -54,15 +54,15 @@
 </div>
 
 <div class="bg-white rounded-2xl shadow overflow-hidden">
-    <div class="overflow-x-auto">
-        <table class="w-full">
+    <div class="erp-table-wrap">
+        <table class="erp-table">
             <thead class="bg-gray-100">
                 <tr>
-                    <th class="text-left p-4">Cliente</th>
-                    <th class="text-left p-4">Teléfono</th>
-                    <th class="text-left p-4">Tipo</th>
-                    <th class="text-left p-4">Empresa</th>
-                    <th class="text-left p-4">Acciones</th>
+                    <th class="text-left p-3 sm:p-4">Cliente</th>
+                    <th class="text-left p-3 sm:p-4 erp-hide-mobile">Teléfono</th>
+                    <th class="text-left p-3 sm:p-4">Tipo</th>
+                    <th class="text-left p-3 sm:p-4 erp-hide-mobile">Empresa</th>
+                    <th class="text-left p-3 sm:p-4">Acciones</th>
                 </tr>
             </thead>
 
@@ -135,33 +135,34 @@
 
         return `
         <tr class="border-t hover:bg-slate-50 transition">
-            <td class="p-5">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center font-bold text-purple-700">
+            <td class="p-3 sm:p-5 cell-wrap">
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-100 flex items-center justify-center font-bold text-purple-700 shrink-0">
                         ${initials}
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <div class="font-semibold">${name}</div>
-                        <div class="text-sm text-gray-500">${email}</div>
+                        <div class="text-sm text-gray-500 truncate">${email}</div>
+                        <div class="text-sm text-gray-500 sm:hidden">${phone}</div>
                     </div>
                 </div>
             </td>
-            <td class="p-5">${phone}</td>
-            <td class="p-5">${typeBadge(client.client_type)}</td>
-            <td class="p-5">${company}</td>
-            <td class="p-5">
-                <div class="flex gap-2">
+            <td class="p-3 sm:p-5 erp-hide-mobile">${phone}</td>
+            <td class="p-3 sm:p-5">${typeBadge(client.client_type)}</td>
+            <td class="p-3 sm:p-5 erp-hide-mobile cell-wrap">${company}</td>
+            <td class="p-3 sm:p-5">
+                <div class="erp-actions">
                     <a href="/clients/${client.id}/edit"
-                        class="border border-purple-300 text-purple-700 px-4 py-2 rounded-xl">
+                        class="border border-purple-300 text-purple-700 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl">
                         Editar
                     </a>
                     <a href="/clients/${client.id}/history"
-                        class="border border-gray-300 px-4 py-2 rounded-xl">
+                        class="border border-gray-300 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl">
                         Historial
                     </a>
                     <a href="/clients/${client.id}/delete"
                         onclick="return confirm('¿Eliminar cliente?')"
-                        class="border border-red-300 text-red-600 px-4 py-2 rounded-xl">
+                        class="border border-red-300 text-red-600 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl">
                         Eliminar
                     </a>
                 </div>

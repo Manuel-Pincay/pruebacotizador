@@ -67,19 +67,19 @@
 <div class="erp-container space-y-6">
 
     <!-- HEADER -->
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
+    <div class="erp-page-header">
+        <div class="min-w-0">
             <a href="/products" class="text-sm text-purple-600 hover:text-purple-800 inline-flex items-center gap-1 mb-2">
                 ← Volver a productos
             </a>
-            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Ajustes de productos</h1>
-            <p class="text-slate-500 mt-1">Catálogos usados al crear y cotizar productos</p>
+            <h1 class="erp-page-title text-slate-900">Ajustes de productos</h1>
+            <p class="text-slate-500 mt-1 text-sm sm:text-base">Catálogos usados al crear y cotizar productos</p>
         </div>
 
         <a href="/product-settings/init"
             onclick="return confirm('¿Cargar catálogos iniciales? Solo se añaden valores que no existan.')"
-            class="inline-flex items-center justify-center gap-2 border-2 border-green-500 text-green-700 hover:bg-green-50 px-5 py-3 rounded-xl font-medium transition shrink-0">
-            ⚡ Inicializar catálogos
+            class="erp-full-mobile sm:w-auto text-center shrink-0 bg-purple-100 text-purple-800 px-5 py-3 rounded-xl font-medium hover:bg-purple-200 transition text-sm">
+            Cargar catálogos base
         </a>
     </div>
 

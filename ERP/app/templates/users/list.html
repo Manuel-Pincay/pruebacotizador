@@ -2,24 +2,15 @@
 
 {% block content %}
 
-<div class="flex justify-between items-center mb-8">
+<div class="erp-page-header">
 
     <div>
-
-        <h1 class="text-2xl md:text-3xl font-bold">
-            Usuarios
-        </h1>
-
-        <p class="text-gray-500 mt-1">
-            Administración de accesos ERP
-        </p>
-
+        <h1 class="erp-page-title">Usuarios</h1>
+        <p class="text-gray-500 mt-1">Administración de accesos ERP</p>
     </div>
 
-    <a
-        href="/users/new"
-        class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl"
-    >
+    <a href="/users/new"
+        class="erp-full-mobile sm:w-auto text-center bg-purple-700 hover:bg-purple-800 text-white px-5 py-3 rounded-xl">
         Nuevo Usuario
     </a>
 
@@ -27,9 +18,9 @@
 
 <div class="bg-white rounded-2xl shadow overflow-hidden">
 
-    <div class="overflow-x-auto">
+    <div class="erp-table-wrap">
 
-        <table class="w-full">
+        <table class="erp-table">
 
         <thead class="bg-gray-100">
 

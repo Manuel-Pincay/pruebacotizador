@@ -24,31 +24,48 @@ lucide.createIcons();
         --secondary: {{ global_config.config.secondary_color if global_config.config else '#E9D5FF' }};
         --accent: {{ global_config.config.accent_color if global_config.config else '#4C1D95' }};
         --font-color: {{ global_config.config.font_color if global_config.config else '#333333' }};
+        --sidebar-width: 16rem;
       }
 
       html {
-    font-size: 14px;
-}
+        font-size: 14px;
+        -webkit-text-size-adjust: 100%;
+      }
 
-@media (min-width: 1600px) {
+      @media (min-width: 768px) {
+        html { font-size: 15px; }
+      }
 
-    .erp-container {
+      @media (min-width: 1600px) {
+        .erp-container {
+          max-width: 1800px;
+          margin: 0 auto;
+        }
+      }
 
-        max-width: 1800px;
+      body {
+        font-size: 0.95rem;
+        overflow-x: hidden;
+      }
 
-        margin: 0 auto;
-
-    }
-
-}
-
-body {
-    font-size: 0.95rem;
-}
+      body.sidebar-open {
+        overflow: hidden;
+      }
 
       /* Sidebar gradient */
       #sidebar {
         background: linear-gradient(to bottom, var(--primary)) !important;
+      }
+
+      #sidebar-overlay {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+      }
+
+      #sidebar-overlay.is-visible {
+        opacity: 1;
+        visibility: visible;
       }
 
       /* Override common Tailwind purple classes to use configured colors */
@@ -66,36 +83,133 @@ body {
       a { color: inherit; }
       a:hover { color: var(--accent); }
 
+      /* Responsive helpers */
+      .erp-page-header {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      @media (min-width: 640px) {
+        .erp-page-header {
+          flex-direction: row;
+          align-items: flex-start;
+          justify-content: space-between;
+          margin-bottom: 2rem;
+        }
+      }
+
+      .erp-page-title {
+        font-size: 1.75rem;
+        line-height: 2rem;
+        font-weight: 700;
+      }
+
+      @media (min-width: 768px) {
+        .erp-page-title {
+          font-size: 2.25rem;
+          line-height: 2.5rem;
+        }
+      }
+
+      .erp-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .erp-table {
+        width: 100%;
+        min-width: 42rem;
+      }
+
+      .erp-table th,
+      .erp-table td {
+        white-space: nowrap;
+      }
+
+      .erp-table .cell-wrap {
+        white-space: normal;
+        min-width: 10rem;
+      }
+
+      .erp-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .erp-actions a,
+      .erp-actions button {
+        font-size: 0.8125rem;
+      }
+
+      @media (max-width: 639px) {
+        .erp-hide-mobile { display: none !important; }
+        .erp-stack-mobile {
+          flex-direction: column !important;
+          align-items: stretch !important;
+        }
+        .erp-full-mobile { width: 100% !important; }
+      }
+
+      .erp-kanban-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.75rem;
+      }
+
+      .erp-kanban-columns {
+        display: flex;
+        gap: 1rem;
+        min-width: max-content;
+      }
+
+      @media (min-width: 1536px) {
+        .erp-kanban-columns {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          min-width: 0;
+        }
+      }
     </style>
   </head>
 
   <body class="bg-gray-100">
-    <button
-      onclick="toggleSidebar()"
-      class="md:hidden fixed top-4 left-4 z-[9999] bg-purple-700 text-white w-12 h-12 rounded-xl shadow-xl flex items-center justify-center"
+    <header
+      id="mobileHeader"
+      class="md:hidden fixed top-0 inset-x-0 z-[9998] h-14 bg-white/95 backdrop-blur border-b border-gray-200 flex items-center gap-3 px-3 shadow-sm"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
+      <button
+        id="sidebarToggle"
+        type="button"
+        onclick="toggleSidebar()"
+        aria-label="Abrir menú"
+        class="shrink-0 bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M4 6h16M4 12h16M4 18h16"
-        />
-      </svg>
-    </button>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-slate-800 truncate">
+          {{ global_config.config.company_name if global_config.config else "SISTEMA ERP" }}
+        </p>
+        <p class="text-xs text-gray-500 truncate">ERP Empresarial</p>
+      </div>
+    </header>
+
+    <div
+      id="sidebar-overlay"
+      class="fixed inset-0 bg-black/50 z-40 md:hidden"
+      onclick="closeSidebar()"
+    ></div>
 
     <div class="flex min-h-screen w-full">
-      <!-- SIDEBAR -->
-
       <aside
         id="sidebar"
-        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-64 h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300"
+        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-[var(--sidebar-width)] max-w-[85vw] h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300"
       >
         <!-- LOGO -->
 
@@ -150,7 +264,7 @@ body {
 
         <!-- NAVIGATION -->
 
-        <nav class="flex-1 p-4 space-y-3 overflow-y-auto">
+        <nav class="flex-1 p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto" id="sidebarNav">
           {% set current_role = user.role if user is defined and user else '' %}
 
           {% if current_role == 'produccion' %}
@@ -396,7 +510,7 @@ body {
 
       <!-- MAIN -->
 
-      <main class="flex-1 p-6 max-w-[1800px] mx-auto">
+      <main class="flex-1 w-full min-w-0 pt-[3.75rem] md:pt-0 px-3 sm:px-5 md:px-6 py-4 sm:py-6 max-w-[1800px] mx-auto">
     {% block content %}
     {% endblock %}
 </main>
@@ -405,15 +519,51 @@ body {
     <script>
       function toggleSidebarMenu(id) {
         const menu = document.getElementById(id);
-
         menu.classList.toggle("hidden");
+      }
+
+      function isMobileSidebar() {
+        return window.matchMedia("(max-width: 767px)").matches;
+      }
+
+      function openSidebar() {
+        const sidebar = document.getElementById("sidebar");
+        const overlay = document.getElementById("sidebar-overlay");
+        sidebar.classList.remove("-translate-x-full");
+        overlay.classList.add("is-visible");
+        document.body.classList.add("sidebar-open");
+      }
+
+      function closeSidebar() {
+        const sidebar = document.getElementById("sidebar");
+        const overlay = document.getElementById("sidebar-overlay");
+        sidebar.classList.add("-translate-x-full");
+        overlay.classList.remove("is-visible");
+        document.body.classList.remove("sidebar-open");
       }
 
       function toggleSidebar() {
         const sidebar = document.getElementById("sidebar");
-
-        sidebar.classList.toggle("-translate-x-full");
+        if (sidebar.classList.contains("-translate-x-full")) {
+          openSidebar();
+        } else {
+          closeSidebar();
+        }
       }
+
+      document.getElementById("sidebarNav")?.addEventListener("click", function (event) {
+        if (!isMobileSidebar()) return;
+        const link = event.target.closest("a[href]");
+        if (link) closeSidebar();
+      });
+
+      window.addEventListener("resize", function () {
+        if (!isMobileSidebar()) {
+          document.body.classList.remove("sidebar-open");
+          document.getElementById("sidebar-overlay").classList.remove("is-visible");
+          document.getElementById("sidebar").classList.remove("-translate-x-full");
+        }
+      });
     </script>
 
     
