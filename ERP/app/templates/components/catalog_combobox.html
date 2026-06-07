@@ -1,0 +1,38 @@
+{% macro catalog_combobox(name, label, items, selected='', api_url='', required=false, placeholder='Escribir o elegir...') %}
+{% set names = items | map(attribute='name') | list %}
+{% if selected and selected not in names %}
+  {% set names = names + [selected] %}
+{% endif %}
+<div
+  class="catalog-combobox"
+  data-catalog-combobox
+  data-api-url="{{ api_url }}"
+  data-options='{{ names | tojson }}'
+>
+  <label class="block mb-2">{{ label }}</label>
+  <div class="flex gap-2">
+    <div class="relative flex-1">
+      <input
+        type="text"
+        name="{{ name }}"
+        value="{{ selected }}"
+        data-catalog-input
+        class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+        autocomplete="off"
+        placeholder="{{ placeholder }}"
+        {% if required %}required{% endif %}
+      />
+      <ul
+        data-catalog-list
+        class="catalog-combobox-suggestions hidden absolute z-30 left-0 right-0 top-full mt-1 max-h-48 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+      ></ul>
+    </div>
+    <button
+      type="button"
+      data-catalog-add
+      class="bg-purple-600 hover:bg-purple-700 text-white w-12 rounded-xl flex items-center justify-center shrink-0 font-semibold text-lg"
+      title="Agregar al catálogo"
+    >+</button>
+  </div>
+</div>
+{% endmacro %}

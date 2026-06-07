@@ -45,7 +45,6 @@ services:
       - "8000:8000"
     volumes:
       - ./uploads:/app/uploads
-      - ./database:/app/database
 
 volumes:
   mysql_data:

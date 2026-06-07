@@ -4,9 +4,12 @@ from fastapi import Depends
 from fastapi import Form
 
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 from fastapi.templating import Jinja2Templates
+
+from pydantic import BaseModel
 
 from sqlalchemy.orm import Session
 
@@ -19,6 +22,7 @@ from app.models.productcolor import ProductColor
 from app.models.producttheme import ProductTheme
 from app.models.productthickness import ProductThickness
 from app.models.measurementunit import MeasurementUnit
+from app.services.catalog_seed import seed_product_catalogs
 
 router = APIRouter(prefix="/product-settings", tags=["product_settings"])
 
@@ -29,11 +33,85 @@ from app.utils.context import get_global_config
 templates.env.globals["inject_global_config"] = get_global_config
 
 
+class CatalogItemCreate(BaseModel):
+    name: str
+
+
 def _require_admin(request: Request):
     user = role_required(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
     return user
+
+
+def _api_create_catalog_item(
+    request: Request,
+    db: Session,
+    model,
+    name: str,
+):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse({"ok": False, "error": "No autorizado"}, status_code=401)
+
+    cleaned = name.strip()
+    if not cleaned:
+        return JSONResponse({"ok": False, "error": "El nombre no puede estar vacío"}, status_code=400)
+
+    existing = db.query(model).filter(model.name == cleaned).first()
+    if existing:
+        return {"ok": True, "name": existing.name, "id": existing.id, "created": False}
+
+    item = model(name=cleaned)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return {"ok": True, "name": item.name, "id": item.id, "created": True}
+
+
+@router.post("/api/category")
+async def api_create_category(
+    request: Request,
+    body: CatalogItemCreate,
+    db: Session = Depends(get_db),
+):
+    return _api_create_catalog_item(request, db, ProductCategory, body.name)
+
+
+@router.post("/api/material")
+async def api_create_material(
+    request: Request,
+    body: CatalogItemCreate,
+    db: Session = Depends(get_db),
+):
+    return _api_create_catalog_item(request, db, ProductMaterial, body.name)
+
+
+@router.post("/api/color")
+async def api_create_color(
+    request: Request,
+    body: CatalogItemCreate,
+    db: Session = Depends(get_db),
+):
+    return _api_create_catalog_item(request, db, ProductColor, body.name)
+
+
+@router.post("/api/theme")
+async def api_create_theme(
+    request: Request,
+    body: CatalogItemCreate,
+    db: Session = Depends(get_db),
+):
+    return _api_create_catalog_item(request, db, ProductTheme, body.name)
+
+
+@router.post("/api/thickness")
+async def api_create_thickness(
+    request: Request,
+    body: CatalogItemCreate,
+    db: Session = Depends(get_db),
+):
+    return _api_create_catalog_item(request, db, ProductThickness, body.name)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -129,93 +207,7 @@ async def initialize_catalogs(request: Request, db: Session = Depends(get_db)):
     if isinstance(user, RedirectResponse):
         return user
 
-    categories = ["Topper", "Base", "Letrero", "Caja", "Decoración", "Cake Topper"]
-
-    materials = ["MDF", "Acrílico", "PVC", "Cartón"]
-
-    colors = ["Dorado", "Plateado", "Negro", "Blanco", "Rojo", "Azul", "Verde"]
-
-    thicknesses = ["1 mm", "2 mm", "3 mm", "5 mm", "9 mm", "12 mm", "18 mm"]
-
-    themes = [
-        "Feliz Cumpleaños",
-        "Baby Shower",
-        "Bautizo",
-        "Primera Comunión",
-        "San Valentín",
-        "Navidad",
-        "Año Nuevo",
-    ]
-
-    units = [("Milímetros", "mm"), ("Centímetros", "cm"), ("Metros", "m")]
-
-    # CATEGORIAS
-
-    for item in categories:
-
-        exists = db.query(ProductCategory).filter(ProductCategory.name == item).first()
-
-        if not exists:
-
-            db.add(ProductCategory(name=item))
-
-    # MATERIALES
-
-    for item in materials:
-
-        exists = db.query(ProductMaterial).filter(ProductMaterial.name == item).first()
-
-        if not exists:
-
-            db.add(ProductMaterial(name=item))
-
-    # COLORES
-
-    for item in colors:
-
-        exists = db.query(ProductColor).filter(ProductColor.name == item).first()
-
-        if not exists:
-
-            db.add(ProductColor(name=item))
-
-    # ESPESORES
-
-    for item in thicknesses:
-
-        exists = (
-            db.query(ProductThickness).filter(ProductThickness.name == item).first()
-        )
-
-        if not exists:
-
-            db.add(ProductThickness(name=item))
-
-    # TEMATICAS
-
-    for item in themes:
-
-        exists = db.query(ProductTheme).filter(ProductTheme.name == item).first()
-
-        if not exists:
-
-            db.add(ProductTheme(name=item))
-
-    # UNIDADES
-
-    for name, abbreviation in units:
-
-        exists = (
-            db.query(MeasurementUnit)
-            .filter(MeasurementUnit.abbreviation == abbreviation)
-            .first()
-        )
-
-        if not exists:
-
-            db.add(MeasurementUnit(name=name, abbreviation=abbreviation))
-
-    db.commit()
+    seed_product_catalogs(db)
 
     return RedirectResponse("/product-settings", status_code=302)
 
