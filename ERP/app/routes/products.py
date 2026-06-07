@@ -1,6 +1,4 @@
-import os
-import shutil
-import uuid
+import json
 
 from fastapi import APIRouter
 from fastapi import Request
@@ -29,7 +27,15 @@ from app.models.productthickness import ProductThickness
 from app.models.measurementunit import MeasurementUnit
 from app.models.product import Product
 
-from app.auth.auth_handler import login_required, role_required
+from app.auth.auth_handler import role_required
+from app.utils.image_storage import (
+    UploadValidationError,
+    delete_product_files,
+    product_image_url,
+    read_upload_bytes_sync,
+    save_product_image,
+    validate_upload_filename,
+)
 
 # =====================================
 # ROUTER
@@ -42,8 +48,7 @@ templates = Jinja2Templates(directory="app/templates")
 from app.utils.context import get_global_config
 
 templates.env.globals["inject_global_config"] = get_global_config
-
-UPLOAD_DIR = "uploads/products"
+templates.env.globals["product_image_url"] = product_image_url
 
 
 # =====================================
@@ -59,12 +64,25 @@ async def products_page(request: Request, db: Session = Depends(get_db)):
     if isinstance(user, RedirectResponse):
         return user
 
-    products = db.query(Product).all()
+    products = db.query(Product).order_by(Product.name.asc()).all()
+
+    total_products = len(products)
+    out_of_stock = sum(1 for p in products if (p.stock or 0) <= 0)
+    low_stock = sum(1 for p in products if 0 < (p.stock or 0) <= 5)
+    custom_count = sum(1 for p in products if p.custom)
 
     return templates.TemplateResponse(
         request=request,
-        name="products.html",
-        context={"products": products, "user": user},
+        name="products/list.html",
+        context={
+            "products": products,
+            "user": user,
+            "total_products": total_products,
+            "out_of_stock": out_of_stock,
+            "low_stock": low_stock,
+            "custom_count": custom_count,
+            "is_admin": user.role == "admin",
+        },
     )
 
 
@@ -95,7 +113,7 @@ async def new_product_page(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse(
         request=request,
-        name="product_new.html",
+        name="products/new.html",
         context={
             "categories": categories,
             "materials": materials,
@@ -113,7 +131,11 @@ async def new_product_page(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/search")
-def search_products(q: str, db: Session = Depends(get_db)):
+def search_products(request: Request, q: str, db: Session = Depends(get_db)):
+
+    user = role_required(request, ["admin", "ventas"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     products = (
         db.query(Product)
@@ -153,6 +175,7 @@ def search_products(q: str, db: Session = Depends(get_db)):
 
 @router.post("/new")
 async def create_product(
+    request: Request,
     code: str = Form(...),
     name: str = Form(...),
     description: str = Form(""),
@@ -170,6 +193,10 @@ async def create_product(
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
     formatted_size = ""
 
     if size:
@@ -196,27 +223,21 @@ async def create_product(
         )
     image_name = None
 
-    # =====================================
-    # SAVE IMAGE
-    # =====================================
-
     if image and image.filename:
-
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-        extension = image.filename.split(".")[-1]
-
-        image_name = f"{uuid.uuid4()}.{extension}"
-
-        file_path = os.path.join(UPLOAD_DIR, image_name)
-
-        with open(file_path, "wb") as buffer:
-
-            shutil.copyfileobj(image.file, buffer)
-
-    # =====================================
-    # CREATE PRODUCT
-    # =====================================
+        try:
+            validate_upload_filename(image.filename)
+            data = read_upload_bytes_sync(image, 5 * 1024 * 1024)
+            image_name = save_product_image(data)
+        except UploadValidationError as exc:
+            return HTMLResponse(
+                content=f"""
+                <script>
+                    alert({json.dumps(str(exc))});
+                    window.history.back();
+                </script>
+                """,
+                status_code=400,
+            )
 
     product = Product(
         code=code,
@@ -288,7 +309,7 @@ async def edit_product_page(
 
     return templates.TemplateResponse(
         request=request,
-        name="product_edit.html",
+        name="products/edit.html",
         context={
             "product": product,
             "categories": categories,
@@ -308,6 +329,7 @@ async def edit_product_page(
 
 @router.post("/{product_id}/edit")
 async def update_product(
+    request: Request,
     product_id: int,
     code: str = Form(...),
     name: str = Form(...),
@@ -325,6 +347,10 @@ async def update_product(
     custom: str = Form("no"),
     db: Session = Depends(get_db),
 ):
+
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     try:
 
@@ -430,17 +456,23 @@ async def update_product(
 
 
 @router.get("/{product_id}/delete")
-async def delete_product(product_id: int, db: Session = Depends(get_db)):
+async def delete_product(
+    request: Request, product_id: int, db: Session = Depends(get_db)
+):
+
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     try:
 
         product = db.query(Product).filter(Product.id == product_id).first()
 
         if product:
-
+            image_name = product.image
             db.delete(product)
-
             db.commit()
+            delete_product_files(image_name)
 
         return RedirectResponse(url="/products", status_code=302)
 
@@ -465,7 +497,11 @@ async def delete_product(product_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/list")
-async def products_api(db: Session = Depends(get_db)):
+async def products_api(request: Request, db: Session = Depends(get_db)):
+
+    user = role_required(request, ["admin", "ventas"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     products = db.query(Product).all()
 
@@ -490,6 +526,10 @@ async def catalog_modal(
     db: Session = Depends(get_db)
 ):
 
+    user = role_required(request, ["admin", "ventas"])
+    if isinstance(user, RedirectResponse):
+        return user
+
     products = (
         db.query(Product)
         .order_by(Product.name.asc())
@@ -499,7 +539,7 @@ async def catalog_modal(
 
     return templates.TemplateResponse(
         request=request,
-        name="partials/catalog_table.html",
+        name="partials/products/catalog_table.html",
         context={
             "products": products
         }
@@ -507,9 +547,14 @@ async def catalog_modal(
 
 @router.get("/{product_id}/json")
 async def product_json(
+    request: Request,
     product_id: int,
     db: Session = Depends(get_db)
 ):
+
+    user = role_required(request, ["admin", "ventas"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     product = (
         db.query(Product)

@@ -1,0 +1,166 @@
+{% extends 'layouts/base.html' %}
+{% from "components/kanban_card.html" import kanban_order_card %}
+
+{% block content %}
+
+{% set today = today if today is defined else none %}
+{% set hide_delivered = hide_delivered if hide_delivered is defined else false %}
+{% set view = view if view is defined else 'status' %}
+
+{% if kanban_columns is defined and kanban_columns|length > 0 %}
+    {% set status_columns = kanban_columns %}
+{% else %}
+    {% set status_columns = [
+        {'status': 'pendiente', 'label': 'Pendiente', 'accent': 'slate', 'count': pending|length, 'orders': pending|default([]), 'next_status': 'diseño', 'action_label': 'Pasar a Diseño', 'action_class': 'bg-purple-600 hover:bg-purple-700'},
+        {'status': 'diseño', 'label': 'Diseño', 'accent': 'indigo', 'count': designing|length, 'orders': designing|default([]), 'next_status': 'produccion', 'action_label': 'Pasar a Producción', 'action_class': 'bg-indigo-600 hover:bg-indigo-700'},
+        {'status': 'produccion', 'label': 'Producción', 'accent': 'purple', 'count': producing|length, 'orders': producing|default([]), 'next_status': 'empacado', 'action_label': 'Pasar a Empacado', 'action_class': 'bg-purple-700 hover:bg-purple-800'},
+        {'status': 'empacado', 'label': 'Empacado', 'accent': 'orange', 'count': packed|length, 'orders': packed|default([]), 'next_status': 'enviado', 'action_label': 'Marcar Enviado', 'action_class': 'bg-orange-600 hover:bg-orange-700'},
+        {'status': 'enviado', 'label': 'Enviado', 'accent': 'blue', 'count': shipped|length, 'orders': shipped|default([]), 'next_status': 'entregado', 'action_label': 'Marcar Entregado', 'action_class': 'bg-green-600 hover:bg-green-700'},
+        {'status': 'entregado', 'label': 'Entregado', 'accent': 'green', 'count': delivered|length, 'orders': delivered|default([]), 'next_status': none, 'action_label': none, 'action_class': none},
+    ] %}
+{% endif %}
+
+{% set weekly_columns = weekly_columns if weekly_columns is defined else [] %}
+{% set status_action_map = {
+    'pendiente': status_columns[0] if status_columns|length > 0 else {},
+    'diseño': status_columns[1] if status_columns|length > 1 else {},
+    'produccion': status_columns[2] if status_columns|length > 2 else {},
+    'empacado': status_columns[3] if status_columns|length > 3 else {},
+    'enviado': status_columns[4] if status_columns|length > 4 else {},
+    'entregado': status_columns[5] if status_columns|length > 5 else {},
+} %}
+
+<div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Kanban de Producción</h1>
+        <p class="text-gray-500 mt-1">
+            {% if view == 'week' %}Órdenes agrupadas por semana de entrega{% else %}Flujo por estado de fabricación{% endif %}
+        </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="/production/" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Listado</a>
+        <a href="/production/calendar" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Calendario</a>
+        <a href="/quotations/" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-sm">Cotizaciones</a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm border-l-4 border-purple-600">
+        <div class="text-sm text-gray-500">Órdenes activas</div>
+        <div class="text-2xl font-bold text-slate-900">{{ active_orders_count|default(0) }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm border-l-4 border-red-500">
+        <div class="text-sm text-gray-500">Prioridad alta / urgente</div>
+        <div class="text-2xl font-bold text-slate-900">{{ urgent_orders_count|default(0) }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm border-l-4 border-orange-500">
+        <div class="text-sm text-gray-500">Entregas vencidas</div>
+        <div class="text-2xl font-bold text-slate-900">{{ overdue_orders_count|default(0) }}</div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm p-4 mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div class="flex flex-wrap gap-2">
+        <a href="{{ status_view_url|default('/production/kanban?view=status') }}"
+            class="px-4 py-2 rounded-xl text-sm font-medium {% if view == 'status' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200 text-gray-700{% endif %}">
+            Por estado
+        </a>
+        <a href="{{ week_view_url|default('/production/kanban?view=week') }}"
+            class="px-4 py-2 rounded-xl text-sm font-medium {% if view == 'week' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200 text-gray-700{% endif %}">
+            Por semana
+        </a>
+    </div>
+
+    {% if view == 'week' %}
+    <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ prev_week_url }}" class="px-3 py-2 rounded-xl border hover:bg-gray-50 text-sm" title="Semana anterior">‹</a>
+        <a href="{{ current_week_url }}" class="px-4 py-2 rounded-xl border hover:bg-gray-50 text-sm font-medium">Semana actual</a>
+        <a href="{{ next_week_url }}" class="px-3 py-2 rounded-xl border hover:bg-gray-50 text-sm" title="Semana siguiente">›</a>
+    </div>
+    {% endif %}
+
+    <div>
+        {% if hide_delivered %}
+        <a href="{{ status_view_url if view == 'status' else week_view_url }}" class="text-sm text-purple-700 hover:underline">Mostrar entregadas</a>
+        {% else %}
+        <a href="?view={{ view }}&week={{ week_param|default('') }}&hide_delivered=1" class="text-sm text-gray-500 hover:text-purple-700">Ocultar entregadas</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if view == 'week' %}
+
+<div class="overflow-x-auto pb-4">
+    <div class="flex gap-4 min-w-max">
+        {% for column in weekly_columns %}
+        <div class="w-72 shrink-0 flex flex-col max-h-[calc(100vh-22rem)]">
+            <div class="rounded-t-2xl px-4 py-3 text-white
+                {% if column.accent == 'red' %}bg-red-600
+                {% elif column.accent == 'purple' %}bg-purple-700 ring-2 ring-purple-300
+                {% elif column.accent == 'indigo' %}bg-indigo-600
+                {% elif column.accent == 'slate' %}bg-slate-600
+                {% else %}bg-gray-600{% endif %}">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <h2 class="font-bold text-sm leading-tight">{{ column.label }}</h2>
+                        {% if column.sublabel %}
+                        <p class="text-[11px] text-white/80 mt-0.5">{{ column.sublabel }}</p>
+                        {% endif %}
+                    </div>
+                    <span class="bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full shrink-0">{{ column.count }}</span>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto bg-gray-100 rounded-b-2xl p-3 min-h-[14rem]">
+                {% for order in column.orders %}
+                {% set st = (order.status or 'pendiente')|lower|trim %}
+                {% set action_col = status_action_map.get(st, status_columns[0]) %}
+                {% set move_q = '&view=week&week=' ~ (week_param|urlencode) if week_param is defined and week_param else '' %}
+                {{ kanban_order_card(order, action_col, user, true, move_q) }}
+                {% else %}
+                <div class="rounded-xl border-2 border-dashed border-gray-300 p-5 text-center text-sm text-gray-400">
+                    Sin órdenes
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="w-full text-center py-12 text-gray-500">No hay órdenes para mostrar en vista semanal.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% else %}
+
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
+    {% for column in status_columns %}
+    {% if hide_delivered and column.status == 'entregado' %}
+    {% else %}
+    <div class="flex flex-col min-h-[20rem]">
+        <div class="rounded-t-2xl px-4 py-3 flex items-center justify-between text-white
+            {% if column.accent == 'slate' %}bg-slate-700
+            {% elif column.accent == 'indigo' %}bg-indigo-600
+            {% elif column.accent == 'purple' %}bg-purple-700
+            {% elif column.accent == 'orange' %}bg-orange-600
+            {% elif column.accent == 'blue' %}bg-blue-600
+            {% elif column.accent == 'green' %}bg-green-600
+            {% else %}bg-gray-600{% endif %}">
+            <h2 class="font-bold text-sm">{{ column.label }}</h2>
+            <span class="bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{{ column.count|default(column.orders|length) }}</span>
+        </div>
+        <div class="flex-1 bg-gray-100 rounded-b-2xl p-3 overflow-y-auto max-h-[32rem]">
+            {% for order in column.orders %}
+            {{ kanban_order_card(order, column, user) }}
+            {% else %}
+            <div class="rounded-xl border-2 border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
+                Sin órdenes
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% endif %}
+
+{% endblock %}

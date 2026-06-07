@@ -47,7 +47,7 @@ async def shipments_page(
 
     user = role_required(
         request,
-        ["admin", "despacho"]
+        ["admin", "despacho", "transporte"]
     )
 
     if isinstance(user, RedirectResponse):
@@ -61,7 +61,7 @@ async def shipments_page(
 
     return templates.TemplateResponse(
         request=request,
-        name="shipments.html",
+        name="shipments/list.html",
         context={
             "shipments": shipments
         }
@@ -84,7 +84,7 @@ async def new_shipment(
 
     user = role_required(
         request,
-        ["admin", "despacho"]
+        ["admin", "despacho", "transporte"]
     )
 
     if isinstance(user, RedirectResponse):
@@ -111,7 +111,7 @@ async def new_shipment(
 
     return templates.TemplateResponse(
         request=request,
-        name="shipment_new.html",
+        name="shipments/new.html",
         context={
             "quotation": quotation,
             "client": client
@@ -125,7 +125,7 @@ async def new_shipment(
 
 @router.post("/create")
 async def create_shipment(
-
+    request: Request,
     quotation_id: int = Form(...),
 
     customer_name: str = Form(...),
@@ -145,6 +145,14 @@ async def create_shipment(
     db: Session = Depends(get_db)
 
 ):
+
+    user = role_required(
+        request,
+        ["admin", "despacho", "transporte"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     shipment_count = db.query(
         Shipment
@@ -219,7 +227,7 @@ async def shipment_label(
 
     user = role_required(
         request,
-        ["admin", "despacho"]
+        ["admin", "despacho", "transporte"]
     )
 
     if isinstance(user, RedirectResponse):
@@ -243,7 +251,7 @@ async def shipment_label(
 
     return templates.TemplateResponse(
         request=request,
-        name="shipment_label.html",
+        name="shipments/label.html",
         context={
             "shipment": shipment,
             "company_name": company_name
@@ -257,8 +265,17 @@ async def shipment_label(
 
 @router.get("/{shipment_id}/print")
 async def print_shipment(
+    request: Request,
     shipment_id: int
 ):
+
+    user = role_required(
+        request,
+        ["admin", "despacho", "transporte"]
+    )
+
+    if isinstance(user, RedirectResponse):
+        return user
 
     return RedirectResponse(
         url=f"/shipments/{shipment_id}/label",

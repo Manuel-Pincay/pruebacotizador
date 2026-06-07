@@ -73,7 +73,7 @@ async def imports_page(
 
     return templates.TemplateResponse(
         request=request,
-        name="imports.html",
+        name="imports/index.html",
         context={}
     )
 
@@ -83,7 +83,11 @@ async def imports_page(
 # ==========================================
 
 @router.get("/clients/template")
-async def clients_template():
+async def clients_template(request: Request):
+
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     path = "clients_template.xlsx"
 
@@ -100,7 +104,11 @@ async def clients_template():
 # ==========================================
 
 @router.get("/products/template")
-async def products_template():
+async def products_template(request: Request):
+
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     path = "products_template.xlsx"
 
@@ -118,12 +126,14 @@ async def products_template():
 
 @router.post("/clients/upload")
 async def upload_clients(
-
+    request: Request,
     file: UploadFile = File(...),
-
     db: Session = Depends(get_db)
-
 ):
+
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     file_path = os.path.join(
         UPLOAD_DIR,
@@ -164,12 +174,14 @@ async def upload_clients(
 
 @router.post("/products/upload")
 async def upload_products(
-
+    request: Request,
     file: UploadFile = File(...),
-
     db: Session = Depends(get_db)
-
 ):
+
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
 
     file_path = os.path.join(
         UPLOAD_DIR,

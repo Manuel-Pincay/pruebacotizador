@@ -1,0 +1,245 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+
+{% macro catalog_panel(panel_id, title, icon, items, form_action, delete_prefix, placeholder, empty_text) %}
+<section class="catalog-panel bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full"
+    data-panel-id="{{ panel_id }}">
+
+    <div class="p-5 border-b border-gray-100">
+        <div class="flex justify-between items-start gap-3">
+            <div>
+                <h2 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <span>{{ icon }}</span> {{ title }}
+                </h2>
+                <p class="text-xs text-gray-400 mt-0.5">{{ items|length }} registrados</p>
+            </div>
+            <span class="shrink-0 min-w-[2rem] h-8 px-2 flex items-center justify-center bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
+                {{ items|length }}
+            </span>
+        </div>
+
+        <div class="mt-4">
+            {{ caller() }}
+        </div>
+    </div>
+
+    <div class="p-4 flex-1 min-h-0">
+        <input type="text"
+            class="catalog-search w-full border border-gray-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400"
+            placeholder="Filtrar en {{ title|lower }}..."
+            data-target="{{ panel_id }}">
+
+        <div class="max-h-56 overflow-y-auto pr-1 space-y-2 catalog-list" id="list-{{ panel_id }}">
+
+            {% if items %}
+            {% for item in items %}
+            <div class="catalog-item flex justify-between items-center gap-2 border border-gray-100 rounded-xl px-3 py-2.5 bg-gray-50/80 hover:bg-white hover:border-purple-200 transition"
+                data-name="{{ item.name|lower }}{% if item.abbreviation %} {{ item.abbreviation|lower }}{% endif %}">
+
+                <span class="truncate text-sm text-slate-700 font-medium">
+                    {{ item.name }}{% if item.abbreviation %} <span class="text-gray-400 font-normal">({{ item.abbreviation }})</span>{% endif %}
+                </span>
+
+                <a href="/product-settings/{{ delete_prefix }}/{{ item.id }}/delete"
+                    onclick="return confirm('¿Eliminar este registro?')"
+                    class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                    title="Eliminar">
+                    🗑️
+                </a>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="catalog-empty py-8 text-center text-gray-400">
+                <div class="text-3xl mb-2">{{ icon }}</div>
+                <p class="text-sm">{{ empty_text }}</p>
+            </div>
+            {% endif %}
+
+            <div class="catalog-no-match hidden py-6 text-center text-gray-400 text-sm">
+                Sin coincidencias en este catálogo
+            </div>
+        </div>
+    </div>
+</section>
+{% endmacro %}
+
+<div class="erp-container space-y-6">
+
+    <!-- HEADER -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+            <a href="/products" class="text-sm text-purple-600 hover:text-purple-800 inline-flex items-center gap-1 mb-2">
+                ← Volver a productos
+            </a>
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Ajustes de productos</h1>
+            <p class="text-slate-500 mt-1">Catálogos usados al crear y cotizar productos</p>
+        </div>
+
+        <a href="/product-settings/init"
+            onclick="return confirm('¿Cargar catálogos iniciales? Solo se añaden valores que no existan.')"
+            class="inline-flex items-center justify-center gap-2 border-2 border-green-500 text-green-700 hover:bg-green-50 px-5 py-3 rounded-xl font-medium transition shrink-0">
+            ⚡ Inicializar catálogos
+        </a>
+    </div>
+
+    <!-- RESUMEN -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <p class="text-xs text-gray-500">Total</p>
+            <p class="text-2xl font-bold text-purple-700">{{ total_items }}</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <p class="text-xs text-gray-500">Categorías</p>
+            <p class="text-2xl font-bold text-slate-800">{{ categories|length }}</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <p class="text-xs text-gray-500">Materiales</p>
+            <p class="text-2xl font-bold text-slate-800">{{ materials|length }}</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <p class="text-xs text-gray-500">Colores</p>
+            <p class="text-2xl font-bold text-slate-800">{{ colors|length }}</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <p class="text-xs text-gray-500">Temáticas</p>
+            <p class="text-2xl font-bold text-slate-800">{{ themes|length }}</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <p class="text-xs text-gray-500">Espesores / Unid.</p>
+            <p class="text-2xl font-bold text-slate-800">{{ thicknesses|length }} / {{ units|length }}</p>
+        </div>
+    </div>
+
+    {% if total_items == 0 %}
+    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div class="text-3xl">💡</div>
+        <div class="flex-1">
+            <h3 class="font-semibold text-amber-900">Catálogos vacíos</h3>
+            <p class="text-sm text-amber-800/80 mt-1">
+                Usa «Inicializar catálogos» para cargar valores predeterminados o agrega cada ítem manualmente abajo.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- BÚSQUEDA GLOBAL -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <input id="globalCatalogSearch" type="text"
+                placeholder="Buscar en todos los catálogos..."
+                class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400">
+        </div>
+    </div>
+
+    <!-- PANELES -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+
+        {% call catalog_panel('categories', 'Categorías', '🏷️', categories, '/product-settings/category/new', 'category', 'Nueva categoría', 'No hay categorías. Agrega la primera arriba.') %}
+        <form action="/product-settings/category/new" method="POST" class="flex gap-2">
+            <input type="text" name="name" placeholder="Nueva categoría"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition shrink-0"
+                title="Agregar">+</button>
+        </form>
+        {% endcall %}
+
+        {% call catalog_panel('materials', 'Materiales', '📦', materials, '/product-settings/material/new', 'material', 'Nuevo material', 'No hay materiales registrados.') %}
+        <form action="/product-settings/material/new" method="POST" class="flex gap-2">
+            <input type="text" name="name" placeholder="Nuevo material"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition shrink-0">+</button>
+        </form>
+        {% endcall %}
+
+        {% call catalog_panel('colors', 'Colores', '🎨', colors, '/product-settings/color/new', 'color', 'Nuevo color', 'No hay colores registrados.') %}
+        <form action="/product-settings/color/new" method="POST" class="flex gap-2">
+            <input type="text" name="name" placeholder="Nuevo color"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition shrink-0">+</button>
+        </form>
+        {% endcall %}
+
+        {% call catalog_panel('themes', 'Temáticas', '🎉', themes, '/product-settings/theme/new', 'theme', 'Nueva temática', 'No hay temáticas registradas.') %}
+        <form action="/product-settings/theme/new" method="POST" class="flex gap-2">
+            <input type="text" name="name" placeholder="Nueva temática"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition shrink-0">+</button>
+        </form>
+        {% endcall %}
+
+        {% call catalog_panel('thicknesses', 'Espesores', '📏', thicknesses, '/product-settings/thickness/new', 'thickness', 'Nuevo espesor', 'No hay espesores registrados.') %}
+        <form action="/product-settings/thickness/new" method="POST" class="flex gap-2">
+            <input type="text" name="name" placeholder="Ej: 3 mm"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition shrink-0">+</button>
+        </form>
+        {% endcall %}
+
+        {% call catalog_panel('units', 'Unidades de medida', '📐', units, '/product-settings/unit/new', 'unit', 'Nueva unidad', 'No hay unidades registradas.') %}
+        <form action="/product-settings/unit/new" method="POST" class="flex flex-col sm:flex-row gap-2">
+            <input type="text" name="name" placeholder="Nombre (ej. Centímetros)"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <input type="text" name="abbreviation" placeholder="Abrev. (cm)"
+                class="w-full sm:w-28 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white h-10 px-4 rounded-xl text-sm font-medium transition shrink-0">
+                Agregar
+            </button>
+        </form>
+        {% endcall %}
+
+    </div>
+</div>
+
+<script>
+    function filterPanel(listEl, query) {
+        const items = listEl.querySelectorAll(".catalog-item")
+        const emptyEl = listEl.querySelector(".catalog-empty")
+        const noMatch = listEl.querySelector(".catalog-no-match")
+        let visible = 0
+
+        items.forEach(item => {
+            const match = !query || item.dataset.name.includes(query)
+            item.classList.toggle("hidden", !match)
+            if (match) visible++
+        })
+
+        if (emptyEl) emptyEl.classList.toggle("hidden", query.length > 0)
+        if (noMatch) noMatch.classList.toggle("hidden", visible > 0 || items.length === 0)
+    }
+
+    document.querySelectorAll(".catalog-search").forEach(input => {
+        input.addEventListener("input", () => {
+            const list = document.getElementById("list-" + input.dataset.target)
+            filterPanel(list, input.value.trim().toLowerCase())
+        })
+    })
+
+    document.getElementById("globalCatalogSearch").addEventListener("input", (e) => {
+        const q = e.target.value.trim().toLowerCase()
+        document.querySelectorAll(".catalog-panel").forEach(panel => {
+            const panelId = panel.dataset.panelId
+            const list = document.getElementById("list-" + panelId)
+            const localSearch = panel.querySelector(".catalog-search")
+            if (localSearch) localSearch.value = q ? "" : localSearch.value
+            filterPanel(list, q)
+
+            if (q) {
+                const hasVisible = list.querySelectorAll(".catalog-item:not(.hidden)").length > 0
+                const hasItems = list.querySelectorAll(".catalog-item").length > 0
+                panel.classList.toggle("hidden", hasItems && !hasVisible)
+            } else {
+                panel.classList.remove("hidden")
+            }
+        })
+    })
+</script>
+
+{% endblock %}

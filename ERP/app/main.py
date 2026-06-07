@@ -1,9 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-import socket
-from fastapi.templating import Jinja2Templates
 from app.database import Base, engine, SessionLocal
-from app.database import SessionLocal
+from app.utils.cached_static import CachedStaticFiles
 
 from app.models.user import User
 from app.models.quotation import Quotation
@@ -15,6 +13,8 @@ from app.models.company_config import CompanyConfig
 from app.models.activity_log import ActivityLog
 
 from app.auth.security import hash_password
+
+from app.db_migrations import run_sqlite_migrations
 
 from app.routes import auth
 from app.routes import dashboard
@@ -29,14 +29,14 @@ from app.routes import config
 from app.routes import imports
 from app.routes import product_settings
 
-Base.metadata.create_all(bind=engine)
+from app.config.settings import settings
+
+# SQLite: esquema automático en desarrollo. MySQL: usar Alembic (alembic upgrade head).
+if settings.is_sqlite:
+    Base.metadata.create_all(bind=engine)
+    run_sqlite_migrations()
 
 app = FastAPI(title="SISTEMA ERP")
-from fastapi.templating import Jinja2Templates
-
-templates = Jinja2Templates(
-    directory="app/templates"
-)
 
 app.mount(
     "/static",
@@ -48,7 +48,7 @@ app.mount(
 
 app.mount(
     "/uploads",
-    StaticFiles(directory="uploads"),
+    CachedStaticFiles(directory="uploads"),
     name="uploads"
 )
 
@@ -96,25 +96,3 @@ def create_admin():
 
 
 create_admin()
-
-
-def inject_global_config():
-
-    db = SessionLocal()
-
-    try:
-
-        config = db.query(
-            CompanyConfig
-        ).first()
-
-        return {
-            "config": config
-        }
-
-    finally:
-
-        db.close()
-
-# Note: template globals are registered per-router in their modules to avoid
-# importing DB models at module import time.

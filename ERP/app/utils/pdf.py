@@ -1,4 +1,3 @@
-from annotated_types import doc
 from reportlab.platypus import (
     SimpleDocTemplate,
     Spacer,
@@ -9,15 +8,12 @@ from reportlab.lib.pagesizes import A4
 
 from reportlab.lib import colors
 
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import getSampleStyleSheet
 
 from reportlab.platypus.flowables import HRFlowable
 
-from datetime import datetime
-
-import os
-
 from app.models.company_config import CompanyConfig
+from app.utils.image_storage import resolve_design_path
 
 from app.services.pdf_sections import (
     build_header,
@@ -27,7 +23,6 @@ from app.services.pdf_sections import (
     build_notes_section,
 )
 from io import BytesIO
-from fastapi.responses import StreamingResponse
 
 
 def generate_quotation_pdf(quotation, items, client, db=None):
@@ -109,18 +104,7 @@ def generate_quotation_pdf(quotation, items, client, db=None):
 
     # ====================================
     # DESIGN IMAGE
-    # ====================================
-    image_path = None
-
-    if quotation.design_file:
-
-        image_path = os.path.join("uploads", "designs", quotation.design_file)
-
-        print("IMAGE PATH:", image_path)
-
-        print("EXISTS:", os.path.exists(image_path))
-
-        print("DESIGN FILE:", quotation.design_file)
+    image_path = resolve_design_path(quotation.design_file)
 
     elements.append(build_design_totals_section(quotation, config, image_path))
 

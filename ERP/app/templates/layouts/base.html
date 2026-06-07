@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    {% set global_config = inject_global_config() %}
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>
+      {{ global_config.config.company_name if global_config.config else "SISTEMA
+      ERP" }} ERP
+    </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+lucide.createIcons();
+</script>
+
+    <style>
+      :root {
+        --primary: {{ global_config.config.primary_color if global_config.config else '#7C3AED' }};
+        --secondary: {{ global_config.config.secondary_color if global_config.config else '#E9D5FF' }};
+        --accent: {{ global_config.config.accent_color if global_config.config else '#4C1D95' }};
+        --font-color: {{ global_config.config.font_color if global_config.config else '#333333' }};
+      }
+
+      html {
+    font-size: 14px;
+}
+
+@media (min-width: 1600px) {
+
+    .erp-container {
+
+        max-width: 1800px;
+
+        margin: 0 auto;
+
+    }
+
+}
+
+body {
+    font-size: 0.95rem;
+}
+
+      /* Sidebar gradient */
+      #sidebar {
+        background: linear-gradient(to bottom, var(--primary)) !important;
+      }
+
+      /* Override common Tailwind purple classes to use configured colors */
+      .bg-purple-700 { background-color: var(--primary) !important; }
+      .hover\:bg-purple-800:hover { background-color: var(--accent) !important; }
+      .text-purple-200 { color: var(--secondary) !important; }
+      .border-purple-700 { border-color: var(--primary) !important; }
+
+      /* Buttons */
+      .btn-primary { background-color: var(--primary) !important; color: white !important; }
+      .btn-primary:hover { filter: brightness(0.9); }
+      .btn-secondary { background-color: var(--secondary) !important; color: black !important; }
+
+      /* Links/Accent */
+      a { color: inherit; }
+      a:hover { color: var(--accent); }
+
+    </style>
+  </head>
+
+  <body class="bg-gray-100">
+    <button
+      onclick="toggleSidebar()"
+      class="md:hidden fixed top-4 left-4 z-[9999] bg-purple-700 text-white w-12 h-12 rounded-xl shadow-xl flex items-center justify-center"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 6h16M4 12h16M4 18h16"
+        />
+      </svg>
+    </button>
+
+    <div class="flex min-h-screen w-full">
+      <!-- SIDEBAR -->
+
+      <aside
+        id="sidebar"
+        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-64 h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300"
+      >
+        <!-- LOGO -->
+
+        <div class="p-6">
+
+    <div class="flex items-center gap-3">
+
+        <div class="
+            w-12 h-12
+            rounded-2xl
+            bg-white/15
+            backdrop-blur
+            flex items-center justify-center
+        ">
+
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="w-7 h-7 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M3 7l9-4 9 4v10l-9 4-9-4V7z"
+                />
+            </svg>
+
+        </div>
+
+        <div>
+
+            <h1 class="text-xl font-bold leading-tight">
+
+                {{ global_config.config.company_name if global_config.config else "SISTEMA ERP" }}
+
+            </h1>
+
+            <p class="text-purple-200 text-xs">
+
+                ERP Empresarial
+
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+        <!-- NAVIGATION -->
+
+        <nav class="flex-1 p-4 space-y-3 overflow-y-auto">
+          {% set current_role = user.role if user is defined and user else '' %}
+
+          {% if current_role == 'produccion' %}
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
+
+            <span> Dashboard Producción </span>
+          </a>
+
+          <a
+            href="/production/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 🗂️ </span>
+
+            <span> Órdenes de Producción </span>
+          </a>
+
+          {% elif current_role == 'ventas' %}
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
+
+            <span> Dashboard </span>
+          </a>
+
+          <a
+            href="/quotations"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📄 </span>
+
+            <span> Cotizaciones </span>
+          </a>
+
+          <a
+            href="/quotations/tracking"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📈 </span>
+
+            <span> Seguimiento Comercial </span>
+          </a>
+
+          <div>
+            <button
+              onclick="toggleSidebarMenu('databaseMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> 📚 </span>
+
+                <span> Base de Datos </span>
+              </div>
+
+              <span> ▼ </span>
+            </button>
+
+            <div id="databaseMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
+                href="/clients"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                👥 Clientes
+              </a>
+
+              <a
+                href="/products"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                📦 Productos
+              </a>
+            </div>
+          </div>
+
+          {% elif current_role == 'admin' %}
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
+
+            <span> Dashboard </span>
+          </a>
+
+          <a
+            href="/quotations"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📄 </span>
+
+            <span> Cotizaciones </span>
+          </a>
+
+          <a
+            href="/production/kanban"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 🗂️ </span>
+
+            <span> Kanban </span>
+          </a>
+
+          <div>
+            <button
+              onclick="toggleSidebarMenu('databaseMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> 📚 </span>
+
+                <span> Base de Datos </span>
+              </div>
+
+              <span> ▼ </span>
+            </button>
+
+            <div id="databaseMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
+                href="/clients"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                👥 Clientes
+              </a>
+
+              <a
+                href="/products"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                📦 Productos
+              </a>
+              <a
+                href="/product-settings"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                ⚙️ Configuración de productos
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <button
+              onclick="toggleSidebarMenu('productionMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> 🏭 </span>
+
+                <span> Producción </span>
+              </div>
+
+              <span> ▼ </span>
+            </button>
+
+            <div id="productionMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
+                href="/production/"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                📝 Ordenes
+              </a>
+              <a
+                href="/production/kanban"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                📋 Kanban
+              </a>
+              <a
+                href="/production/calendar"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                🗓️ Calendario
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <button
+              onclick="toggleSidebarMenu('systemMenu')"
+              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+            >
+              <div class="flex items-center gap-3">
+                <span> 🛠️ </span>
+
+                <span> Sistema </span>
+              </div>
+
+              <span> ▼ </span>
+            </button>
+
+            <div id="systemMenu" class="hidden ml-6 mt-2 space-y-2">
+              <a
+                href="/shipments"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                🚚 Despachos
+              </a>
+              <a
+                href="/users"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                👤 Usuarios
+              </a>
+              <a
+                href="/secretadmin/config"
+                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                ⚙️ Configuración
+              </a>
+            </div>
+          </div>
+          {% else %}
+          <a
+            href="/"
+            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+          >
+            <span> 📊 </span>
+
+            <span> Dashboard </span>
+          </a>
+          {% endif %}
+        </nav>
+
+        <!-- FOOTER -->
+        <!-- FOOTER -->
+
+        <div class="p-4 border-t border-purple-700">
+          <a
+            href="/logout"
+            class="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl transition"
+          >
+            <span> 🚪 </span>
+
+            <span> Cerrar sesión </span>
+          </a>
+        </div>
+      </aside>
+
+      <!-- MAIN -->
+
+      <main class="flex-1 p-6 max-w-[1800px] mx-auto">
+    {% block content %}
+    {% endblock %}
+</main>
+    </div>
+
+    <script>
+      function toggleSidebarMenu(id) {
+        const menu = document.getElementById(id);
+
+        menu.classList.toggle("hidden");
+      }
+
+      function toggleSidebar() {
+        const sidebar = document.getElementById("sidebar");
+
+        sidebar.classList.toggle("-translate-x-full");
+      }
+    </script>
+
+    
+  </body>
+</html>

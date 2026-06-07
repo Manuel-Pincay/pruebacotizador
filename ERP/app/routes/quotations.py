@@ -1,67 +1,105 @@
-from fileinput import filename
 import json
-from datetime import datetime
 import re
+from datetime import datetime
 from typing import Optional
-import os
-from urllib import request
-import uuid
-import shutil
 
-from fastapi import UploadFile
-from fastapi import File
-from fastapi import APIRouter
-from fastapi import Request
-from fastapi import Depends
-from fastapi import Form
-from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.responses import HTMLResponse
-from fastapi.responses import RedirectResponse
-
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session, joinedload
 
-from sqlalchemy.orm import Session
-
+from app.auth.auth_handler import role_required
 from app.database import get_db
-from app.utils.activity import log_activity
-from app.utils.pdf import generate_quotation_pdf
-from app.auth.auth_handler import login_required, role_required
-
 from app.models.client import Client
+from app.models.company_config import CompanyConfig
+from app.models.inventory_movement import InventoryMovement
 from app.models.product import Product
+from app.models.production_order import ProductionOrder
 from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
-from app.models.production_order import ProductionOrder
-from app.models.inventory_movement import InventoryMovement
-from app.models.company_config import CompanyConfig
+from app.services.production_helpers import ensure_production_order, cancel_stale_pending_quotations
+from app.services.quotation_service import recalculate_quotation
+from app.utils.activity import log_activity
+from app.utils.context import get_global_config
+from app.utils.pdf import generate_quotation_pdf
+from app.utils.status_helpers import COMPLETED_STATUSES, expand_status_filter
+from app.config.settings import settings
+from app.utils.pagination import build_page_url, paginate_query
+from app.utils.image_storage import (
+    UploadValidationError,
+    design_image_url,
+    read_upload_bytes,
+    save_design_image,
+    validate_upload_filename,
+)
 
 router = APIRouter(prefix="/quotations", tags=["quotations"])
 
 templates = Jinja2Templates(directory="app/templates")
-
-from app.utils.context import get_global_config
-
 templates.env.globals["inject_global_config"] = get_global_config
+templates.env.globals["build_page_url"] = build_page_url
+templates.env.globals["design_image_url"] = design_image_url
+
+QUOTATION_ROLES = ["admin", "ventas"]
+
+
+def _purge_quotation(db: Session, quotation: Quotation) -> None:
+    """Elimina ítems y órdenes de producción ligadas antes de borrar la cotización."""
+    db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete(
+        synchronize_session=False
+    )
+    db.query(ProductionOrder).filter(
+        ProductionOrder.quotation_id == quotation.id
+    ).delete(synchronize_session=False)
+    db.delete(quotation)
+
+
+def _normalize_product_id(value) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _require_quotation_access(request: Request):
+    user = role_required(request, QUOTATION_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    return user
+
+
+def _quotation_counts(db: Session) -> dict:
+    return {
+        "total_quotations": db.query(Quotation).count(),
+        "pending_quotations": db.query(Quotation).filter(Quotation.status == "pendiente").count(),
+        "approved_quotations": db.query(Quotation).filter(Quotation.status == "aprobada").count(),
+        "production_quotations": db.query(Quotation).filter(Quotation.status == "produccion").count(),
+        "sent_quotations": db.query(Quotation).filter(
+            Quotation.status.in_(["enviada", "enviado"])
+        ).count(),
+        "delivered_quotations": db.query(Quotation).filter(
+            Quotation.status.in_(["entregada", "entregado"])
+        ).count(),
+        "cancelled_quotations": db.query(Quotation).filter(Quotation.status == "cancelada").count(),
+    }
 
 
 @router.get("/new", response_class=HTMLResponse)
 async def new_quotation(request: Request, db: Session = Depends(get_db)):
-
-    user = role_required(request, ["admin", "ventas"])
-
+    user = _require_quotation_access(request)
     if isinstance(user, RedirectResponse):
         return user
 
     clients = db.query(Client).all()
-
     products = db.query(Product).all()
-
     config = db.query(CompanyConfig).first()
 
     return templates.TemplateResponse(
         request=request,
-        name="quotation_new.html",
-        context={"clients": clients, "products": products, "config": config},
+        name="quotations/new.html",
+        context={"clients": clients, "products": products, "config": config, "user": user},
     )
 
 
@@ -73,684 +111,146 @@ async def quotations_page(
     status: str = "",
     start_date: str = "",
     end_date: str = "",
-    db: Session = Depends(get_db)
+    page: int = 1,
+    db: Session = Depends(get_db),
 ):
-
-    user = role_required(
-        request,
-        ["admin", "ventas"]
-    )
-
+    user = _require_quotation_access(request)
     if isinstance(user, RedirectResponse):
         return user
 
-    query = db.query(
-        Quotation
-    )
+    cancel_stale_pending_quotations(db)
 
-    # ==========================
-    # BUSQUEDA GENERAL
-    # ==========================
+    query = db.query(Quotation).options(joinedload(Quotation.client))
 
     if search:
-
-        query = query.join(
-            Client
-        ).filter(
-            Client.name.ilike(
-                f"%{search}%"
-            )
-        )
-
-    # ==========================
-    # CLIENTE
-    # ==========================
+        query = query.join(Client).filter(Client.name.ilike(f"%{search}%"))
 
     if client_id and client_id.strip():
-
-        query = query.filter(
-            Quotation.client_id == int(client_id)
-        )
-
-    # ==========================
-    # ESTADO
-    # ==========================
+        query = query.filter(Quotation.client_id == int(client_id))
 
     if status:
-        statuses = [s.strip().lower() for s in status.split(",") if s.strip()]
-
-        expanded = set()
-        for s in statuses:
-            if s in ("enviada", "enviado"):
-                expanded.update(["enviada", "enviado"])
-            elif s in ("entregada", "entregado"):
-                expanded.update(["entregada", "entregado"])
-            else:
-                expanded.add(s)
-
-        query = query.filter(Quotation.status.in_(list(expanded)))
-
-    # ==========================
-    # FECHA INICIO
-    # ==========================
+        query = query.filter(Quotation.status.in_(expand_status_filter(status)))
 
     if start_date:
-
-        query = query.filter(
-            Quotation.created_at >= start_date
-        )
-
-    # ==========================
-    # FECHA FIN
-    # ==========================
+        query = query.filter(Quotation.created_at >= start_date)
 
     if end_date:
+        query = query.filter(Quotation.created_at <= end_date)
 
-        query = query.filter(
-            Quotation.created_at <= end_date
-        )
+    query = query.order_by(Quotation.id.desc())
+    pagination = paginate_query(query, page, settings.per_page)
+    clients = db.query(Client).order_by(Client.name).all()
+    counts = _quotation_counts(db)
 
-    quotations = query.order_by(
-        Quotation.id.desc()
-    ).all()
-
-    total_quotations = db.query(
-        Quotation
-    ).count()
-
-    pending_quotations = db.query(
-        Quotation
-    ).filter(
-        Quotation.status == "pendiente"
-    ).count()
-
-    approved_quotations = db.query(
-        Quotation
-    ).filter(
-        Quotation.status == "aprobada"
-    ).count()
-
-    production_quotations = db.query(
-        Quotation
-    ).filter(
-        Quotation.status == "produccion"
-    ).count()
-
-    sent_quotations = db.query(Quotation).filter(
-        Quotation.status.in_(["enviada", "enviado"])
-    ).count()
-
-    delivered_quotations = db.query(Quotation).filter(
-        Quotation.status.in_(["entregada", "entregado"])
-    ).count()
-
-    cancelled_quotations = db.query(
-        Quotation
-    ).filter(
-        Quotation.status == "cancelada"
-    ).count()
-
-    clients = db.query(
-        Client
-    ).order_by(
-        Client.name
-    ).all()
+    filter_params = {
+        "search": search,
+        "client_id": client_id or "",
+        "status": status,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
 
     return templates.TemplateResponse(
         request=request,
-        name="quotations.html",
+        name="quotations/list.html",
         context={
-            "quotations": quotations,
+            "quotations": pagination["items"],
             "clients": clients,
             "search": search,
             "client_id": client_id,
             "status": status,
             "start_date": start_date,
             "end_date": end_date,
-
-            "total_quotations": total_quotations,
-            "pending_quotations": pending_quotations,
-            "approved_quotations": approved_quotations,
-            "production_quotations": production_quotations,
-            "sent_quotations": sent_quotations,
-            "delivered_quotations": delivered_quotations,
-            "cancelled_quotations": cancelled_quotations,
+            "user": user,
+            "page": pagination["page"],
+            "pages": pagination["pages"],
+            "filtered_total": pagination["total"],
+            "filter_params": filter_params,
+            **counts,
         },
-    )
-
-
-@router.get("/{quotation_id}", response_class=HTMLResponse)
-async def quotation_detail(
-    quotation_id: int, request: Request, db: Session = Depends(get_db)
-):
-
-    user = role_required(request, ["admin", "ventas"])
-
-    if isinstance(user, RedirectResponse):
-        return user
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-    return templates.TemplateResponse(
-        request=request, name="quotation_detail.html", context={"quotation": quotation}
     )
 
 
 @router.get("/completed", response_class=HTMLResponse)
-async def completed_quotations_page(
-    request: Request,
-    db: Session = Depends(get_db)
-):
+async def completed_quotations_page(request: Request, db: Session = Depends(get_db)):
     return await quotations_page(
         request=request,
         search="",
         client_id=None,
-        status="produccion,enviada,enviado,entregada,entregado",
+        status=",".join(COMPLETED_STATUSES),
         start_date="",
         end_date="",
-        db=db
+        db=db,
     )
 
 
-@router.get("/{quotation_id}/approve")
-async def approve_quotation(quotation_id: int, db: Session = Depends(get_db)):
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-    if not quotation:
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # SOLO PENDIENTES
-    if quotation.status != "pendiente":
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # APROBAR
-    quotation.status = "aprobada"
-
-    existing_order = (
-        db.query(ProductionOrder)
-        .filter(ProductionOrder.quotation_id == quotation.id)
-        .first()
-    )
-
-    if not existing_order:
-
-        production_order = ProductionOrder(
-            quotation_id=quotation.id,
-            delivery_date=quotation.delivery_date,
-            priority="media",
-            status="pendiente",
-            observations=""
-        )
-
-        db.add(production_order)
-
-    db.commit()
-
-    return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
-
-
-@router.get("/{quotation_id}/cancel")
-async def cancel_quotation(quotation_id: int, db: Session = Depends(get_db)):
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-    if not quotation:
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # SOLO SI ESTÁ PENDIENTE
-    if quotation.status != "pendiente":
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    quotation.status = "cancelada"
-
-    db.commit()
-
-    return RedirectResponse(url="/quotations", status_code=302)
-
-
-@router.get("/{quotation_id}/delete")
-async def delete_quotation(quotation_id: int, db: Session = Depends(get_db)):
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-    if not quotation:
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # SOLO PENDIENTES
-    if quotation.status != "pendiente":
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # BORRAR ITEMS
-    db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete()
-
-    # BORRAR COTIZACIÓN
-    db.delete(quotation)
-
-    db.commit()
-
-    return RedirectResponse(url="/quotations", status_code=302)
-
-
-@router.get("/{quotation_id}/edit", response_class=HTMLResponse)
-async def edit_quotation_page(
-    quotation_id: int, request: Request, db: Session = Depends(get_db)
-):
-
-    user = role_required(request, ["admin", "ventas"])
-
+@router.get("/tracking", response_class=HTMLResponse)
+async def sales_tracking_page(request: Request, db: Session = Depends(get_db)):
+    user = _require_quotation_access(request)
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    cancel_stale_pending_quotations(db)
 
-    if not quotation:
+    pipeline = [
+        {"key": "pendiente", "label": "Pendientes", "count": db.query(Quotation).filter(Quotation.status == "pendiente").count()},
+        {"key": "aprobada", "label": "Aprobadas", "count": db.query(Quotation).filter(Quotation.status == "aprobada").count()},
+        {"key": "produccion", "label": "En producción", "count": db.query(Quotation).filter(Quotation.status == "produccion").count()},
+        {"key": "enviada,enviado", "label": "Enviadas", "count": db.query(Quotation).filter(Quotation.status.in_(["enviada", "enviado"])).count()},
+        {"key": "entregada,entregado", "label": "Entregadas", "count": db.query(Quotation).filter(Quotation.status.in_(["entregada", "entregado"])).count()},
+        {"key": "cancelada", "label": "Canceladas", "count": db.query(Quotation).filter(Quotation.status == "cancelada").count()},
+    ]
 
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # SOLO PENDIENTES
-    if quotation.status != "pendiente":
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    clients = db.query(Client).all()
-    products = db.query(Product).all()
-    config = db.query(CompanyConfig).first()
-
-    items = (
-        db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).all()
+    active_quotations = (
+        db.query(Quotation)
+        .options(joinedload(Quotation.client))
+        .filter(~Quotation.status.in_(["cancelada", "entregada", "entregado"]))
+        .order_by(Quotation.id.desc())
+        .limit(50)
+        .all()
     )
-
-    # ITEMS PARA JS
-    items_json = []
-
-    for item in items:
-
-        items_json.append(
-            {
-                "type": "inventory",
-                "product_id": None,
-                "quantity": item.quantity,
-                "detail": item.detail,
-                "price": item.unit_price,
-                "total": item.total,
-            }
-        )
 
     return templates.TemplateResponse(
         request=request,
-        name="quotation_new.html",
+        name="quotations/tracking.html",
         context={
-            "clients": clients,
-            "products": products,
-            "config": config,
-            "quotation": quotation,
-            "items_json": json.dumps(items_json),
-            "edit_mode": True,
+            "pipeline": pipeline,
+            "active_quotations": active_quotations,
+            "user": user,
         },
     )
 
 
-@router.post("/{quotation_id}/edit")
-async def update_quotation(
-    quotation_id: int,
-    client_id: int = Form(...),
-    subtotal: float = Form(...),
-    discount: float = Form(...),
-    iva: float = Form(...),
-    total: float = Form(...),
-    items: str = Form(...),
+@router.get("/catalog")
+async def product_catalog(
+    request: Request,
+    q: str = "",
+    page: int = 1,
     db: Session = Depends(get_db),
 ):
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-    if not quotation:
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # SOLO PENDIENTES
-    if quotation.status != "pendiente":
-
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    # UPDATE HEADER
-    quotation.client_id = client_id
-
-    quotation.subtotal = subtotal
-
-    quotation.discount = discount
-
-    quotation.iva = iva
-
-    quotation.total = total
-
-    # DELETE OLD ITEMS
-    db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete()
-
-    items_data = json.loads(items)
-
-    # INSERT NEW ITEMS
-    for item in items_data:
-
-        quotation_item = QuotationItem(
-            quotation_id=quotation.id,
-            product_id=item.get("product_id"),
-            quantity=item.get("quantity", 1),
-            detail=item.get("detail", ""),
-            unit_price=item.get("price", 0.0),
-            total=item.get("total", 0.0),
-        )
-
-        db.add(quotation_item)
-
-    db.commit()
-
-    return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
-
-
-@router.get("/{quotation_id}/production")
-async def production_quotation(quotation_id: int, db: Session = Depends(get_db)):
-
-    try:
-
-        # =====================================
-        # QUOTATION
-        # =====================================
-
-        quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-        if not quotation:
-
-            return RedirectResponse(url="/quotations/", status_code=302)
-
-        # =====================================
-        # ITEMS
-        # =====================================
-
-        items = (
-            db.query(QuotationItem)
-            .filter(QuotationItem.quotation_id == quotation.id)
-            .all()
-        )
-
-        # =====================================
-        # VALIDATE + DISCOUNT STOCK
-        # =====================================
-
-        for item in items:
-
-            # IGNORE CUSTOM PRODUCTS
-            if not item.product_id:
-                continue
-
-            product = db.query(Product).filter(Product.id == item.product_id).first()
-
-            if not product:
-                continue
-
-            previous_stock = product.stock or 0
-
-            new_stock = previous_stock - item.quantity
-
-            # =====================================
-            # NO NEGATIVE STOCK
-            # =====================================
-
-            if new_stock < 0:
-
-                return HTMLResponse(
-                    content=f"""
-                    <h1>
-                        Stock insuficiente
-                    </h1>
-
-                    <p>
-                        Producto:
-                        {product.name}
-                    </p>
-
-                    <p>
-                        Disponible:
-                        {previous_stock}
-                    </p>
-
-                    <p>
-                        Solicitado:
-                        {item.quantity}
-                    </p>
-                    """,
-                    status_code=400,
-                )
-
-            # =====================================
-            # UPDATE STOCK
-            # =====================================
-
-            product.stock = new_stock
-
-            # =====================================
-            # CREATE MOVEMENT
-            # =====================================
-
-            movement = InventoryMovement(
-                product_id=product.id,
-                movement_type="salida",
-                quantity=-item.quantity,
-                previous_stock=product.stock or 0,
-                new_stock=new_stock,
-                reason=f"Cotización #{quotation.id} → Producción",
-            )
-
-            db.add(movement)
-
-        # =====================================
-        # UPDATE QUOTATION
-        # =====================================
-
-        if quotation.status == "produccion":
-
-            return RedirectResponse(url="/production/", status_code=302)
-
-        # =====================================
-        # UPDATE QUOTATION STATUS
-        # =====================================
-
-        quotation.status = "produccion"
-
-        # =====================================
-        # CHECK EXISTING ORDER
-        # =====================================
-
-        existing_order = (
-            db.query(ProductionOrder)
-            .filter(ProductionOrder.quotation_id == quotation.id)
-            .first()
-        )
-
-        # =====================================
-        # CREATE ONLY IF NOT EXISTS
-        # =====================================
-
-        if not existing_order:
-
-            production_order = ProductionOrder(
-                quotation_id=quotation.id,
-                status="pendiente",
-                priority="media",
-                delivery_date=quotation.delivery_date,
-            )
-
-            db.add(production_order)
-
-        # =====================================
-        # SAVE
-        # =====================================
-
-        db.commit()
-
-        try:
-            log_activity(db, "Enviado a producción", f"Cotización #{quotation.id}")
-        except Exception:
-            pass
-
-        return RedirectResponse(url="/production/", status_code=302)
-
-    except Exception as e:
-
-        db.rollback()
-
-        print("ERROR PRODUCTION:", str(e))
-
-        return HTMLResponse(
-            content=f"""
-            <h1>
-                Error enviando a producción
-            </h1>
-
-            <p>
-                {str(e)}
-            </p>
-            """,
-            status_code=500,
-        )
-
-
-@router.get("/{quotation_id}/shipping")
-async def shipping_quotation(quotation_id: int, db: Session = Depends(get_db)):
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-    if quotation.status != "produccion":
-
-        return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
-
-    quotation.status = "enviada"
-
-    db.commit()
-
-
-@router.get("/{quotation_id}/delivered")
-async def delivered_quotation(quotation_id: int, db: Session = Depends(get_db)):
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-    quotation.status = "entregada"
-
-    db.commit()
-
-    return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
-
-
-@router.get("/{quotation_id}/pdf")
-async def quotation_pdf(quotation_id: int, db: Session = Depends(get_db)):
-
-    try:
-
-        # =====================================
-        # QUOTATION
-        # =====================================
-
-        quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-
-        if not quotation:
-
-            return HTMLResponse(
-                content="""
-                <h1>
-                    Cotización no encontrada
-                </h1>
-                """,
-                status_code=404,
-            )
-
-        # =====================================
-        # ITEMS
-        # =====================================
-
-        items = (
-            db.query(QuotationItem)
-            .filter(QuotationItem.quotation_id == quotation_id)
-            .all()
-        )
-
-        # =====================================
-        # CLIENT
-        # =====================================
-
-        client = db.query(Client).filter(Client.id == quotation.client_id).first()
-
-        if not client:
-
-            return HTMLResponse(
-                content="""
-                <h1>
-                    Cliente no encontrado
-                </h1>
-                """,
-                status_code=404,
-            )
-        # =====================================
-        # GENERATE PDF
-        # =====================================
-
-        pdf_buffer = generate_quotation_pdf(
-            quotation,
-            items,
-            client,
-            db
-        )
-        # =====================================
-        # CLIENTE 
-        # =====================================
-        client_name = client.name or "Cliente"
-
-        # Limpiar caracteres inválidos para Windows
-        client_name = re.sub(
-            r'[<>:"/\\|?*]',
-            '',
-            client_name
-        )
-
-        pdf_name = (
-            f'Cotizacion {quotation.id} - {client_name}.pdf'
-        )
-
-        return StreamingResponse(
-            pdf_buffer,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition":
-                f'attachment; filename="{pdf_name}"'
-            }
-        )
-
-    except Exception as e:
-
-        print("ERROR PDF:", str(e))
-
-        return HTMLResponse(
-            content=f"""
-            <h1>
-                Error generando PDF
-            </h1>
-
-            <p>
-                {str(e)}
-            </p>
-            """,
-            status_code=500,
-        )
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    per_page = 10
+    query = db.query(Product)
+
+    if q:
+        query = query.filter(Product.name.ilike(f"%{q}%"))
+
+    total = query.count()
+    products = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/products/catalog_table.html",
+        context={"products": products, "page": page, "total": total},
+    )
 
 
 @router.post("/create")
 async def create_quotation(
+    request: Request,
     client_id: int = Form(...),
     subtotal: float = Form(...),
     discount: float = Form(...),
@@ -761,28 +261,40 @@ async def create_quotation(
     design_file: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            return JSONResponse(
+                status_code=400,
+                content={"message": "El cliente seleccionado no existe."},
+            )
+
+        items_data = json.loads(items)
+        if not items_data:
+            return JSONResponse(
+                status_code=400,
+                content={"message": "Agrega al menos un producto a la cotización."},
+            )
 
         parsed_delivery_date = None
-
         if delivery_date:
-
             parsed_delivery_date = datetime.strptime(delivery_date, "%Y-%m-%d").date()
 
         filename = None
-
         if design_file and design_file.filename:
-
-            os.makedirs("uploads/designs", exist_ok=True)
-
-            extension = design_file.filename.split(".")[-1]
-
-            filename = f"{uuid.uuid4()}.{extension}"
-
-            with open(f"uploads/designs/{filename}", "wb") as buffer:
-
-                shutil.copyfileobj(design_file.file, buffer)
+            try:
+                validate_upload_filename(design_file.filename)
+                data = await read_upload_bytes(design_file, 10 * 1024 * 1024)
+                filename = save_design_image(data)
+            except UploadValidationError as exc:
+                return JSONResponse(
+                    status_code=400,
+                    content={"message": str(exc)},
+                )
 
         quotation = Quotation(
             client_id=client_id,
@@ -796,63 +308,54 @@ async def create_quotation(
         )
 
         db.add(quotation)
-
         db.flush()
 
-        items_data = json.loads(items)
-
         for item in items_data:
-
-            quotation_item = QuotationItem(
-                quotation_id=quotation.id,
-                product_id=item.get("product_id"),
-                quantity=item.get("quantity", 1),
-                detail=item.get("detail", ""),
-                measure=item.get("measure", ""),
-                theme=item.get("theme", ""),
-                color=item.get("color", ""),
-                logo=item.get("logo", False),
-                unit_price=item.get("price", 0),
-                total=item.get("total", 0),
+            db.add(
+                QuotationItem(
+                    quotation_id=quotation.id,
+                    product_id=_normalize_product_id(item.get("product_id")),
+                    quantity=item.get("quantity", 1),
+                    detail=item.get("detail", ""),
+                    measure=item.get("measure", ""),
+                    theme=item.get("theme", ""),
+                    color=item.get("color", ""),
+                    logo=item.get("logo", False),
+                    unit_price=item.get("price", 0),
+                    total=item.get("total", 0),
+                )
             )
-
-            db.add(quotation_item)
 
         db.commit()
 
         try:
-
             log_activity(db, "Cotización creada", f"Cotización #{quotation.id}")
-
         except Exception:
-
             pass
 
         return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
 
-    except Exception as e:
-
+    except json.JSONDecodeError:
         db.rollback()
-
-        return HTMLResponse(
-            content=f"""
-            <div style="padding:30px">
-
-                <h2>
-                    Error al guardar cotización
-                </h2>
-
-                <p>
-                    {str(e)}
-                </p>
-
-                <a href="/quotations/new">
-                    Volver
-                </a>
-
-            </div>
-            """,
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Los productos de la cotización no son válidos. Recarga la página e intenta de nuevo."},
+        )
+    except ValueError as e:
+        db.rollback()
+        if "does not match format" in str(e):
+            message = "Fecha de entrega inválida."
+        else:
+            message = str(e)
+        return JSONResponse(status_code=400, content={"message": message})
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(
             status_code=500,
+            content={
+                "message": "No se pudo guardar la cotización. Revisa los datos e intenta de nuevo.",
+                "detail": str(e),
+            },
         )
 
 
@@ -860,19 +363,24 @@ async def create_quotation(
 async def edit_quotation_item(
     item_id: int, request: Request, db: Session = Depends(get_db)
 ):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
-
     if not item:
         return RedirectResponse("/quotations", status_code=302)
 
     return templates.TemplateResponse(
-        "quotation_item_edit.html", {"request": request, "item": item}
+        request=request,
+        name="partials/quotations/item_modal.html",
+        context={"item": item},
     )
 
 
 @router.post("/quotation-items/{item_id}/edit")
 async def update_item(
+    request: Request,
     item_id: int,
     quantity: int = Form(...),
     theme: str = Form(""),
@@ -881,12 +389,18 @@ async def update_item(
     logo: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
+    item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
     if not item:
         return RedirectResponse("/quotations", status_code=302)
-    item.quantity = quantity
 
+    if quantity < 1:
+        return RedirectResponse(url=f"/quotations/{item.quotation_id}", status_code=302)
+
+    item.quantity = quantity
     item.total = quantity * item.unit_price
     item.theme = theme
     item.measure = measure
@@ -898,23 +412,22 @@ async def update_item(
     return RedirectResponse(url=f"/quotations/{item.quotation_id}", status_code=302)
 
 
-@router.get("/quotation-items/{id}/delete")
-async def delete_item(id: int, db: Session = Depends(get_db)):
+@router.get("/quotation-items/{item_id}/delete")
+async def delete_item(
+    request: Request, item_id: int, db: Session = Depends(get_db)
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
-    item = db.query(QuotationItem).filter(QuotationItem.id == id).first()
-
+    item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
     if not item:
-
         return RedirectResponse("/quotations", status_code=302)
 
     quotation = item.quotation
-
     db.delete(item)
-
     db.commit()
-
     recalculate_quotation(quotation, db)
-
     return RedirectResponse(f"/quotations/{quotation.id}", status_code=302)
 
 
@@ -922,34 +435,421 @@ async def delete_item(id: int, db: Session = Depends(get_db)):
 async def quotation_item_modal(
     item_id: int, request: Request, db: Session = Depends(get_db)
 ):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
-
     if not item:
-
         return HTMLResponse("Item no encontrado", status_code=404)
 
     return templates.TemplateResponse(
-        request=request, name="partials/item_modal.html", context={"item": item}
+        request=request, name="partials/quotations/item_modal.html", context={"item": item}
     )
+
+
+@router.post("/quotation-items/{item_id}/update-quantity")
+async def update_quantity(
+    request: Request,
+    item_id: int,
+    quantity: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
+    if not item:
+        return {"success": False}
+
+    if quantity < 1:
+        return {"success": False}
+
+    item.quantity = quantity
+    item.total = item.quantity * item.unit_price
+    db.commit()
+    recalculate_quotation(item.quotation, db)
+    return {"success": True}
+
+
+@router.get("/{quotation_id}", response_class=HTMLResponse)
+async def quotation_detail(
+    quotation_id: int, request: Request, db: Session = Depends(get_db)
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = (
+        db.query(Quotation)
+        .options(
+            joinedload(Quotation.client),
+            joinedload(Quotation.items).joinedload(QuotationItem.product),
+        )
+        .filter(Quotation.id == quotation_id)
+        .first()
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="quotations/detail.html",
+        context={"quotation": quotation, "user": user},
+    )
+
+
+@router.get("/{quotation_id}/approve")
+async def approve_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quotation.status != "pendiente":
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    quotation.status = "aprobada"
+    ensure_production_order(db, quotation)
+    db.commit()
+
+    try:
+        log_activity(db, "Cotización aprobada", f"Cotización #{quotation.id}")
+    except Exception:
+        pass
+
+    return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+
+@router.get("/{quotation_id}/cancel")
+async def cancel_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quotation.status != "pendiente":
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    quotation.status = "cancelada"
+    db.query(ProductionOrder).filter(
+        ProductionOrder.quotation_id == quotation.id
+    ).delete(synchronize_session=False)
+    db.commit()
+    return RedirectResponse(url="/quotations", status_code=302)
+
+
+@router.get("/{quotation_id}/delete")
+async def delete_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quotation.status not in ("pendiente", "cancelada"):
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    _purge_quotation(db, quotation)
+    db.commit()
+    return RedirectResponse(url="/quotations", status_code=302)
+
+
+@router.get("/{quotation_id}/reactivate")
+async def reactivate_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quotation.status != "cancelada":
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    quotation.status = "pendiente"
+    db.query(ProductionOrder).filter(
+        ProductionOrder.quotation_id == quotation.id
+    ).delete(synchronize_session=False)
+    db.commit()
+    return RedirectResponse(url="/quotations", status_code=302)
+
+
+@router.get("/{quotation_id}/edit", response_class=HTMLResponse)
+async def edit_quotation_page(
+    quotation_id: int, request: Request, db: Session = Depends(get_db)
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quotation.status != "pendiente":
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    clients = db.query(Client).all()
+    products = db.query(Product).all()
+    config = db.query(CompanyConfig).first()
+    items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).all()
+
+    items_json = []
+    for item in items:
+        items_json.append(
+            {
+                "type": "inventory",
+                "product_id": None,
+                "quantity": item.quantity,
+                "detail": item.detail,
+                "price": item.unit_price,
+                "total": item.total,
+            }
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="quotations/new.html",
+        context={
+            "clients": clients,
+            "products": products,
+            "config": config,
+            "quotation": quotation,
+            "items_json": json.dumps(items_json),
+            "edit_mode": True,
+            "user": user,
+        },
+    )
+
+
+@router.post("/{quotation_id}/edit")
+async def update_quotation(
+    request: Request,
+    quotation_id: int,
+    client_id: int = Form(...),
+    subtotal: float = Form(...),
+    discount: float = Form(...),
+    iva: float = Form(...),
+    total: float = Form(...),
+    items: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quotation.status != "pendiente":
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    quotation.client_id = client_id
+    quotation.subtotal = subtotal
+    quotation.discount = discount
+    quotation.iva = iva
+    quotation.total = total
+
+    db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete()
+    items_data = json.loads(items)
+
+    for item in items_data:
+        db.add(
+            QuotationItem(
+                quotation_id=quotation.id,
+                product_id=item.get("product_id"),
+                quantity=item.get("quantity", 1),
+                detail=item.get("detail", ""),
+                unit_price=item.get("price", 0.0),
+                total=item.get("total", 0.0),
+            )
+        )
+
+    db.commit()
+    return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
+
+
+@router.get("/{quotation_id}/production")
+async def production_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = role_required(request, ["admin", "produccion"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    try:
+        quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+        if not quotation:
+            return RedirectResponse(url="/quotations/", status_code=302)
+
+        items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).all()
+
+        for item in items:
+            if not item.product_id:
+                continue
+
+            product = db.query(Product).filter(Product.id == item.product_id).first()
+            if not product:
+                continue
+
+            previous_stock = product.stock or 0
+            new_stock = previous_stock - item.quantity
+
+            if new_stock < 0:
+                return HTMLResponse(
+                    content=f"""
+                    <h1>Stock insuficiente</h1>
+                    <p>Producto: {product.name}</p>
+                    <p>Disponible: {previous_stock}</p>
+                    <p>Solicitado: {item.quantity}</p>
+                    """,
+                    status_code=400,
+                )
+
+            product.stock = new_stock
+            db.add(
+                InventoryMovement(
+                    product_id=product.id,
+                    movement_type="salida",
+                    quantity=-item.quantity,
+                    previous_stock=previous_stock,
+                    new_stock=new_stock,
+                    reason=f"Cotización #{quotation.id} → Producción",
+                )
+            )
+
+        if quotation.status == "produccion":
+            return RedirectResponse(url="/production/", status_code=302)
+
+        quotation.status = "produccion"
+        ensure_production_order(db, quotation)
+        db.commit()
+
+        try:
+            log_activity(db, "Enviado a producción", f"Cotización #{quotation.id}")
+        except Exception:
+            pass
+
+        return RedirectResponse(url="/production/", status_code=302)
+
+    except Exception as e:
+        db.rollback()
+        return HTMLResponse(
+            content=f"<h1>Error enviando a producción</h1><p>{str(e)}</p>",
+            status_code=500,
+        )
+
+
+@router.get("/{quotation_id}/shipping")
+async def shipping_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = role_required(request, ["admin", "despacho", "transporte"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quotation.status != "produccion":
+        return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+    quotation.status = "enviado"
+    db.commit()
+    return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+
+@router.get("/{quotation_id}/delivered")
+async def delivered_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = role_required(request, ["admin", "despacho", "transporte"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    quotation.status = "entregado"
+    db.commit()
+    return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+
+@router.get("/{quotation_id}/pdf")
+async def quotation_pdf(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    try:
+        quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+        if not quotation:
+            return HTMLResponse(content="<h1>Cotización no encontrada</h1>", status_code=404)
+
+        items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation_id).all()
+        client = db.query(Client).filter(Client.id == quotation.client_id).first()
+
+        if not client:
+            return HTMLResponse(content="<h1>Cliente no encontrado</h1>", status_code=404)
+
+        pdf_buffer = generate_quotation_pdf(quotation, items, client, db)
+        client_name = re.sub(r'[<>:"/\\|?*]', "", client.name or "Cliente")
+        pdf_name = f"Cotizacion {quotation.id} - {client_name}.pdf"
+
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{pdf_name}"'},
+        )
+
+    except Exception as e:
+        return HTMLResponse(
+            content=f"<h1>Error generando PDF</h1><p>{str(e)}</p>",
+            status_code=500,
+        )
 
 
 @router.get("/{quotation_id}/add-product-modal", response_class=HTMLResponse)
 async def add_product_modal(
     quotation_id: int, request: Request, db: Session = Depends(get_db)
 ):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     products = db.query(Product).order_by(Product.name).all()
-
     return templates.TemplateResponse(
         request=request,
-        name="partials/add_product_modal.html",
+        name="partials/quotations/add_product_modal.html",
         context={"quotation_id": quotation_id, "products": products},
     )
 
 
 @router.post("/{quotation_id}/add-product")
 async def add_product_to_quotation(
+    request: Request,
     quotation_id: int,
     product_type: str = Form(...),
     product_id: int | None = Form(None),
@@ -962,13 +862,20 @@ async def add_product_to_quotation(
     logo: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    quotation = db.query(Quotation).get(quotation_id)
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    if quantity < 1:
+        return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
     if product_type == "catalogo":
-
         product = db.query(Product).filter(Product.id == product_id).first()
-
         if not product:
-
             return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
         item = QuotationItem(
@@ -983,11 +890,7 @@ async def add_product_to_quotation(
             unit_price=product.price,
             total=quantity * product.price,
         )
-
     else:
-
-        print("DETAIL RECIBIDO:", detail)
-
         item = QuotationItem(
             quotation_id=quotation.id,
             product_id=None,
@@ -1002,91 +905,6 @@ async def add_product_to_quotation(
         )
 
     db.add(item)
-
     db.commit()
-
     recalculate_quotation(quotation, db)
     return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
-
-
-@router.post(
-    "/quotation-items/{item_id}/update-quantity"
-)
-async def update_quantity(
-
-    item_id: int,
-
-    quantity: int = Form(...),
-
-    db: Session = Depends(get_db)
-
-):
-
-    item = db.query(
-        QuotationItem
-    ).filter(
-        QuotationItem.id == item_id
-    ).first()
-
-    if not item:
-
-        return {
-            "success": False
-        }
-
-    item.quantity = quantity
-
-    item.total = (
-        item.quantity *
-        item.unit_price
-    )
-
-    db.commit()
-
-    recalculate_quotation(
-        item.quotation,
-        db
-    )
-
-    return {
-        "success": True
-    }
-
-
-# PARA MODAL CATALOGO
-@router.get("/catalog")
-async def product_catalog(
-    q: str = "",
-    page: int = 1,
-    db: Session = Depends(get_db)
-):
-
-    per_page = 10
-
-    query = db.query(Product)
-
-    if q:
-
-        query = query.filter(
-            Product.name.ilike(f"%{q}%")
-        )
-
-    total = query.count()
-
-    products = (
-        query
-        .offset(
-            (page - 1) * per_page
-        )
-        .limit(per_page)
-        .all()
-    )
-
-    return templates.TemplateResponse(
-        "partials/catalog_table.html",
-        {
-            "products": products,
-            "page": page,
-            "total": total
-        }
-    )

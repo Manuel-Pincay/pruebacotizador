@@ -1,0 +1,39 @@
+<table class="w-full text-sm">
+
+    <thead>
+        <tr class="bg-gray-50">
+            <th class="p-3 text-left">Cliente</th>
+            <th class="p-3 text-left">RUC/CI</th>
+            <th class="p-3 text-left">Teléfono</th>
+            <th class="p-3 text-left">Email</th>
+            <th class="p-3"></th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for client in clients %}
+        <tr class="border-b hover:bg-gray-50">
+            <td class="p-3 font-medium">{{ client.name }}</td>
+            <td class="p-3">{{ client.ruc_ci or '-' }}</td>
+            <td class="p-3">{{ client.phone or '-' }}</td>
+            <td class="p-3">{{ client.email or '-' }}</td>
+            <td class="p-3">
+                <button
+                    type="button"
+                    onclick="selectClient({{ client.id }}, '{{ client.name | e }}')"
+                    class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs"
+                >
+                    Seleccionar
+                </button>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5" class="p-6 text-center text-gray-500">
+                No hay clientes registrados
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+
+</table>

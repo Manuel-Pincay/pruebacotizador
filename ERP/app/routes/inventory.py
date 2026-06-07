@@ -52,7 +52,7 @@ async def inventory_page(
 
     return templates.TemplateResponse(
         request=request,
-        name="inventory.html",
+        name="inventory/list.html",
         context={
             "movements": movements
         }

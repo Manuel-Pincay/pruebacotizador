@@ -23,10 +23,14 @@ def build_header(quotation, config, styles):
 
     if config.logo:
 
-        temp_path = os.path.join("uploads", config.logo)
-
-        if os.path.exists(temp_path):
-            logo_path = temp_path
+        for candidate in (
+            os.path.join("uploads", "logos", config.logo),
+            os.path.join("uploads", config.logo),
+            config.logo,
+        ):
+            if os.path.exists(candidate):
+                logo_path = candidate
+                break
 
     if not logo_path:
 

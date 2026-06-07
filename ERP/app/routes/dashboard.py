@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 
 from fastapi.templating import Jinja2Templates
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta
 from sqlalchemy import func
 from app.database import get_db
@@ -19,6 +19,11 @@ from app.models.quotation import Quotation
 from app.models.production_order import ProductionOrder
 from app.models.company_config import CompanyConfig
 from app.models.activity_log import ActivityLog
+from app.services.production_helpers import (
+    prepare_production_module,
+    production_orders_base_query,
+    build_dashboard_production_summary,
+)
 
 router = APIRouter()
 
@@ -27,6 +32,8 @@ templates = Jinja2Templates(directory="app/templates")
 from app.utils.context import get_global_config
 
 templates.env.globals["inject_global_config"] = get_global_config
+
+DASHBOARD_ACTIVITY_LIMIT = 5
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -37,6 +44,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     if isinstance(user, RedirectResponse):
         return user
 
+    prepare_production_module(db)
+
     # defaults / fallbacks
     total_clients = 0
     total_products = 0
@@ -44,9 +53,19 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     production_pending = 0
     recent_quotations = []
     recent_products = []
-    recent_production = []
+    recent_production_items = []
+    production_summary = {
+        "active_count": 0,
+        "overdue": 0,
+        "due_today": 0,
+        "due_this_week": 0,
+        "urgent": 0,
+        "recent_items": [],
+    }
     recent_activity = []
     company_name = "SISTEMA ERP"
+    quotation_status_summary = []
+    today = date.today()
 
     try:
         total_clients = db.query(Client).count()
@@ -68,7 +87,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 
     try:
         production_pending = (
-            db.query(ProductionOrder)
+            production_orders_base_query(db)
             .filter(
                 ProductionOrder.status.in_(
                     ["pendiente", "diseño", "produccion", "empacado"]
@@ -81,7 +100,13 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         production_pending = 0
 
     try:
-        recent_quotations = db.query(Quotation).order_by(Quotation.id.desc()).limit(5).all()
+        recent_quotations = (
+            db.query(Quotation)
+            .options(joinedload(Quotation.client))
+            .order_by(Quotation.id.desc())
+            .limit(5)
+            .all()
+        )
     except Exception as e:
         print("DASHBOARD ERROR recent_quotations:", str(e))
         recent_quotations = []
@@ -93,12 +118,35 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         recent_products = []
 
     try:
-        recent_production = (
-            db.query(ProductionOrder).order_by(ProductionOrder.id.desc()).limit(5).all()
-        )
+        production_summary = build_dashboard_production_summary(db)
+        recent_production_items = production_summary["recent_items"]
     except Exception as e:
-        print("DASHBOARD ERROR recent_production:", str(e))
-        recent_production = []
+        print("DASHBOARD ERROR production_summary:", str(e))
+        production_summary = {
+            "active_count": 0,
+            "overdue": 0,
+            "due_today": 0,
+            "due_this_week": 0,
+            "urgent": 0,
+            "recent_items": [],
+        }
+        recent_production_items = []
+
+    try:
+        status_rows = (
+            db.query(Quotation.status, func.count(Quotation.id))
+            .group_by(Quotation.status)
+            .all()
+        )
+        quotation_status_summary = [
+            {"status": (status or "—"), "count": count}
+            for status, count in status_rows
+            if count
+        ]
+        quotation_status_summary.sort(key=lambda row: row["count"], reverse=True)
+    except Exception as e:
+        print("DASHBOARD ERROR quotation_status_summary:", str(e))
+        quotation_status_summary = []
 
     try:
         config = db.query(CompanyConfig).first()
@@ -112,7 +160,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             ActivityLog
         ).order_by(
             ActivityLog.id.desc()
-        ).limit(10).all()
+        ).limit(DASHBOARD_ACTIVITY_LIMIT).all()
     except Exception as e:
         print("DASHBOARD ERROR recent_activity:", str(e))
         recent_activity = []
@@ -121,6 +169,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 
     if role == "ventas":
         approved_quotations = db.query(Quotation).filter(Quotation.status == "aprobada").count()
+        pending_quotations = db.query(Quotation).filter(Quotation.status == "pendiente").count()
         estimated_sales = db.query(Quotation).filter(
             Quotation.status.in_(
                 ["aprobada", "produccion", "enviada", "enviado", "entregada", "entregado"]
@@ -131,23 +180,25 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         dashboard_cards = [
             {"title": "Clientes", "value": total_clients, "icon": "👥", "color": "purple"},
             {"title": "Cotizaciones", "value": total_quotations, "icon": "📄", "color": "green"},
+            {"title": "Pendientes", "value": pending_quotations, "icon": "⏳", "color": "yellow"},
+            {"title": "Aprobadas", "value": approved_quotations, "icon": "✅", "color": "teal"},
             {"title": "Ventas estimadas", "value": estimated_value, "icon": "💰", "color": "blue"},
-            {"title": "Cotizaciones aprobadas", "value": approved_quotations, "icon": "✅", "color": "teal"},
         ]
 
         quick_actions = [
             {"title": "Nuevo Cliente", "url": "/clients/new", "icon": "👤"},
             {"title": "Nueva Cotización", "url": "/quotations/new", "icon": "📄"},
-            {"title": "Productos", "url": "/products", "icon": "📦"},
-            {"title": "Cotizaciones", "url": "/quotations", "icon": "📑"},
+            {"title": "Seguimiento", "url": "/quotations/tracking", "icon": "📈"},
+            {"title": "Clientes", "url": "/clients", "icon": "👥"},
         ]
     elif role == "produccion":
-        pending_count = db.query(ProductionOrder).filter(ProductionOrder.status == "pendiente").count()
-        in_production_count = db.query(ProductionOrder).filter(
+        prod_base = production_orders_base_query(db)
+        pending_count = prod_base.filter(ProductionOrder.status == "pendiente").count()
+        in_production_count = prod_base.filter(
             ProductionOrder.status.in_(["diseño", "produccion"])
         ).count()
-        finished_count = db.query(ProductionOrder).filter(ProductionOrder.status == "empacado").count()
-        delivered_count = db.query(ProductionOrder).filter(ProductionOrder.status == "entregado").count()
+        finished_count = prod_base.filter(ProductionOrder.status == "empacado").count()
+        delivered_count = prod_base.filter(ProductionOrder.status == "entregado").count()
 
         dashboard_cards = [
             {"title": "Pendientes", "value": pending_count, "icon": "⏳", "color": "purple"},
@@ -157,10 +208,10 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         ]
 
         quick_actions = [
-            {"title": "Órdenes de Producción", "url": "/production/", "icon": "🗂️"},
             {"title": "Kanban", "url": "/production/kanban", "icon": "📋"},
-            {"title": "Calendario", "url": "/production/calendar", "icon": "🗓️"},
-            {"title": "Últimos pedidos", "url": "/production/", "icon": "📦"},
+            {"title": "Calendario", "url": "/production/calendar", "icon": "📅"},
+            {"title": "Órdenes", "url": "/production/", "icon": "🗂️"},
+            {"title": "Pendientes", "url": "/production/?status=pendiente", "icon": "⏳"},
         ]
     else:
         dashboard_cards = [
@@ -184,22 +235,17 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             {"title": "Nuevo Cliente", "url": "/clients/new", "icon": "👤"},
             {"title": "Nuevo Producto", "url": "/products/new", "icon": "📦"},
             {"title": "Nueva Cotización", "url": "/quotations/new", "icon": "📄"},
+            {"title": "Kanban", "url": "/production/kanban", "icon": "📋"},
+            {"title": "Calendario", "url": "/production/calendar", "icon": "📅"},
             {"title": "Producción", "url": "/production/", "icon": "🏭"},
         ]
-    # =====================================
-# CHART LAST 30 DAYS
-# =====================================
-
-    last_30_days = []
+    # CHART LAST 30 DAYS
 
     chart_labels = []
-
     chart_values = []
 
     for i in range(29, -1, -1):
-
-        day = date.today() - timedelta(days=i)
-
+        day = today - timedelta(days=i)
         total = db.query(
             Quotation
         ).filter(
@@ -214,9 +260,11 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 
         chart_values.append(total)
 
+    chart_total = sum(chart_values)
+
     return templates.TemplateResponse(
         request=request,
-        name="dashboard.html",
+        name="dashboard/index.html",
         context={
             "total_clients": total_clients,
             "total_products": total_products,
@@ -227,10 +275,15 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             "dashboard_cards": dashboard_cards,
             "quick_actions": quick_actions,
             "user": user,
+            "role": role,
             "recent_products": recent_products,
-            "recent_production": recent_production,
+            "recent_production_items": recent_production_items,
+            "production_summary": production_summary,
             "recent_activity": recent_activity,
             "chart_labels": chart_labels,
             "chart_values": chart_values,
+            "chart_total": chart_total,
+            "quotation_status_summary": quotation_status_summary,
+            "today": today,
         },
     )

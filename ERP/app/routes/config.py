@@ -1,6 +1,4 @@
 import os
-import shutil
-import uuid
 
 from fastapi import APIRouter
 from fastapi import Request
@@ -19,6 +17,12 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.company_config import CompanyConfig
+from app.config.settings import settings
+from app.auth.session import (
+    admin_cookie_options,
+    is_admin_session_valid,
+    sign_admin_session,
+)
 
 
 # =====================================
@@ -35,14 +39,22 @@ templates = Jinja2Templates(
 )
 
 from app.utils.context import get_global_config
-templates.env.globals['inject_global_config'] = get_global_config
+from app.utils.image_storage import (
+    UploadValidationError,
+    delete_logo_file,
+    logo_image_url,
+    read_upload_bytes,
+    save_logo_image,
+    validate_upload_filename,
+)
+
+templates.env.globals["inject_global_config"] = get_global_config
+templates.env.globals["logo_image_url"] = logo_image_url
 
 UPLOAD_DIR = "uploads/logos"
 
 # Create upload directory if it doesn't exist
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-SECRET_PASSWORD = "203211"
 
 
 # =====================================
@@ -68,7 +80,7 @@ async def admin_login(request: Request):
     """Admin login page"""
     return templates.TemplateResponse(
         request=request,
-        name="admin_login.html",
+        name="auth/admin_login.html",
         context={}
     )
 
@@ -84,24 +96,23 @@ async def verify_password(
     db: Session = Depends(get_db)
 ):
     """Verify admin password"""
-    if password == SECRET_PASSWORD:
-        config = get_or_create_config(db)
+    if password == settings.secretadmin_password:
+        get_or_create_config(db)
         response = RedirectResponse(
             url="/secretadmin/config",
             status_code=302
         )
         response.set_cookie(
             key="admin_token",
-            value="authenticated",
-            max_age=3600,
-            httponly=True
+            value=sign_admin_session(),
+            **admin_cookie_options(),
         )
         return response
     else:
         # Return to login with error
         return templates.TemplateResponse(
             request=request,
-            name="admin_login.html",
+            name="auth/admin_login.html",
             context={"error": "Contraseña incorrecta"}
         )
 
@@ -117,8 +128,7 @@ async def admin_config(
 ):
     """Admin config page"""
     # Check if authenticated
-    token = request.cookies.get("admin_token")
-    if token != "authenticated":
+    if not is_admin_session_valid(request.cookies.get("admin_token")):
         return RedirectResponse(
             url="/secretadmin/",
             status_code=302
@@ -128,8 +138,23 @@ async def admin_config(
 
     return templates.TemplateResponse(
         request=request,
-        name="admin_config.html",
+        name="admin/config.html",
         context={"config": config}
+    )
+
+
+@router.get("/storage", response_class=HTMLResponse)
+async def admin_storage(request: Request, db: Session = Depends(get_db)):
+    if not is_admin_session_valid(request.cookies.get("admin_token")):
+        return RedirectResponse(url="/secretadmin/", status_code=302)
+
+    from app.services.storage_stats import collect_storage_stats
+
+    stats = collect_storage_stats(db)
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/storage.html",
+        context={"stats": stats},
     )
 
 
@@ -154,8 +179,7 @@ async def save_config(
     """Save company configuration"""
 
     # Check if authenticated
-    token = request.cookies.get("admin_token")
-    if token != "authenticated":
+    if not is_admin_session_valid(request.cookies.get("admin_token")):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     config = get_or_create_config(db)
@@ -172,21 +196,16 @@ async def save_config(
 
     # Handle logo upload
     if logo and logo.filename:
-        # Delete old logo if exists
-        if config.logo:
-            old_path = os.path.join(UPLOAD_DIR, config.logo)
-            if os.path.exists(old_path):
-                os.remove(old_path)
-
-        # Save new logo
-        file_ext = logo.filename.split(".")[-1]
-        logo_filename = f"logo_{uuid.uuid4()}.{file_ext}"
-        logo_path = os.path.join(UPLOAD_DIR, logo_filename)
-
-        with open(logo_path, "wb") as buffer:
-            shutil.copyfileobj(logo.file, buffer)
-
-        config.logo = logo_filename
+        try:
+            validate_upload_filename(logo.filename)
+            data = await read_upload_bytes(logo, 3 * 1024 * 1024)
+            delete_logo_file(config.logo)
+            config.logo = save_logo_image(data)
+        except UploadValidationError:
+            return RedirectResponse(
+                url="/secretadmin/config?error=logo_invalido",
+                status_code=302,
+            )
 
     db.commit()
 
@@ -207,5 +226,5 @@ async def admin_logout():
         url="/secretadmin/",
         status_code=302
     )
-    response.delete_cookie("admin_token")
+    response.delete_cookie("admin_token", samesite="lax")
     return response

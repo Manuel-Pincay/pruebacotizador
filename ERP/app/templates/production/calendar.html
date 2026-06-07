@@ -1,0 +1,275 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+
+<div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Calendario de Producción</h1>
+        <p class="text-gray-500 mt-1">
+            Entregas por orden de fabricación
+            {% if scope == 'month' %} · {{ month_label }}{% else %} · Todas las fechas{% endif %}
+        </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="/production/kanban" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">
+            Kanban
+        </a>
+        <a href="/production/" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">
+            Listado
+        </a>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-yellow-500">
+        <p class="text-sm text-gray-500">Entregas hoy</p>
+        <h2 class="text-3xl font-bold mt-1 text-slate-900">{{ today_count|default(0) }}</h2>
+    </div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-red-500">
+        <p class="text-sm text-gray-500">Atrasadas</p>
+        <h2 class="text-3xl font-bold mt-1 text-slate-900">{{ overdue_count|default(0) }}</h2>
+    </div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-purple-600">
+        <p class="text-sm text-gray-500">Activas</p>
+        <h2 class="text-3xl font-bold mt-1 text-slate-900">{{ upcoming_count|default(0) }}</h2>
+    </div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-green-600">
+        <p class="text-sm text-gray-500">Completadas</p>
+        <h2 class="text-3xl font-bold mt-1 text-slate-900">{{ completed_count|default(0) }}</h2>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm p-4 mb-6 space-y-4">
+    <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <div class="flex flex-wrap gap-2">
+            <a href="/production/calendar?view=upcoming&scope={{ scope }}&month={{ month_param }}"
+                class="px-4 py-2 rounded-xl text-sm {% if view == 'upcoming' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200{% endif %}">
+                Próximas ({{ upcoming_tab_count|default(upcoming_count) }})
+            </a>
+            <a href="/production/calendar?view=completed&scope={{ scope }}&month={{ month_param }}"
+                class="px-4 py-2 rounded-xl text-sm {% if view == 'completed' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200{% endif %}">
+                Completadas ({{ completed_tab_count|default(completed_count) }})
+            </a>
+            <a href="/production/calendar?view=all&scope={{ scope }}&month={{ month_param }}"
+                class="px-4 py-2 rounded-xl text-sm {% if view == 'all' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200{% endif %}">
+                Todas ({{ all_tab_count|default(month_count) }})
+            </a>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <a href="{{ prev_month_url }}" class="px-3 py-2 rounded-xl border hover:bg-gray-50" title="Mes anterior">‹</a>
+            <a href="{{ month_scope_url }}"
+                class="px-4 py-2 rounded-xl text-sm {% if scope == 'month' %}bg-slate-800 text-white{% else %}border hover:bg-gray-50{% endif %}">
+                Mes actual
+            </a>
+            <a href="{{ next_month_url }}" class="px-3 py-2 rounded-xl border hover:bg-gray-50" title="Mes siguiente">›</a>
+            <a href="{{ all_dates_url }}"
+                class="px-4 py-2 rounded-xl text-sm {% if scope == 'all' %}bg-slate-800 text-white{% else %}border hover:bg-gray-50{% endif %}">
+                Ver todo
+            </a>
+        </div>
+    </div>
+
+    <form method="GET" class="grid md:grid-cols-5 gap-3">
+        <input type="hidden" name="view" value="{{ view }}" />
+        <input type="hidden" name="scope" value="{{ scope }}" />
+        <input type="hidden" name="month" value="{{ month_param }}" />
+
+        <select name="status" class="border border-gray-200 rounded-xl px-3 py-2 text-sm">
+            <option value="">Todos los estados</option>
+            <option value="aprobada" {% if status == 'aprobada' %}selected{% endif %}>Aprobada (cotización)</option>
+            <option value="pendiente" {% if status == 'pendiente' %}selected{% endif %}>Pendiente</option>
+            <option value="diseño" {% if status == 'diseño' %}selected{% endif %}>Diseño</option>
+            <option value="produccion" {% if status == 'produccion' %}selected{% endif %}>Producción</option>
+            <option value="empacado" {% if status == 'empacado' %}selected{% endif %}>Empacado</option>
+            <option value="enviado" {% if status == 'enviado' %}selected{% endif %}>Enviado</option>
+            <option value="entregado" {% if status == 'entregado' %}selected{% endif %}>Entregado</option>
+        </select>
+
+        <input type="date" name="start_date" value="{{ start_date }}"
+            class="border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+
+        <input type="date" name="end_date" value="{{ end_date }}"
+            class="border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+
+        <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-sm">
+            Filtrar
+        </button>
+
+        <a href="{{ clear_filters_url|default('/production/calendar?view=upcoming&scope=all') }}"
+            class="inline-flex items-center justify-center border border-gray-200 rounded-xl px-4 py-2 text-sm hover:bg-gray-50">
+            Limpiar filtros
+        </a>
+    </form>
+
+    <p class="text-sm text-gray-500">
+        Mostrando {{ month_count }} entrega(s) en esta vista.
+    </p>
+</div>
+
+{% if month_count > 0 and grouped_days %}
+
+<div class="space-y-6">
+    {% for day in grouped_days %}
+    {% set delivery_date = day.date %}
+    {% set orders = day.orders %}
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+        {% if delivery_date < today %}
+        <div class="bg-red-600 text-white px-6 py-4">
+        {% elif delivery_date == today %}
+        <div class="bg-yellow-500 text-white px-6 py-4">
+        {% else %}
+        <div class="bg-purple-700 text-white px-6 py-4">
+        {% endif %}
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <h2 class="text-xl md:text-2xl font-bold">
+                        {{ delivery_date.strftime('%d/%m/%Y') }}
+                    </h2>
+                    {% if delivery_date < today %}
+                    <span class="bg-white text-red-600 px-3 py-1 rounded-full text-xs font-bold">ATRASADO</span>
+                    {% elif delivery_date == today %}
+                    <span class="bg-white text-yellow-700 px-3 py-1 rounded-full text-xs font-bold">HOY</span>
+                    {% endif %}
+                </div>
+                <span class="inline-flex self-start sm:self-auto bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                    {{ orders|length }} orden(es)
+                </span>
+            </div>
+        </div>
+
+        <div class="divide-y">
+            {% for order in orders %}
+            <div class="p-5 hover:bg-gray-50 transition">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <span class="text-lg font-bold text-purple-700">
+                                Orden #{{ order.id }}
+                            </span>
+                            <span class="text-gray-400">·</span>
+                            <span class="font-semibold text-slate-900">{{ order.client_name or 'Sin cliente' }}</span>
+                            {% if order.priority == 'alta' %}
+                            <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-semibold">Alta</span>
+                            {% elif order.priority == 'urgente' %}
+                            <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-semibold">Urgente</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            Cotización #{{ order.quotation_id or '—' }}
+                            {% if order.first_item %}
+                            · {{ order.first_item }}{% if order.extra_items > 0 %} +{{ order.extra_items }} más{% endif %}
+                            {% endif %}
+                        </p>
+                        <p class="text-sm text-gray-500 mt-1">
+                            {% if order.designer %}Diseñador: {{ order.designer }}{% endif %}
+                            {% if order.fabricator %}{% if order.designer %} · {% endif %}Fabricador: {{ order.fabricator }}{% endif %}
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
+                        {% set st = order.status %}
+                        {% set qst = order.quotation_status or '' %}
+                        {% if qst == 'aprobada' %}
+                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">Aprobada</span>
+                        {% endif %}
+                        {% if st == 'pendiente' %}
+                        <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">Pendiente</span>
+                        {% elif st == 'diseño' %}
+                        <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium">Diseño</span>
+                        {% elif st == 'produccion' %}
+                        <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-medium">Producción</span>
+                        {% elif st == 'empacado' %}
+                        <span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-medium">Empacado</span>
+                        {% elif st == 'enviado' %}
+                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">Enviado</span>
+                        {% elif st == 'entregado' %}
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">Entregado</span>
+                        {% elif st and st != qst %}
+                        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">{{ st }}</span>
+                        {% endif %}
+
+                        <a href="{{ order.detail_url or ('/production/' ~ order.id) }}"
+                            class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg text-sm">
+                            Ver orden
+                        </a>
+                        {% if order.quotation_id %}
+                        <a href="{{ order.quotation_url or ('/quotations/' ~ order.quotation_id) }}"
+                            class="border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm">
+                            Ver cotización
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% elif month_count > 0 and grouped_orders %}
+
+<div class="space-y-6">
+    {% for delivery_date, orders in grouped_orders|dictsort %}
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+        {% if delivery_date < today %}
+        <div class="bg-red-600 text-white px-6 py-4">
+        {% elif delivery_date == today %}
+        <div class="bg-yellow-500 text-white px-6 py-4">
+        {% else %}
+        <div class="bg-purple-700 text-white px-6 py-4">
+        {% endif %}
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <h2 class="text-xl md:text-2xl font-bold">
+                        {{ delivery_date.strftime('%d/%m/%Y') }}
+                    </h2>
+                </div>
+                <span class="inline-flex self-start sm:self-auto bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                    {{ orders|length }} orden(es)
+                </span>
+            </div>
+        </div>
+        <div class="divide-y">
+            {% for order in orders %}
+            <div class="p-5 hover:bg-gray-50 transition">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div class="min-w-0">
+                        <span class="text-lg font-bold text-purple-700">Orden #{{ order.id }}</span>
+                        <span class="font-semibold text-slate-900 ml-2">{{ order.client_name or 'Sin cliente' }}</span>
+                    </div>
+                    <a href="{{ order.detail_url or ('/production/' ~ order.id) }}"
+                        class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg text-sm">
+                        Ver orden
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+
+<div class="bg-white rounded-2xl shadow p-12 text-center">
+    <div class="text-6xl mb-4">📅</div>
+    <h2 class="text-2xl font-bold text-slate-900">No hay entregas en esta vista</h2>
+    <p class="text-gray-500 mt-2 max-w-md mx-auto">
+        {% if filters_active and upcoming_count > 0 %}
+        Hay {{ upcoming_count }} orden(es) activa(s), pero los filtros actuales las ocultan.
+        Usa «Ver todo» o «Limpiar filtros» para verlas.
+        {% else %}
+        Prueba otro mes, cambia el filtro de estado o verifica que las órdenes tengan fecha de entrega asignada.
+        {% endif %}
+    </p>
+    <div class="flex flex-wrap justify-center gap-3 mt-6">
+        <a href="{{ all_dates_url }}" class="bg-purple-700 text-white px-5 py-2 rounded-xl text-sm">Ver todas las fechas</a>
+        <a href="/production/" class="border border-gray-300 px-5 py-2 rounded-xl text-sm hover:bg-gray-50">Ir a órdenes</a>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}

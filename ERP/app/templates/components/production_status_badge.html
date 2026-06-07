@@ -1,0 +1,21 @@
+{% macro production_status_badge(status, size='sm') %}
+{% set st = (status or 'pendiente')|lower|trim %}
+{% set pad = 'px-3 py-1' if size == 'sm' else 'px-4 py-1.5' %}
+{% set text = 'text-xs' if size == 'sm' else 'text-sm' %}
+
+{% if st == 'pendiente' %}
+<span class="bg-gray-100 text-gray-700 {{ pad }} rounded-full {{ text }} font-medium">Pendiente</span>
+{% elif st == 'diseño' %}
+<span class="bg-indigo-100 text-indigo-700 {{ pad }} rounded-full {{ text }} font-medium">Diseño</span>
+{% elif st == 'produccion' %}
+<span class="bg-purple-100 text-purple-700 {{ pad }} rounded-full {{ text }} font-medium">Producción</span>
+{% elif st == 'empacado' %}
+<span class="bg-orange-100 text-orange-700 {{ pad }} rounded-full {{ text }} font-medium">Empacado</span>
+{% elif st == 'enviado' %}
+<span class="bg-blue-100 text-blue-700 {{ pad }} rounded-full {{ text }} font-medium">Enviado</span>
+{% elif st == 'entregado' %}
+<span class="bg-green-100 text-green-700 {{ pad }} rounded-full {{ text }} font-medium">Entregado</span>
+{% else %}
+<span class="bg-gray-100 text-gray-700 {{ pad }} rounded-full {{ text }} font-medium">{{ status }}</span>
+{% endif %}
+{% endmacro %}

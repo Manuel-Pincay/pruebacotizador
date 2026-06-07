@@ -1,0 +1,244 @@
+{% extends 'layouts/base.html' %} {% block content %}
+
+<div class="max-w-6xl mx-auto">
+  <!-- HEADER -->
+
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-3xl font-bold">Nuevo Producto</h1>
+
+      <p class="text-gray-500 mt-1">
+        Crear nuevo producto para catálogo e inventario
+      </p>
+    </div>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-6">
+    <!-- INFORMACION GENERAL -->
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <h2 class="text-base font-semibold mb-3 text-gray-700">Información General</h2>
+
+      <div class="grid md:grid-cols-2 gap-5">
+        <div>
+          <label class="block mb-2"> Código </label>
+
+          <input type="text" name="code" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
+        </div>
+
+        <div>
+          <label class="block mb-2"> Nombre del Producto </label>
+
+          <input type="text" name="name" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
+        </div>
+
+        <div>
+          <label class="block mb-2"> Categoría </label>
+
+          <div class="flex gap-2">
+            <select name="category" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+              {% for category in categories %}
+
+              <option value="{{ category.name }}">{{ category.name }}</option>
+
+              {% endfor %}
+            </select>
+
+            <a href="/product-settings" target="_blank"
+              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
+              +
+            </a>
+          </div>
+        </div>
+
+        <div>
+          <label class="block mb-2"> Temática </label>
+
+          <div class="flex gap-2">
+            <select name="theme" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+              {% for theme in themes %}
+
+              <option value="{{ theme.name }}">{{ theme.name }}</option>
+
+              {% endfor %}
+            </select>
+
+            <a href="/product-settings" target="_blank"
+              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
+              +
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARACTERISTICAS -->
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <h2 class="text-base font-semibold mb-3 text-gray-700">Características</h2>
+
+      <div class="grid md:grid-cols-2 gap-5">
+        <div>
+          <label class="block mb-2"> Material </label>
+
+          <div class="flex gap-2">
+            <select name="material" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+              {% for material in materials %}
+
+              <option value="{{ material.name }}">{{ material.name }}</option>
+
+              {% endfor %}
+            </select>
+
+            <a href="/product-settings" target="_blank"
+              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
+              +
+            </a>
+          </div>
+        </div>
+
+        <div>
+          <label class="block mb-2"> Color </label>
+
+          <div class="flex gap-2">
+            <select name="color" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+              {% for color in colors %}
+
+              <option value="{{ color.name }}">{{ color.name }}</option>
+
+              {% endfor %}
+            </select>
+
+            <a href="/product-settings" target="_blank"
+              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
+              +
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-5 mt-5">
+        <div>
+          <label class="block mb-2"> Grosor </label>
+
+          <select name="thickness" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+            {% for thickness in thicknesses %}
+
+            <option value="{{ thickness.name }}">{{ thickness.name }}</option>
+
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block mb-2"> Tamaño </label>
+
+          <input type="number" step="0.01" name="size" class="w-full border border-gray-200 px-3 py-2 rounded-lg" />
+        </div>
+
+        <div>
+          <label class="block mb-2"> Unidad </label>
+
+          <select name="size_unit" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+            {% for unit in units %}
+
+            <option value="{{ unit.abbreviation }}">
+              {{ unit.abbreviation }}
+            </option>
+
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVENTARIO Y COSTOS -->
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <h2 class="text-base font-semibold mb-3 text-gray-700">Inventario y Costos</h2>
+
+      <div class="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <div>
+          <label class="block mb-2"> Costo </label>
+
+          <input type="number" step="0.01" name="cost" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
+        </div>
+
+        <div>
+          <label class="block mb-2"> Precio </label>
+
+          <input type="number" step="0.01" name="price" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
+        </div>
+
+        <div>
+          <label class="block mb-2"> Stock </label>
+
+          <input type="number" name="stock" value="0" class="w-full border border-gray-200 px-3 py-2 rounded-lg" />
+        </div>
+
+        <div>
+          <label class="block mb-2"> Personalizado </label>
+
+          <select name="custom" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+            <option value="no">No</option>
+
+            <option value="yes">Sí</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETALLES -->
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <h2 class="text-base font-semibold mb-3 text-gray-700">Detalles</h2>
+
+      <div class="mb-5">
+        <img id="preview" class="hidden w-40 h-40 object-cover rounded-xl border" />
+      </div>
+
+      <div class="mb-5">
+        <label class="block mb-2"> Imagen </label>
+
+        <input type="file" name="image" id="imageInput" accept=".jpg,.jpeg,.png,.webp"
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg" />
+      </div>
+
+      <div>
+        <label class="block mb-2"> Descripción </label>
+
+        <textarea name="description" rows="5" class="w-full border border-gray-200 p-3 rounded-xl"></textarea>
+      </div>
+    </div>
+
+    <!-- BOTONES -->
+
+    <div class="flex justify-end gap-3">
+      <a href="/products" class="px-6 py-3 border border-gray-300 rounded-xl">
+        Cancelar
+      </a>
+
+      <button class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl">
+        Guardar Producto
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const imageInput = document.getElementById("imageInput");
+
+  const preview = document.getElementById("preview");
+
+  imageInput.addEventListener("change", function (e) {
+    const file = e.target.files[0];
+
+    if (!file) return;
+
+    preview.src = URL.createObjectURL(file);
+
+    preview.classList.remove("hidden");
+  });
+</script>
+
+{% endblock %}

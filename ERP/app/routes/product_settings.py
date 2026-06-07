@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.auth.auth_handler import role_required
 
 from app.models.productcategory import ProductCategory
 from app.models.productmaterial import ProductMaterial
@@ -28,8 +29,19 @@ from app.utils.context import get_global_config
 templates.env.globals["inject_global_config"] = get_global_config
 
 
+def _require_admin(request: Request):
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    return user
+
+
 @router.get("/", response_class=HTMLResponse)
 async def product_settings_page(request: Request, db: Session = Depends(get_db)):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     categories = db.query(ProductCategory).all()
 
@@ -45,7 +57,7 @@ async def product_settings_page(request: Request, db: Session = Depends(get_db))
 
     return templates.TemplateResponse(
         request=request,
-        name="product_settings.html",
+        name="products/settings.html",
         context={
             "categories": categories,
             "materials": materials,
@@ -53,6 +65,11 @@ async def product_settings_page(request: Request, db: Session = Depends(get_db))
             "themes": themes,
             "thicknesses": thicknesses,
             "units": units,
+            "user": user,
+            "total_items": (
+                len(categories) + len(materials) + len(colors)
+                + len(themes) + len(thicknesses) + len(units)
+            ),
         },
     )
 
@@ -63,7 +80,11 @@ async def product_settings_page(request: Request, db: Session = Depends(get_db))
 
 
 @router.post("/category/new")
-async def create_category(name: str = Form(...), db: Session = Depends(get_db)):
+async def create_category(request: Request, name: str = Form(...), db: Session = Depends(get_db)):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     exists = db.query(ProductCategory).filter(ProductCategory.name == name).first()
 
@@ -82,7 +103,11 @@ async def create_category(name: str = Form(...), db: Session = Depends(get_db)):
 
 
 @router.get("/category/{category_id}/delete")
-async def delete_category(category_id: int, db: Session = Depends(get_db)):
+async def delete_category(request: Request, category_id: int, db: Session = Depends(get_db)):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     category = (
         db.query(ProductCategory).filter(ProductCategory.id == category_id).first()
@@ -98,7 +123,11 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/init")
-async def initialize_catalogs(db: Session = Depends(get_db)):
+async def initialize_catalogs(request: Request, db: Session = Depends(get_db)):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     categories = ["Topper", "Base", "Letrero", "Caja", "Decoración", "Cake Topper"]
 
@@ -192,9 +221,14 @@ async def initialize_catalogs(db: Session = Depends(get_db)):
 
 @router.post("/material/new")
 async def create_material(
+    request: Request,
     name: str = Form(...),
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     exists = db.query(
         ProductMaterial
@@ -220,9 +254,14 @@ async def create_material(
 
 @router.get("/material/{material_id}/delete")
 async def delete_material(
+    request: Request,
     material_id: int,
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     material = db.query(
         ProductMaterial
@@ -249,9 +288,14 @@ async def delete_material(
 
 @router.post("/color/new")
 async def create_color(
+    request: Request,
     name: str = Form(...),
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     exists = db.query(
         ProductColor
@@ -282,9 +326,14 @@ async def create_color(
 
 @router.get("/color/{color_id}/delete")
 async def delete_color(
+    request: Request,
     color_id: int,
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     color = db.query(
         ProductColor
@@ -311,9 +360,14 @@ async def delete_color(
 
 @router.post("/theme/new")
 async def create_theme(
+    request: Request,
     name: str = Form(...),
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     exists = db.query(
         ProductTheme
@@ -344,9 +398,14 @@ async def create_theme(
 
 @router.get("/theme/{theme_id}/delete")
 async def delete_theme(
+    request: Request,
     theme_id: int,
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     theme = db.query(
         ProductTheme
@@ -373,9 +432,14 @@ async def delete_theme(
 
 @router.post("/thickness/new")
 async def create_thickness(
+    request: Request,
     name: str = Form(...),
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     exists = db.query(
         ProductThickness
@@ -406,9 +470,14 @@ async def create_thickness(
 
 @router.get("/thickness/{thickness_id}/delete")
 async def delete_thickness(
+    request: Request,
     thickness_id: int,
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     thickness = db.query(
         ProductThickness
@@ -435,10 +504,15 @@ async def delete_thickness(
 
 @router.post("/unit/new")
 async def create_unit(
+    request: Request,
     name: str = Form(...),
     abbreviation: str = Form(...),
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     exists = db.query(
         MeasurementUnit
@@ -470,9 +544,14 @@ async def create_unit(
 
 @router.get("/unit/{unit_id}/delete")
 async def delete_unit(
+    request: Request,
     unit_id: int,
     db: Session = Depends(get_db)
 ):
+
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
 
     unit = db.query(
         MeasurementUnit

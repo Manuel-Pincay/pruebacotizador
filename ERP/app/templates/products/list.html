@@ -1,0 +1,247 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+
+<div class="erp-container space-y-6">
+
+    <!-- HEADER -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Productos</h1>
+            <p class="text-slate-500 mt-1">Catálogo de inventario y precios</p>
+        </div>
+
+        {% if is_admin %}
+        <a href="/products/new"
+            class="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition font-medium">
+            + Nuevo Producto
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- RESUMEN -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Total productos</p>
+            <h2 class="text-3xl font-bold mt-1 text-slate-800">{{ total_products }}</h2>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Stock bajo</p>
+            <h2 class="text-3xl font-bold mt-1 text-orange-500">{{ low_stock }}</h2>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Agotados</p>
+            <h2 class="text-3xl font-bold mt-1 text-red-600">{{ out_of_stock }}</h2>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Personalizados</p>
+            <h2 class="text-3xl font-bold mt-1 text-purple-600">{{ custom_count }}</h2>
+        </div>
+    </div>
+
+    {% if products %}
+
+    <!-- BÚSQUEDA -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div class="flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                <input id="productSearch" type="text" placeholder="Buscar por nombre, código o categoría..."
+                    class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400">
+            </div>
+            <select id="stockFilter"
+                class="border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white min-w-[160px]">
+                <option value="">Todo el stock</option>
+                <option value="ok">Stock normal</option>
+                <option value="low">Stock bajo</option>
+                <option value="out">Agotado</option>
+            </select>
+        </div>
+        <p id="productCountLabel" class="text-xs text-gray-400 mt-3">
+            Mostrando {{ total_products }} productos
+        </p>
+    </div>
+
+    <!-- GRID -->
+    <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+
+        {% for product in products %}
+        <article
+            class="product-card bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow"
+            data-name="{{ (product.name or '')|lower }}"
+            data-code="{{ (product.code or '')|lower }}"
+            data-category="{{ (product.category or '')|lower }}"
+            data-stock="{{ product.stock or 0 }}">
+
+            <div class="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200">
+                {% set img = product_image_url(product.image, thumb=true) %}
+                {% if img %}
+                <img src="{{ img }}" alt="{{ product.name }}"
+                    class="w-full h-full object-cover">
+                {% else %}
+                <div class="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                    <span class="text-5xl mb-2">📦</span>
+                    <span class="text-xs">Sin imagen</span>
+                </div>
+                {% endif %}
+
+                {% if product.custom %}
+                <span class="absolute top-3 right-3 bg-purple-600 text-white text-xs px-2.5 py-1 rounded-full font-medium">
+                    Personalizado
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="p-5 flex flex-col flex-1">
+
+                <div class="text-xs font-mono text-gray-400 tracking-wide">
+                    {{ product.code or '—' }}
+                </div>
+
+                <h2 class="text-lg font-bold text-slate-800 mt-1 line-clamp-2 leading-snug">
+                    {{ product.name }}
+                </h2>
+
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    <span class="bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full text-xs">
+                        {{ product.category or "Sin categoría" }}
+                    </span>
+                    {% if product.theme %}
+                    <span class="bg-purple-50 text-purple-700 px-2.5 py-0.5 rounded-full text-xs">
+                        {{ product.theme }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <p class="mt-2 text-gray-500 text-xs line-clamp-2">
+                    {{ product.material or '—' }}
+                    {% if product.size %} · {{ product.size }}{% endif %}
+                    {% if product.thickness %} · {{ product.thickness }}{% endif %}
+                </p>
+
+                <div class="mt-auto pt-4 border-t border-gray-100">
+                    <div class="flex items-end justify-between gap-2">
+                        <div>
+                            <div class="text-2xl font-bold text-purple-700">
+                                ${{ "%.2f"|format(product.price or 0) }}
+                            </div>
+                            {% if product.cost %}
+                            <div class="text-xs text-gray-400">Costo: ${{ "%.2f"|format(product.cost) }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="text-right">
+                            {% if (product.stock or 0) <= 0 %}
+                            <span class="inline-block bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                Agotado
+                            </span>
+                            {% elif (product.stock or 0) <= 5 %}
+                            <span class="inline-block bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                {{ product.stock }} uds.
+                            </span>
+                            {% else %}
+                            <span class="inline-block bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                {{ product.stock }} uds.
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if is_admin %}
+                <div class="mt-4 flex gap-2">
+                    <a href="/products/{{ product.id }}/edit"
+                        class="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-center px-3 py-2 rounded-xl text-sm font-medium transition">
+                        Editar
+                    </a>
+                    <a href="/products/{{ product.id }}/delete"
+                        onclick="return confirm('¿Eliminar este producto?')"
+                        class="flex-1 bg-red-500 hover:bg-red-600 text-white text-center px-3 py-2 rounded-xl text-sm font-medium transition">
+                        Eliminar
+                    </a>
+                </div>
+                {% endif %}
+
+            </div>
+        </article>
+        {% endfor %}
+
+    </div>
+
+    <div id="noResults" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+        <div class="text-5xl mb-3">🔍</div>
+        <h3 class="text-lg font-semibold text-slate-700">Sin coincidencias</h3>
+        <p class="text-gray-500 text-sm mt-1">Prueba con otro término o filtro de stock.</p>
+    </div>
+
+    {% else %}
+
+    <!-- ESTADO VACÍO -->
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-12 md:p-20 text-center">
+        <div class="text-7xl mb-5">📦</div>
+        <h3 class="text-2xl font-bold text-slate-800 mb-2">No hay productos registrados</h3>
+        <p class="text-gray-500 max-w-md mx-auto mb-8">
+            Aún no existe ningún producto en el catálogo. Crea el primero para usarlo en cotizaciones e inventario.
+        </p>
+        {% if is_admin %}
+        <a href="/products/new"
+            class="inline-flex items-center gap-2 bg-purple-700 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-medium transition">
+            + Crear primer producto
+        </a>
+        {% else %}
+        <p class="text-sm text-gray-400">Contacta al administrador para agregar productos al catálogo.</p>
+        {% endif %}
+    </div>
+
+    {% endif %}
+
+</div>
+
+{% if products %}
+<script>
+    const searchInput = document.getElementById("productSearch")
+    const stockFilter = document.getElementById("stockFilter")
+    const cards = document.querySelectorAll(".product-card")
+    const noResults = document.getElementById("noResults")
+    const countLabel = document.getElementById("productCountLabel")
+
+    function stockMatches(value, stock) {
+        const s = parseInt(stock, 10) || 0
+        if (value === "out") return s <= 0
+        if (value === "low") return s > 0 && s <= 5
+        if (value === "ok") return s > 5
+        return true
+    }
+
+    function filterProducts() {
+        const q = searchInput.value.trim().toLowerCase()
+        const stockVal = stockFilter.value
+        let visible = 0
+
+        cards.forEach(card => {
+            const haystack = [
+                card.dataset.name,
+                card.dataset.code,
+                card.dataset.category
+            ].join(" ")
+
+            const matchText = !q || haystack.includes(q)
+            const matchStock = stockMatches(stockVal, card.dataset.stock)
+            const show = matchText && matchStock
+
+            card.classList.toggle("hidden", !show)
+            if (show) visible++
+        })
+
+        noResults.classList.toggle("hidden", visible > 0)
+        countLabel.textContent = visible === cards.length
+            ? `Mostrando ${visible} productos`
+            : `Mostrando ${visible} de ${cards.length} productos`
+    }
+
+    searchInput.addEventListener("input", filterProducts)
+    stockFilter.addEventListener("change", filterProducts)
+</script>
+{% endif %}
+
+{% endblock %}

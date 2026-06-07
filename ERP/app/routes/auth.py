@@ -16,6 +16,7 @@ from app.models.user import User
 from app.models.company_config import CompanyConfig
 
 from app.auth.security import verify_password
+from app.auth.session import cookie_options, sign_user_session
 
 router = APIRouter()
 
@@ -38,7 +39,7 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse(
         request=request,
-        name="login.html",
+        name="auth/login.html",
         context={"company_name": company_name}
     )
 
@@ -62,7 +63,7 @@ async def login(
 
         return templates.TemplateResponse(
             request=request,
-            name="login.html",
+            name="auth/login.html",
             context={
                 "error": "Usuario incorrecto",
                 "company_name": company_name
@@ -81,9 +82,23 @@ async def login(
 
         return templates.TemplateResponse(
             request=request,
-            name="login.html",
+            name="auth/login.html",
             context={
                 "error": "Contraseña incorrecta",
+                "company_name": company_name
+            }
+        )
+
+    if not getattr(user, "active", True):
+
+        config = db.query(CompanyConfig).first()
+        company_name = config.company_name if config else "SISTEMA ERP"
+
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/login.html",
+            context={
+                "error": "Usuario inactivo. Contacte al administrador.",
                 "company_name": company_name
             }
         )
@@ -94,11 +109,10 @@ async def login(
     )
 
     response.set_cookie(
-    key="user",
-    value=user.username,
-    httponly=True,
-    samesite="Lax"
-)
+        key="user",
+        value=sign_user_session(user.username),
+        **cookie_options(),
+    )
 
     return response
 
@@ -110,8 +124,9 @@ async def logout():
         status_code=302
     )
 
-    response.delete_cookie(
-        key="user"
-    )
+    opts = cookie_options()
+    response.delete_cookie(key="user", samesite=opts["samesite"])
+    if opts.get("secure"):
+        response.delete_cookie(key="user", secure=True, samesite=opts["samesite"])
 
     return response
