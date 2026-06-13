@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
-MariaDB portable SOLO para desarrollo local (puerto 3307).
-No usar en producción — ver docs/DATABASE.md
-
+Descarga e inicia MariaDB portable (compatible MySQL) sin instalador.
 Uso: python scripts/setup_local_mysql.py
 """
 
@@ -220,44 +218,34 @@ def print_ready(process: subprocess.Popen | None = None) -> None:
         log("  (servidor ya estaba en ejecución)")
 
 
-def ensure_running(force_download: bool = False) -> bool:
-    """Inicia MariaDB portable si no responde. Devuelve True si la BD está lista."""
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force-download", action="store_true")
+    args = parser.parse_args()
+
     try:
         if app_database_ready():
-            return True
+            log("MariaDB ya responde en el puerto 3307.")
+            print_ready()
+            return 0
 
-        mariadb_root = download_mariadb(force=force_download)
+        mariadb_root = download_mariadb(force=args.force_download)
         init_database(mariadb_root)
 
+        process = None
         if not port_is_open():
-            start_server(mariadb_root)
+            process = start_server(mariadb_root)
             wait_for_mysql(mariadb_root)
         else:
             log(f"Puerto {MYSQL_PORT} ocupado; esperando conexión...")
             wait_for_mysql(mariadb_root)
 
         setup_users(mariadb_root)
-        return app_database_ready()
+        print_ready(process)
+        return 0
     except Exception as exc:
         log(f"ERROR: {exc}")
-        return False
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--force-download", action="store_true")
-    args = parser.parse_args()
-
-    if app_database_ready():
-        log("MariaDB ya responde en el puerto 3307.")
-        print_ready()
-        return 0
-
-    if ensure_running(force_download=args.force_download):
-        print_ready()
-        return 0
-
-    return 1
+        return 1
 
 
 if __name__ == "__main__":

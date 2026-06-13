@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -8,10 +7,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 _APP_ENV = os.getenv("ERP_ENV", "development")
-
-_DEV_DATABASE_URL = (
-    "mysql+pymysql://erp_user:erppassword@127.0.0.1:3307/erp?charset=utf8mb4"
-)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -21,21 +16,8 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _resolve_database_url() -> str:
-    explicit = os.getenv("DATABASE_URL")
-    if explicit:
-        return explicit
-
-    if _APP_ENV.lower() == "production":
-        raise RuntimeError(
-            "DATABASE_URL es obligatorio cuando ERP_ENV=production"
-        )
-
-    return _DEV_DATABASE_URL
-
-
 class Settings:
-    """Configuración desde variables de entorno."""
+    """Configuración desde variables de entorno (valores actuales como fallback)."""
 
     app_env: str = _APP_ENV
     secret_key: str = os.getenv(
@@ -54,7 +36,10 @@ class Settings:
         _APP_ENV.lower() == "production",
     )
 
-    database_url: str = _resolve_database_url()
+    database_url: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///./database/innova.db",
+    )
     database_pool_size: int = int(os.getenv("DB_POOL_SIZE", "20"))
     database_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "40"))
     database_pool_recycle: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))
@@ -64,14 +49,8 @@ class Settings:
         return self.app_env.lower() == "production"
 
     @property
-    def is_development(self) -> bool:
-        return not self.is_production
-
-    @property
-    def uses_portable_mysql(self) -> bool:
-        """MariaDB portable local (solo desarrollo, puerto 3307)."""
-        parsed = urlparse(self.database_url.replace("+pymysql", "", 1))
-        return parsed.hostname in {"127.0.0.1", "localhost"} and parsed.port == 3307
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
 
 
 settings = Settings()
