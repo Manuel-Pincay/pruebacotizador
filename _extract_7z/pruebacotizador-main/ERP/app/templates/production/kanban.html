@@ -1,0 +1,438 @@
+{% extends 'layouts/base.html' %}
+{% from "components/production_status_badge.html" import production_status_badge %}
+
+{% block main_class %}kanban-page-main{% endblock %}
+
+{% block content %}
+{% set mode = mode if mode is defined else 'table' %}
+{% set filters = filters if filters is defined else {} %}
+{% set filter_options = filter_options if filter_options is defined else {} %}
+{% set kpis = kpis if kpis is defined else {} %}
+{% set kpi_labels = kpi_labels if kpi_labels is defined else {} %}
+
+{% if mode == 'kanban' %}
+<style>
+  .kanban-page-main {
+    max-width: none !important;
+    padding-bottom: 0.5rem !important;
+  }
+  .kanban-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100dvh - 1.25rem);
+  }
+  @media (max-width: 767px) {
+    .kanban-shell { min-height: calc(100dvh - 4rem); }
+  }
+  .kanban-board {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+    align-items: stretch;
+    min-height: calc(100dvh - 14.5rem);
+    padding-bottom: 0.75rem;
+  }
+  @media (max-width: 767px) {
+    .kanban-board { min-height: calc(100dvh - 17.5rem); }
+  }
+  .kanban-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    min-width: 0;
+  }
+  .kanban-col-body {
+    flex: 1 1 auto;
+    min-height: 100%;
+  }
+</style>
+{% endif %}
+
+<div class="{% if mode == 'kanban' %}kanban-shell{% endif %}">
+<div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 {% if mode == 'kanban' %}mb-3{% else %}mb-6{% endif %}">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Planificación de Producción</h1>
+        <p class="text-gray-500 mt-1">Semana de entrega → columnas por estado · {{ total_count|default(0) }} órdenes</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="/production/" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Listado</a>
+        <a href="/production/calendar" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Calendario</a>
+    </div>
+</div>
+
+<!-- KPIs -->
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 {% if mode == 'kanban' %}mb-3{% else %}mb-6{% endif %}">
+    {% for key, label in kpi_labels.items() %}
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm
+        {% if key == 'overdue' %}border-l-4 border-red-500
+        {% elif key == 'pendiente' %}border-l-4 border-gray-400
+        {% elif key == 'diseno' %}border-l-4 border-indigo-500
+        {% elif key == 'produccion' %}border-l-4 border-purple-600
+        {% elif key == 'envio' %}border-l-4 border-blue-500
+        {% elif key == 'entregado' %}border-l-4 border-green-500
+        {% else %}border-l-4 border-gray-300{% endif %}">
+        <div class="text-xs text-gray-500 truncate">{{ label }}</div>
+        <div class="text-2xl font-bold text-slate-900">{{ kpis.get(key, 0) }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Toolbar: vista + filtros -->
+<div class="bg-white rounded-xl shadow-sm p-2.5 {% if mode == 'kanban' %}mb-2{% else %}mb-4{% endif %} space-y-2">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex gap-1.5">
+            <a href="{{ table_view_url }}"
+                class="px-2.5 py-1 rounded-lg text-xs font-medium {% if mode == 'table' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200 text-gray-700{% endif %}">
+                Vista Tabla
+            </a>
+            <a href="{{ kanban_view_url }}"
+                class="px-2.5 py-1 rounded-lg text-xs font-medium {% if mode == 'kanban' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200 text-gray-700{% endif %}">
+                Vista Kanban
+            </a>
+        </div>
+        <div class="text-[11px] text-gray-500 hidden sm:block">
+            {% if mode == 'table' %}Modo operativo{% else %}Modo visual — semana + estados{% endif %}
+        </div>
+    </div>
+
+    {% if mode == 'kanban' %}
+    <div class="flex flex-wrap items-center gap-2 px-2 py-1.5 bg-purple-50 rounded-lg border border-purple-100">
+        <a href="{{ prev_week_url }}" class="px-2 py-1 rounded-md bg-white border border-gray-200 hover:bg-gray-50 text-xs" title="Semana anterior">←</a>
+        <form method="GET" action="/production/kanban" class="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            <input type="hidden" name="mode" value="kanban" />
+            <input type="hidden" name="hide_delivered" value="{{ '0' if not filters.hide_delivered else '1' }}" />
+            {% if filters.client_id %}<input type="hidden" name="client_id" value="{{ filters.client_id }}" />{% endif %}
+            {% if filters.designer %}<input type="hidden" name="designer" value="{{ filters.designer }}" />{% endif %}
+            {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}" />{% endif %}
+            {% if filters.material %}<input type="hidden" name="material" value="{{ filters.material }}" />{% endif %}
+            {% if filters.custom_only %}<input type="hidden" name="custom" value="1" />{% endif %}
+            <input type="week" name="week" value="{{ week_input_value }}" title="Semana de entrega"
+                class="border border-purple-200 rounded-md px-2 py-1 text-xs bg-white h-7" />
+            <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-2.5 py-1 rounded-md text-xs font-medium h-7">Ver</button>
+            <a href="{{ current_week_url }}" class="px-2.5 py-1 rounded-md border border-purple-200 bg-white text-xs hover:bg-purple-100 text-purple-800 h-7 leading-5">Hoy</a>
+        </form>
+        <a href="{{ next_week_url }}" class="px-2 py-1 rounded-md bg-white border border-gray-200 hover:bg-gray-50 text-xs" title="Semana siguiente">→</a>
+        <div class="text-right shrink-0">
+            <span class="text-xs font-semibold text-purple-900">{{ week_title }}</span>
+            <span class="text-[11px] text-purple-700 ml-1">{{ week_sublabel }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="GET" action="/production/kanban" class="flex flex-wrap items-end gap-x-2 gap-y-1.5">
+        <input type="hidden" name="mode" value="{{ mode }}" />
+        <input type="hidden" name="hide_delivered" value="{{ '0' if not filters.hide_delivered else '1' }}" />
+        {% if mode == 'kanban' %}
+        <input type="hidden" name="week" value="{{ week_input_value }}" />
+        {% endif %}
+        {% if mode == 'table' %}
+        <div class="min-w-[7rem]">
+            <label class="block text-[10px] text-gray-500 mb-0.5 leading-none">Mes</label>
+            <input type="month" name="month" value="{{ filters.month or '' }}"
+                class="w-full border border-gray-200 rounded-md px-1.5 py-1 text-xs h-7" />
+        </div>
+        {% endif %}
+        <div class="min-w-[6.5rem] flex-1 max-w-[9rem]">
+            <label class="block text-[10px] text-gray-500 mb-0.5 leading-none">Cliente</label>
+            <select name="client_id" class="w-full border border-gray-200 rounded-md px-1.5 py-1 text-xs h-7">
+                <option value="">Todos</option>
+                {% for cid, cname in filter_options.clients|default([]) %}
+                <option value="{{ cid }}" {% if filters.client_id == cid %}selected{% endif %}>{{ cname }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="min-w-[6rem] flex-1 max-w-[8rem]">
+            <label class="block text-[10px] text-gray-500 mb-0.5 leading-none">Diseñador</label>
+            <select name="designer" class="w-full border border-gray-200 rounded-md px-1.5 py-1 text-xs h-7">
+                <option value="">Todos</option>
+                {% for d in filter_options.designers|default([]) %}
+                <option value="{{ d }}" {% if filters.designer == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="min-w-[5.5rem] flex-1 max-w-[7rem]">
+            <label class="block text-[10px] text-gray-500 mb-0.5 leading-none">Estado</label>
+            <select name="status" class="w-full border border-gray-200 rounded-md px-1.5 py-1 text-xs h-7">
+                <option value="">Todos</option>
+                {% for code, label in filter_options.statuses|default([]) %}
+                <option value="{{ code }}" {% if filters.status == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="min-w-[5.5rem] flex-1 max-w-[7rem]">
+            <label class="block text-[10px] text-gray-500 mb-0.5 leading-none">Material</label>
+            <select name="material" class="w-full border border-gray-200 rounded-md px-1.5 py-1 text-xs h-7">
+                <option value="">Todos</option>
+                {% for m in filter_options.materials|default([]) %}
+                <option value="{{ m }}" {% if filters.material == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex items-center gap-1 h-7 pb-0.5">
+            <input type="checkbox" name="custom" value="1" id="customFilter" {% if filters.custom_only %}checked{% endif %}
+                class="rounded border-gray-300 w-3.5 h-3.5" />
+            <label for="customFilter" class="text-[11px] text-gray-600 whitespace-nowrap">Pers.</label>
+        </div>
+        <div class="flex gap-1.5 shrink-0">
+            <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-2.5 py-1 rounded-md text-xs font-medium h-7">Filtrar</button>
+            <a href="{{ clear_filters_url }}" class="px-2.5 py-1 rounded-md border text-xs hover:bg-gray-50 h-7 leading-5">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+{% if mode == 'table' %}
+<!-- VISTA TABLA -->
+<div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[1100px] text-sm" id="kanbanTable">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs sticky top-0">
+                <tr>
+                    <th class="text-left p-3">Orden</th>
+                    <th class="text-left p-3">Cliente</th>
+                    <th class="text-left p-3">Entrega</th>
+                    <th class="text-left p-3">Estado</th>
+                    <th class="text-left p-3">Diseñador</th>
+                    <th class="text-left p-3">Productos</th>
+                    <th class="text-left p-3">Material</th>
+                    <th class="text-left p-3">Prioridad</th>
+                    <th class="text-left p-3">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in table_rows %}
+                <tr class="border-t hover:bg-gray-50 cursor-pointer" data-order-id="{{ row.id }}" onclick="openOrderPanel({{ row.id }})">
+                    <td class="p-3 font-bold text-purple-800">{{ row.label }}</td>
+                    <td class="p-3">{{ row.client_name }}</td>
+                    <td class="p-3 whitespace-nowrap">{{ row.delivery_full }}</td>
+                    <td class="p-3">{{ production_status_badge(row.status) }}</td>
+                    <td class="p-3">{{ row.designer }}</td>
+                    <td class="p-3">{{ row.products_label }}</td>
+                    <td class="p-3">{{ row.material }}</td>
+                    <td class="p-3 whitespace-nowrap">
+                        <span class="text-xs font-medium
+                            {% if row.priority_level == 'urgent' %}text-red-700{% elif row.priority_level == 'soon' %}text-orange-600{% else %}text-green-700{% endif %}">
+                            {{ row.priority_label }}
+                        </span>
+                    </td>
+                    <td class="p-3 whitespace-nowrap" onclick="event.stopPropagation()">
+                        <a href="/production/{{ row.id }}" class="text-purple-700 hover:underline text-xs font-medium mr-2">Detalle</a>
+                        {% if row.can_advance %}
+                        <button type="button" onclick="advanceOrder({{ row.id }}, '{{ row.next_status }}')"
+                            class="text-green-700 hover:underline text-xs font-medium">→ {{ row.next_status_label }}</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="p-12 text-center text-gray-400">No hay órdenes con estos filtros.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<!-- VISTA KANBAN: columnas por estado (semana seleccionada) -->
+<div class="kanban-board">
+        {% for column in status_board %}
+        <div class="kanban-col">
+            <div class="rounded-t-xl px-3 py-2 text-white shrink-0
+                {% if column.accent == 'slate' %}bg-slate-600
+                {% elif column.accent == 'indigo' %}bg-indigo-600
+                {% elif column.accent == 'purple' %}bg-purple-700
+                {% elif column.accent == 'blue' %}bg-blue-600
+                {% elif column.accent == 'green' %}bg-green-600
+                {% else %}bg-gray-600{% endif %}">
+                <div class="flex justify-between items-center gap-2">
+                    <h2 class="font-bold text-xs sm:text-sm uppercase tracking-wide truncate">{{ column.label }}</h2>
+                    <span class="bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full shrink-0">{{ column.count }}</span>
+                </div>
+            </div>
+            <div class="kanban-col-body bg-gray-100 rounded-b-xl p-2 space-y-2 kanban-drop-zone"
+                 data-drop-status="{{ column.drop_status }}"
+                 ondragover="handleDragOver(event)"
+                 ondragleave="handleDragLeave(event)"
+                 ondrop="handleDrop(event)">
+                {% for card in column.cards %}
+                <div class="kanban-card rounded-lg border bg-white p-2.5 shadow-sm hover:shadow-md transition cursor-grab active:cursor-grabbing
+                    {% if card.priority_level == 'urgent' %}border-l-4 border-l-red-500
+                    {% elif card.priority_level == 'soon' %}border-l-4 border-l-orange-400
+                    {% else %}border-l-4 border-l-green-400{% endif %}"
+                    draggable="true"
+                    data-order-id="{{ card.id }}"
+                    data-status="{{ card.status }}"
+                    data-next-status="{{ card.next_status or '' }}"
+                    onclick="openOrderPanel({{ card.id }})"
+                    ondragstart="handleDragStart(event)"
+                    ondragend="handleDragEnd(event)">
+                    <div class="font-bold text-sm text-purple-800">{{ card.label }}</div>
+                    <div class="text-xs font-medium text-slate-800 truncate">{{ card.client_name }}</div>
+                    <div class="text-[11px] text-gray-500 mt-1">{{ card.products_label }} · Entrega {{ card.delivery_label }}</div>
+                    <div class="flex items-center justify-between mt-1.5 gap-1">
+                        <span class="text-[10px] text-gray-600 truncate">🎨 {{ card.designer }}</span>
+                        <span class="text-[10px] shrink-0">{{ card.priority_label }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if column.hidden_count > 0 %}
+                <a href="{{ table_view_url }}" class="block text-center text-[11px] text-purple-700 hover:underline py-1">
+                    +{{ column.hidden_count }} más en tabla
+                </a>
+                {% endif %}
+                {% if column.count == 0 %}
+                <div class="text-center text-xs text-gray-400 py-8">Sin órdenes</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+</div>
+{% endif %}
+
+</div>
+
+<!-- Panel lateral detalle -->
+<div id="orderPanel" class="fixed inset-0 z-[80] hidden">
+    <div class="absolute inset-0 bg-black/40" onclick="closeOrderPanel()"></div>
+    <div class="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col">
+        <div class="p-4 border-b flex items-center justify-between">
+            <h2 class="text-lg font-bold" id="panelTitle">Orden</h2>
+            <button type="button" onclick="closeOrderPanel()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="panelBody">
+            <p class="text-gray-400 text-sm">Cargando...</p>
+        </div>
+        <div class="p-4 border-t">
+            <a id="panelDetailLink" href="#" class="block w-full text-center bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl text-sm font-medium">Abrir detalle completo</a>
+        </div>
+    </div>
+</div>
+
+<div id="kanbanToast" class="fixed bottom-4 right-4 z-[90] hidden px-4 py-3 rounded-xl shadow-lg text-sm font-medium max-w-sm"></div>
+
+<script>
+    let draggedOrderId = null;
+    let draggedStatus = null;
+
+    function showToast(msg, isError) {
+        const el = document.getElementById('kanbanToast');
+        el.textContent = msg;
+        el.className = 'fixed bottom-4 right-4 z-[90] px-4 py-3 rounded-xl shadow-lg text-sm font-medium max-w-sm ' +
+            (isError ? 'bg-red-600 text-white' : 'bg-green-600 text-white');
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+
+    function handleDragStart(e) {
+        const card = e.target.closest('.kanban-card');
+        if (!card) return;
+        draggedOrderId = card.dataset.orderId;
+        draggedStatus = card.dataset.status;
+        card.classList.add('opacity-50');
+        e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragEnd(e) {
+        const card = e.target.closest('.kanban-card');
+        if (card) card.classList.remove('opacity-50');
+        document.querySelectorAll('.kanban-drop-zone').forEach(z => z.classList.remove('ring-2', 'ring-purple-400'));
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        const dropStatus = e.currentTarget.dataset.dropStatus;
+        if (!dropStatus || !draggedOrderId) return;
+        const seq = ['pendiente', 'diseno', 'produccion', 'envio', 'entregado'];
+        const cur = seq.indexOf(draggedStatus);
+        const tgt = seq.indexOf(dropStatus);
+        if (tgt === cur + 1) {
+            e.currentTarget.classList.add('ring-2', 'ring-purple-400');
+        }
+    }
+
+    function handleDragLeave(e) {
+        e.currentTarget.classList.remove('ring-2', 'ring-purple-400');
+    }
+
+    async function handleDrop(e) {
+        e.preventDefault();
+        const dropStatus = e.currentTarget.dataset.dropStatus;
+        e.currentTarget.classList.remove('ring-2', 'ring-purple-400');
+        if (!dropStatus || !draggedOrderId) return;
+        await moveOrder(draggedOrderId, dropStatus);
+        draggedOrderId = null;
+        draggedStatus = null;
+    }
+
+    async function moveOrder(orderId, status) {
+        const response = await fetch(`/production/kanban/orders/${orderId}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast(`Movido a ${result.status_label}`);
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showToast(result.message || 'No se pudo mover', true);
+        }
+    }
+
+    async function advanceOrder(orderId, status) {
+        await moveOrder(orderId, status);
+    }
+
+    async function openOrderPanel(orderId) {
+        const panel = document.getElementById('orderPanel');
+        const body = document.getElementById('panelBody');
+        panel.classList.remove('hidden');
+        body.innerHTML = '<p class="text-gray-400 text-sm">Cargando...</p>';
+
+        const response = await fetch(`/production/kanban/orders/${orderId}/panel`);
+        if (!response.ok) {
+            body.innerHTML = '<p class="text-red-600 text-sm">No se pudo cargar.</p>';
+            return;
+        }
+        const data = await response.json();
+        document.getElementById('panelTitle').textContent = data.label;
+        document.getElementById('panelDetailLink').href = data.detail_url;
+
+        let productsHtml = (data.products || []).map(p =>
+            `<li class="text-sm"><span class="font-medium">${p.detail}</span> × ${p.quantity} · ${p.measure}</li>`
+        ).join('') || '<li class="text-gray-400 text-sm">Sin productos</li>';
+
+        let historyHtml = (data.history || []).map(h =>
+            `<li class="text-xs text-gray-600 border-l-2 border-purple-200 pl-2 mb-1">${h.status_label}${h.notes ? ' — ' + h.notes : ''}</li>`
+        ).join('') || '<li class="text-gray-400 text-xs">Sin historial</li>';
+
+        body.innerHTML = `
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div><span class="text-gray-500">Cliente</span><div class="font-semibold">${data.client_name}</div></div>
+                <div><span class="text-gray-500">Entrega</span><div class="font-semibold">${data.delivery_full}</div></div>
+                <div><span class="text-gray-500">Estado</span><div class="font-semibold">${data.status_label}</div></div>
+                <div><span class="text-gray-500">Prioridad</span><div class="font-semibold">${data.priority_label}</div></div>
+                <div><span class="text-gray-500">Diseñador</span><div>${data.responsible_designer || '—'}</div></div>
+                <div><span class="text-gray-500">Fabricador</span><div>${data.responsible_fabricator || '—'}</div></div>
+            </div>
+            <div>
+                <h3 class="font-bold text-sm mb-2">Productos</h3>
+                <ul class="space-y-1">${productsHtml}</ul>
+            </div>
+            <div class="text-sm space-y-1">
+                <h3 class="font-bold mb-2">Fabricación</h3>
+                <p><span class="text-gray-500">Archivo:</span> <span class="font-mono">${data.design_file || '—'}</span></p>
+                <p><span class="text-gray-500">Material:</span> ${data.design_material || data.material || '—'}</p>
+                <p><span class="text-gray-500">Medida:</span> ${data.design_size || '—'}</p>
+            </div>
+            ${data.observations ? `<div><h3 class="font-bold text-sm mb-1">Observaciones</h3><p class="text-sm text-gray-700 whitespace-pre-wrap">${data.observations}</p></div>` : ''}
+            <div><h3 class="font-bold text-sm mb-2">Historial</h3><ul>${historyHtml}</ul></div>
+            ${data.can_advance ? `<button type="button" onclick="advanceOrder(${data.id}, '${data.next_status}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl text-sm font-medium">Avanzar → ${data.next_status_label}</button>` : ''}
+        `;
+    }
+
+    function closeOrderPanel() {
+        document.getElementById('orderPanel').classList.add('hidden');
+    }
+</script>
+{% endblock %}

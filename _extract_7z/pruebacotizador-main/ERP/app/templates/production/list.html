@@ -1,0 +1,115 @@
+{% extends 'layouts/base.html' %}
+{% from "components/production_status_badge.html" import production_status_badge %}
+
+{% block content %}
+
+<div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Producción</h1>
+        <p class="text-gray-500 mt-1">Control de órdenes de fabricación</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="/production/kanban" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Kanban</a>
+        <a href="/production/calendar" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Calendario</a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm border-l-4 border-purple-600">
+        <div class="text-sm text-gray-500">Órdenes activas</div>
+        <div class="text-2xl font-bold text-slate-900">{{ active_orders_count or 0 }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm border-l-4 border-red-500">
+        <div class="text-sm text-gray-500">Prioridad alta</div>
+        <div class="text-2xl font-bold text-slate-900">{{ urgent_orders_count or 0 }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm border-l-4 border-orange-500">
+        <div class="text-sm text-gray-500">Entregas vencidas</div>
+        <div class="text-2xl font-bold text-slate-900">{{ overdue_orders_count or 0 }}</div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div class="erp-table-wrap">
+        <table class="erp-table text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="text-left p-4">Orden</th>
+                    <th class="text-left p-4">Cliente</th>
+                    <th class="text-left p-4">Cotización</th>
+                    <th class="text-left p-4">Diseñador</th>
+                    <th class="text-left p-4">Fabricador</th>
+                    <th class="text-left p-4">Entrega</th>
+                    <th class="text-left p-4">Prioridad</th>
+                    <th class="text-left p-4">Estado</th>
+                    <th class="text-left p-4">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for order in orders %}
+                {% set client = order.quotation.client if order.quotation else none %}
+                <tr class="hover:bg-gray-50">
+                    <td class="p-4 font-bold">
+                        <a href="/production/{{ order.id }}" class="text-purple-700 hover:underline">#{{ order.id }}</a>
+                    </td>
+                    <td class="p-4">
+                        <div class="font-medium text-slate-900">{{ client.name if client else '—' }}</div>
+                    </td>
+                    <td class="p-4">
+                        <a href="/quotations/{{ order.quotation_id }}" class="text-purple-600 hover:underline">#{{ order.quotation_id }}</a>
+                    </td>
+                    <td class="p-4 text-gray-700">{{ order.designer or '—' }}</td>
+                    <td class="p-4 text-gray-700">{{ order.fabricator or '—' }}</td>
+                    <td class="p-4">
+                        {% if order.delivery_date %}
+                        {% set del_dt = order.delivery_date.date() if order.delivery_date.__class__.__name__ == 'datetime' else order.delivery_date %}
+                        {% set is_late = today is defined and del_dt < today and (order.status or '') not in ['enviado', 'entregado'] %}
+                        <span class="{% if is_late %}text-red-600 font-semibold{% else %}text-gray-700{% endif %}">
+                            {{ del_dt.strftime('%d/%m/%Y') }}
+                        </span>
+                        {% elif order.quotation and order.quotation.delivery_date %}
+                        {% set q_del = order.quotation.delivery_date %}
+                        {% set is_late_q = today is defined and q_del < today and (order.status or '') not in ['enviado', 'entregado'] %}
+                        <span class="{% if is_late_q %}text-red-600 font-semibold{% else %}text-gray-700{% endif %}">
+                            {{ q_del.strftime('%d/%m/%Y') }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400">Sin fecha</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4">
+                        {% if order.priority == 'alta' or order.priority == 'urgente' %}
+                        <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-medium">{{ order.priority|capitalize }}</span>
+                        {% elif order.priority == 'media' %}
+                        <span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs font-medium">Media</span>
+                        {% else %}
+                        <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium">Baja</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4">{{ production_status_badge(order.status) }}</td>
+                    <td class="p-4">
+                        <div class="flex flex-wrap gap-2">
+                            <a href="/production/{{ order.id }}"
+                                class="bg-purple-700 hover:bg-purple-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                                Ver
+                            </a>
+                            <a href="/shipments/new/{{ order.quotation_id }}"
+                                class="border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-xs">
+                                Guía
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="p-12 text-center text-gray-500">
+                        No hay órdenes de producción activas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

@@ -9,17 +9,26 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.auth_handler import role_required
+from app.auth.security import verify_admin_password
 from app.database import get_db
 from app.models.client import Client
 from app.models.company_config import CompanyConfig
-from app.models.inventory_movement import InventoryMovement
 from app.models.product import Product
 from app.models.production_order import ProductionOrder
 from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.models.quotation_payment import QuotationPayment
+from app.models.shipment import Shipment
+from app.models.quotation_design import QuotationDesign
+from app.models.production_tracking import ProductionTracking
+from app.models.design_tracking import DesignTracking
 from app.services.production_helpers import ensure_production_order, cancel_stale_pending_quotations
-from app.services.product_service import create_custom_product_from_quotation, resolve_custom_product_id
+from app.services.product_service import (
+    create_custom_product_from_quotation,
+    resolve_custom_product_id,
+    sync_product_image,
+)
+from app.services.quotation_service import recalculate_quotation
 from app.services.quotation_design_service import (
     MAX_QUOTATION_DESIGNS,
     DesignLimitError,
@@ -37,13 +46,15 @@ from app.utils.pagination import build_page_url, paginate_query
 from app.utils.image_storage import (
     UploadValidationError,
     delete_payment_receipt,
+    delete_design_file,
     design_image_url,
     read_upload_bytes,
-    save_design_image,
+    save_product_image,
     validate_upload_filename,
     payment_receipt_url,
     is_payment_receipt_pdf,
     is_payment_receipt_image,
+    product_image_url,
 )
 
 router = APIRouter(prefix="/quotations", tags=["quotations"])
@@ -55,12 +66,13 @@ templates.env.globals["design_image_url"] = design_image_url
 templates.env.globals["payment_receipt_url"] = payment_receipt_url
 templates.env.globals["is_payment_receipt_pdf"] = is_payment_receipt_pdf
 templates.env.globals["is_payment_receipt_image"] = is_payment_receipt_image
+templates.env.globals["product_image_url"] = product_image_url
 
 QUOTATION_ROLES = ["admin", "ventas"]
 
 
 def _purge_quotation(db: Session, quotation: Quotation) -> None:
-    """Elimina ítems, pagos y órdenes de producción ligadas antes de borrar la cotización."""
+    """Elimina registros ligados y archivos antes de borrar la cotización."""
     payments = (
         db.query(QuotationPayment)
         .filter(QuotationPayment.quotation_id == quotation.id)
@@ -70,6 +82,38 @@ def _purge_quotation(db: Session, quotation: Quotation) -> None:
         delete_payment_receipt(payment.transfer_receipt)
     db.query(QuotationPayment).filter(
         QuotationPayment.quotation_id == quotation.id
+    ).delete(synchronize_session=False)
+
+    designs = (
+        db.query(QuotationDesign)
+        .filter(QuotationDesign.quotation_id == quotation.id)
+        .all()
+    )
+    for design in designs:
+        delete_design_file(design.filename)
+    db.query(QuotationDesign).filter(
+        QuotationDesign.quotation_id == quotation.id
+    ).delete(synchronize_session=False)
+
+    item_ids = [
+        row[0]
+        for row in db.query(QuotationItem.id)
+        .filter(QuotationItem.quotation_id == quotation.id)
+        .all()
+    ]
+    if item_ids:
+        db.query(DesignTracking).filter(
+            DesignTracking.quotation_item_id.in_(item_ids)
+        ).delete(synchronize_session=False)
+        db.query(ProductionTracking).filter(
+            ProductionTracking.quotation_item_id.in_(item_ids)
+        ).delete(synchronize_session=False)
+
+    db.query(ProductionTracking).filter(
+        ProductionTracking.quotation_id == quotation.id
+    ).delete(synchronize_session=False)
+    db.query(Shipment).filter(
+        Shipment.quotation_id == quotation.id
     ).delete(synchronize_session=False)
     db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete(
         synchronize_session=False
@@ -87,6 +131,59 @@ def _normalize_product_id(value) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+async def _item_image_from_form(request: Request, index: int) -> str | None:
+    form = await request.form()
+    upload = form.get(f"item_image_{index}")
+    if not upload or not getattr(upload, "filename", None):
+        return None
+    try:
+        validate_upload_filename(upload.filename)
+        data = await read_upload_bytes(upload, 5 * 1024 * 1024)
+        return save_product_image(data)
+    except UploadValidationError:
+        return None
+
+
+def _add_items_to_quotation(
+    db: Session,
+    quotation: Quotation,
+    items_data: list,
+    item_images: dict[int, str | None],
+) -> None:
+    for idx, item in enumerate(items_data):
+        image_name = item_images.get(idx)
+        if not image_name:
+            existing = (item.get("existing_image") or "").strip()
+            if existing:
+                image_name = existing
+        product_id = resolve_custom_product_id(
+            db,
+            item_data=item,
+            image=image_name,
+        )
+        if product_id is None:
+            product_id = _normalize_product_id(item.get("product_id"))
+
+        if image_name and product_id:
+            sync_product_image(db, product_id, image_name)
+
+        db.add(
+            QuotationItem(
+                quotation_id=quotation.id,
+                product_id=product_id,
+                quantity=item.get("quantity", 1),
+                detail=item.get("detail", ""),
+                measure=item.get("measure", ""),
+                theme=item.get("theme", ""),
+                color=item.get("color", ""),
+                logo=item.get("logo", False),
+                unit_price=item.get("price", 0),
+                total=item.get("total", 0),
+                product_image=image_name,
+            )
+        )
 
 
 def _require_quotation_access(request: Request):
@@ -135,9 +232,12 @@ async def quotations_page(
     search: str = "",
     client_id: Optional[str] = None,
     status: str = "",
+    delivery: str = "",
     start_date: str = "",
     end_date: str = "",
     page: int = 1,
+    error: str = "",
+    deleted: int = 0,
     db: Session = Depends(get_db),
 ):
     user = _require_quotation_access(request)
@@ -146,7 +246,10 @@ async def quotations_page(
 
     cancel_stale_pending_quotations(db)
 
-    query = db.query(Quotation).options(joinedload(Quotation.client))
+    query = db.query(Quotation).options(
+        joinedload(Quotation.client),
+        joinedload(Quotation.payments),
+    )
 
     if search:
         query = query.join(Client).filter(Client.name.ilike(f"%{search}%"))
@@ -157,13 +260,21 @@ async def quotations_page(
     if status:
         query = query.filter(Quotation.status.in_(expand_status_filter(status)))
 
+    if delivery == "entregada":
+        query = query.filter(Quotation.status.in_(expand_status_filter("entregada,entregado")))
+    elif delivery == "no_entregada":
+        query = query.filter(
+            ~Quotation.status.in_(expand_status_filter("entregada,entregado")),
+            Quotation.status != "cancelada",
+        )
+
     if start_date:
         query = query.filter(Quotation.created_at >= start_date)
 
     if end_date:
         query = query.filter(Quotation.created_at <= end_date)
 
-    query = query.order_by(Quotation.id.desc())
+    query = query.order_by(Quotation.created_at.desc(), Quotation.id.desc())
     pagination = paginate_query(query, page, settings.per_page)
     clients = db.query(Client).order_by(Client.name).all()
     counts = _quotation_counts(db)
@@ -172,6 +283,7 @@ async def quotations_page(
         "search": search,
         "client_id": client_id or "",
         "status": status,
+        "delivery": delivery,
         "start_date": start_date,
         "end_date": end_date,
     }
@@ -185,8 +297,11 @@ async def quotations_page(
             "search": search,
             "client_id": client_id,
             "status": status,
+            "delivery": delivery,
             "start_date": start_date,
             "end_date": end_date,
+            "error": error,
+            "deleted": deleted,
             "user": user,
             "page": pagination["page"],
             "pages": pagination["pages"],
@@ -231,7 +346,7 @@ async def sales_tracking_page(request: Request, db: Session = Depends(get_db)):
         db.query(Quotation)
         .options(joinedload(Quotation.client))
         .filter(~Quotation.status.in_(["cancelada", "entregada", "entregado"]))
-        .order_by(Quotation.id.desc())
+        .order_by(Quotation.created_at.desc(), Quotation.id.desc())
         .limit(50)
         .all()
     )
@@ -283,6 +398,7 @@ async def create_quotation(
     delivery_date: str = Form(None),
     iva: float = Form(...),
     total: float = Form(...),
+    shipping_cost: float = Form(0),
     items: str = Form(...),
     design_file: UploadFile = File(None),
     design_files: Annotated[list[UploadFile], File()] = [],
@@ -327,6 +443,7 @@ async def create_quotation(
             delivery_date=parsed_delivery_date,
             iva=iva,
             total=total,
+            shipping_cost=shipping_cost or 0,
             design_file=None,
             status="pendiente",
         )
@@ -351,28 +468,11 @@ async def create_quotation(
         if filename:
             quotation.design_file = filename
 
-        for item in items_data:
-            product_id = resolve_custom_product_id(
-                db,
-                item_data=item,
-            )
-            if product_id is None:
-                product_id = _normalize_product_id(item.get("product_id"))
+        item_images: dict[int, str | None] = {}
+        for idx in range(len(items_data)):
+            item_images[idx] = await _item_image_from_form(request, idx)
 
-            db.add(
-                QuotationItem(
-                    quotation_id=quotation.id,
-                    product_id=product_id,
-                    quantity=item.get("quantity", 1),
-                    detail=item.get("detail", ""),
-                    measure=item.get("measure", ""),
-                    theme=item.get("theme", ""),
-                    color=item.get("color", ""),
-                    logo=item.get("logo", False),
-                    unit_price=item.get("price", 0),
-                    total=item.get("total", 0),
-                )
-            )
+        _add_items_to_quotation(db, quotation, items_data, item_images)
 
         db.commit()
 
@@ -431,10 +531,12 @@ async def update_item(
     request: Request,
     item_id: int,
     quantity: int = Form(...),
+    unit_price: float = Form(...),
     theme: str = Form(""),
     measure: str = Form(""),
     color: str = Form(""),
     logo: bool = Form(False),
+    product_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
     user = _require_quotation_access(request)
@@ -449,11 +551,22 @@ async def update_item(
         return RedirectResponse(url=f"/quotations/{item.quotation_id}", status_code=302)
 
     item.quantity = quantity
-    item.total = quantity * item.unit_price
+    item.unit_price = unit_price
+    item.total = quantity * unit_price
     item.theme = theme
     item.measure = measure
     item.color = color
     item.logo = logo
+
+    if product_image and product_image.filename:
+        try:
+            validate_upload_filename(product_image.filename)
+            data = await read_upload_bytes(product_image, 5 * 1024 * 1024)
+            image_name = save_product_image(data)
+            item.product_image = image_name
+            sync_product_image(db, item.product_id, image_name)
+        except UploadValidationError:
+            pass
 
     db.commit()
     recalculate_quotation(item.quotation, db)
@@ -627,12 +740,35 @@ async def delete_quotation(
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
-    if quotation.status not in ("pendiente", "cancelada"):
+    _purge_quotation(db, quotation)
+    db.commit()
+    return RedirectResponse(url="/quotations", status_code=302)
+
+
+@router.post("/{quotation_id}/delete")
+async def delete_quotation_with_password(
+    request: Request,
+    quotation_id: int,
+    admin_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    if not verify_admin_password(admin_password):
+        return RedirectResponse(
+            url="/quotations/?error=clave_admin_incorrecta",
+            status_code=302,
+        )
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
     _purge_quotation(db, quotation)
     db.commit()
-    return RedirectResponse(url="/quotations", status_code=302)
+    return RedirectResponse(url="/quotations/?deleted=1", status_code=302)
 
 
 @router.get("/{quotation_id}/reactivate")
@@ -680,14 +816,26 @@ async def edit_quotation_page(
 
     items_json = []
     for item in items:
+        is_custom = bool(item.product and item.product.custom)
+        thumb = None
+        if item.product_image:
+            thumb = product_image_url(item.product_image, thumb=True)
+        elif item.product and item.product.image:
+            thumb = product_image_url(item.product.image, thumb=True)
         items_json.append(
             {
-                "type": "inventory",
-                "product_id": None,
+                "type": "custom" if is_custom else "inventory",
+                "product_id": item.product_id,
                 "quantity": item.quantity,
                 "detail": item.detail,
+                "measure": item.measure or "",
+                "theme": item.theme or "",
+                "color": item.color or "",
+                "logo": bool(item.logo),
                 "price": item.unit_price,
                 "total": item.total,
+                "existing_image": item.product_image or "",
+                "existing_image_url": thumb or "",
             }
         )
 
@@ -715,6 +863,7 @@ async def update_quotation(
     discount: float = Form(...),
     iva: float = Form(...),
     total: float = Form(...),
+    shipping_cost: float = Form(0),
     items: str = Form(...),
     db: Session = Depends(get_db),
 ):
@@ -734,31 +883,39 @@ async def update_quotation(
     quotation.discount = discount
     quotation.iva = iva
     quotation.total = total
+    quotation.shipping_cost = shipping_cost or 0
 
     db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete()
     items_data = json.loads(items)
 
-    for item in items_data:
-        product_id = resolve_custom_product_id(
-            db,
-            item_data=item,
-        )
-        if product_id is None:
-            product_id = _normalize_product_id(item.get("product_id"))
+    item_images: dict[int, str | None] = {}
+    for idx in range(len(items_data)):
+        item_images[idx] = await _item_image_from_form(request, idx)
 
-        db.add(
-            QuotationItem(
-                quotation_id=quotation.id,
-                product_id=product_id,
-                quantity=item.get("quantity", 1),
-                detail=item.get("detail", ""),
-                unit_price=item.get("price", 0.0),
-                total=item.get("total", 0.0),
-            )
-        )
+    _add_items_to_quotation(db, quotation, items_data, item_images)
 
     db.commit()
     return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
+
+
+@router.post("/{quotation_id}/shipping-cost")
+async def update_shipping_cost(
+    request: Request,
+    quotation_id: int,
+    shipping_cost: float = Form(0),
+    db: Session = Depends(get_db),
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    quotation.shipping_cost = shipping_cost or 0
+    recalculate_quotation(quotation, db)
+    return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
 
 @router.get("/{quotation_id}/production")
@@ -769,67 +926,21 @@ async def production_quotation(
     if isinstance(user, RedirectResponse):
         return user
 
-    try:
-        quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-        if not quotation:
-            return RedirectResponse(url="/quotations/", status_code=302)
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations/", status_code=302)
 
-        items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).all()
+    order = ensure_production_order(db, quotation)
+    db.commit()
 
-        for item in items:
-            if not item.product_id:
-                continue
+    if order:
+        from app.services.production_order_service import normalize_status
 
-            product = db.query(Product).filter(Product.id == item.product_id).first()
-            if not product:
-                continue
+        stage = normalize_status(order.status)
+        if stage in {"pendiente", "diseno"}:
+            return RedirectResponse(url=f"/production/{order.id}", status_code=302)
 
-            previous_stock = product.stock or 0
-            new_stock = previous_stock - item.quantity
-
-            if new_stock < 0:
-                return HTMLResponse(
-                    content=f"""
-                    <h1>Stock insuficiente</h1>
-                    <p>Producto: {product.name}</p>
-                    <p>Disponible: {previous_stock}</p>
-                    <p>Solicitado: {item.quantity}</p>
-                    """,
-                    status_code=400,
-                )
-
-            product.stock = new_stock
-            db.add(
-                InventoryMovement(
-                    product_id=product.id,
-                    movement_type="salida",
-                    quantity=-item.quantity,
-                    previous_stock=previous_stock,
-                    new_stock=new_stock,
-                    reason=f"Cotización #{quotation.id} → Producción",
-                )
-            )
-
-        if quotation.status == "produccion":
-            return RedirectResponse(url="/production/", status_code=302)
-
-        quotation.status = "produccion"
-        ensure_production_order(db, quotation)
-        db.commit()
-
-        try:
-            log_activity(db, "Enviado a producción", f"Cotización #{quotation.id}")
-        except Exception:
-            pass
-
-        return RedirectResponse(url="/production/", status_code=302)
-
-    except Exception as e:
-        db.rollback()
-        return HTMLResponse(
-            content=f"<h1>Error enviando a producción</h1><p>{str(e)}</p>",
-            status_code=500,
-        )
+    return RedirectResponse(url="/production/", status_code=302)
 
 
 @router.get("/{quotation_id}/shipping")
@@ -880,14 +991,22 @@ async def quotation_pdf(
     try:
         quotation = (
             db.query(Quotation)
-            .options(joinedload(Quotation.payments))
+            .options(
+                joinedload(Quotation.payments),
+                joinedload(Quotation.designs),
+            )
             .filter(Quotation.id == quotation_id)
             .first()
         )
         if not quotation:
             return HTMLResponse(content="<h1>Cotización no encontrada</h1>", status_code=404)
 
-        items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation_id).all()
+        items = (
+            db.query(QuotationItem)
+            .options(joinedload(QuotationItem.product))
+            .filter(QuotationItem.quotation_id == quotation_id)
+            .all()
+        )
         client = db.query(Client).filter(Client.id == quotation.client_id).first()
 
         if not client:
@@ -939,6 +1058,7 @@ async def add_product_to_quotation(
     measure: str = Form(""),
     color: str = Form(""),
     logo: bool = Form(False),
+    product_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
     user = _require_quotation_access(request)
@@ -951,6 +1071,15 @@ async def add_product_to_quotation(
 
     if quantity < 1:
         return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+    image_name = None
+    if product_image and product_image.filename:
+        try:
+            validate_upload_filename(product_image.filename)
+            data = await read_upload_bytes(product_image, 5 * 1024 * 1024)
+            image_name = save_product_image(data)
+        except UploadValidationError:
+            image_name = None
 
     if product_type == "catalogo":
         product = db.query(Product).filter(Product.id == product_id).first()
@@ -978,6 +1107,7 @@ async def add_product_to_quotation(
             size=measure,
             theme=theme,
             price=custom_price,
+            image=image_name,
         )
 
         item = QuotationItem(
@@ -991,6 +1121,7 @@ async def add_product_to_quotation(
             logo=logo,
             unit_price=custom_price,
             total=quantity * custom_price,
+            product_image=image_name,
         )
 
     db.add(item)

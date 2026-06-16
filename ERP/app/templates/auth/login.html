@@ -39,8 +39,11 @@
         <div class="flex-1 flex items-center justify-center p-4 sm:p-6">
 
             <form
+                id="loginForm"
                 method="POST"
+                action="/login"
                 class="bg-white p-6 sm:p-10 rounded-2xl shadow-xl w-full max-w-md"
+                novalidate
             >
 
                 <h2 class="text-xl sm:text-2xl md:text-3xl font-bold mb-6 sm:mb-8 text-center text-purple-800">
@@ -49,27 +52,39 @@
 
                 {% if error %}
 
-                <div class="bg-red-100 text-red-700 p-3 rounded mb-4">
+                <div id="loginError" class="bg-red-100 text-red-700 p-3 rounded mb-4">
                     {{ error }}
                 </div>
+
+                {% else %}
+
+                <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded mb-4"></div>
 
                 {% endif %}
 
                 <input
+                    id="username"
                     type="text"
                     name="username"
+                    value="{{ username or '' }}"
                     placeholder="Usuario"
+                    autocomplete="username"
+                    required
                     class="w-full border p-3 rounded-lg mb-4"
                 >
 
                 <input
+                    id="password"
                     type="password"
                     name="password"
                     placeholder="Contraseña"
+                    autocomplete="current-password"
+                    required
                     class="w-full border p-3 rounded-lg mb-6"
                 >
 
                 <button
+                    type="submit"
                     class="w-full btn-primary p-3 rounded-lg"
                 >
                     Ingresar
@@ -86,6 +101,24 @@
         </div>
 
     </div>
+
+    <script>
+        document.getElementById("loginForm").addEventListener("submit", function (event) {
+            const username = document.getElementById("username").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const errorBox = document.getElementById("loginError");
+
+            if (!username || !password) {
+                event.preventDefault();
+                errorBox.textContent = "Ingrese usuario y contraseña.";
+                errorBox.classList.remove("hidden");
+                (username ? document.getElementById("password") : document.getElementById("username")).focus();
+                return;
+            }
+
+            errorBox.classList.add("hidden");
+        });
+    </script>
 
 </body>
 

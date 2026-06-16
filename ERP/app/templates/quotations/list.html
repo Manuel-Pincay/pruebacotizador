@@ -53,6 +53,32 @@
         <div class="text-xl font-bold text-emerald-700">{{ delivered_quotations }}</div>
     </div>
 </div>
+{% if error == 'clave_admin_incorrecta' %}
+<div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+    Clave de administrador incorrecta. Intenta de nuevo.
+</div>
+{% elif deleted %}
+<div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+    Cotización eliminada correctamente.
+</div>
+{% endif %}
+<!-- FILTROS RÁPIDOS ENTREGA -->
+
+<div class="flex flex-wrap gap-2 mb-3">
+    <a href="/quotations?delivery=entregada{% if client_id %}&client_id={{ client_id }}{% endif %}{% if status %}&status={{ status }}{% endif %}"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if delivery == 'entregada' %}bg-emerald-600 text-white{% else %}bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50{% endif %}">
+        Entregadas
+    </a>
+    <a href="/quotations?delivery=no_entregada{% if client_id %}&client_id={{ client_id }}{% endif %}{% if status %}&status={{ status }}{% endif %}"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if delivery == 'no_entregada' %}bg-orange-600 text-white{% else %}bg-white border border-orange-200 text-orange-700 hover:bg-orange-50{% endif %}">
+        Sin entregar
+    </a>
+    <a href="/quotations{% if client_id %}?client_id={{ client_id }}{% if status %}&status={{ status }}{% endif %}{% elif status %}?status={{ status }}{% endif %}"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if not delivery %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 text-gray-700 hover:bg-gray-50{% endif %}">
+        Todas
+    </a>
+</div>
+
 <!-- FILTROS -->
 
 <form method="GET">
@@ -86,6 +112,8 @@
                     <option value="cancelada" {% if status == "cancelada" %}selected{% endif %}>Cancelada</option>
                 </select>
             </div>
+
+            <input type="hidden" name="delivery" value="{{ delivery or '' }}" />
 
             <!-- FECHA INICIO -->
             <div>
@@ -123,7 +151,7 @@
             <h2 class="text-xl font-bold">Listado de Cotizaciones</h2>
 
             <p class="text-gray-500 text-sm mt-1">
-                {{ filtered_total }} registros · página {{ page }} de {{ pages }}
+                {{ filtered_total }} registros · página {{ page }} de {{ pages }} · más recientes primero
             </p>
         </div>
     </div>
@@ -139,6 +167,8 @@
                     <th class="p-5 text-left">Total</th>
 
                     <th class="p-5 text-left">Estado</th>
+
+                    <th class="p-5 text-left">Estado Pago</th>
 
                     <th class="p-5 text-left">Fecha</th>
 
@@ -215,6 +245,21 @@
                         {% endif %}
                     </td>
                     <td class="p-5">
+                        {% if quotation.payment_status == 'sin_abono' %}
+                        <span class="inline-flex items-center gap-1 bg-red-50 text-red-700 px-2.5 py-1 rounded-full text-xs font-medium">
+                            🔴 Sin abono
+                        </span>
+                        {% elif quotation.payment_status == 'parcial' %}
+                        <span class="inline-flex items-center gap-1 bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full text-xs font-medium">
+                            🟠 Abono parcial
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-medium">
+                            🟢 Pagada
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="p-5">
                         {% if quotation.created_at %} {{
                         quotation.created_at.strftime('%d/%m/%Y') }} {% else %} - {% endif
                         %}
@@ -250,29 +295,25 @@
                                 ❌
                             </button>
 
-                            <button onclick="deleteQuotation('{{ quotation.id }}')"
-                                class="w-10 h-10 bg-red-100 hover:bg-red-200 rounded-xl" title="Eliminar">
-                                🗑️
-                            </button>
-
                             {% elif quotation.status == "cancelada" %}
                             <button onclick="reactivateQuotation('{{ quotation.id }}')"
                                 class="w-10 h-10 bg-green-100 hover:bg-green-200 rounded-xl" title="Reactivar">
                                 ♻️
                             </button>
+
+                            {% endif %}
+
                             <button onclick="deleteQuotation('{{ quotation.id }}')"
                                 class="w-10 h-10 bg-red-100 hover:bg-red-200 rounded-xl" title="Eliminar">
                                 🗑️
                             </button>
-
-                            {% endif %}
                         </div>
                     </td>
                 </tr>
                 {% endfor %} {% else %}
 
                 <tr>
-                    <td colspan="7" class="text-center py-20">
+                    <td colspan="8" class="text-center py-20">
                         <div class="text-6xl mb-4">📄</div>
 
                         <h3 class="text-xl font-semibold">No existen cotizaciones</h3>
@@ -306,9 +347,25 @@
     }
 
     async function deleteQuotation(id) {
-        if (!confirm("¿Eliminar cotización permanentemente?")) return;
+        if (!confirm("¿Eliminar cotización permanentemente? Se borrarán ítems, pagos y órdenes relacionadas.")) return;
 
-        window.location.href = `/quotations/${id}/delete`;
+        const adminPassword = prompt("Ingresa clave de administrador:", "");
+        if (!adminPassword) return;
+
+        const formData = new FormData();
+        formData.append("admin_password", adminPassword);
+
+        const response = await fetch(`/quotations/${id}/delete`, {
+            method: "POST",
+            body: formData,
+        });
+
+        if (response.redirected) {
+            window.location.href = response.url;
+            return;
+        }
+
+        alert("No se pudo eliminar la cotización. Verifica la clave e intenta de nuevo.");
     }
 
     async function reactivateQuotation(id) {

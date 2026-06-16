@@ -29,6 +29,7 @@ class QuotationItem(Base):
     # PRECIOS
     unit_price = Column(Float)
     total = Column(Float)
+    product_image = Column(String, nullable=True)
     # RELACIÓN PRODUCTO
     product = relationship("Product")
     quotation = relationship(

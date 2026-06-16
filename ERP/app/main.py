@@ -23,7 +23,7 @@ from app.models.product import Product
 
 from app.auth.security import hash_password
 
-from app.db_migrations import run_sqlite_migrations
+from app.db_migrations import run_schema_migrations
 
 from app.routes import auth
 from app.routes import dashboard
@@ -68,8 +68,8 @@ except Exception as e:
     print(str(e))
 
     raise
-if settings.is_sqlite:
-    run_sqlite_migrations()
+
+run_schema_migrations()
 
 app = FastAPI(title="SISTEMA ERP")
 

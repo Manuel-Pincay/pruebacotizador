@@ -1,0 +1,255 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+
+{% set f = form or {} %}
+
+<div class="w-full max-w-none">
+
+  <div class="flex flex-col sm:flex-row sm:flex-wrap sm:justify-between sm:items-start gap-4 mb-6 sm:mb-8">
+    <div>
+      <a href="/clients" class="inline-flex items-center gap-2 text-purple-700 hover:text-purple-800 font-medium mb-3">
+        ← Volver a Clientes
+      </a>
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Nuevo Cliente</h1>
+      <p class="text-gray-500 mt-2 text-sm sm:text-base">Registra un cliente para cotizaciones y seguimiento comercial.</p>
+    </div>
+    <a href="/clients"
+      class="erp-full-mobile sm:w-auto text-center border border-purple-300 text-purple-700 px-5 py-3 rounded-xl hover:bg-purple-50 transition shrink-0">
+      Ver listado ({{ total_clients|default(0) }})
+    </a>
+  </div>
+
+  {% if error %}
+  <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-800">
+    <p class="font-semibold">No se pudo guardar el cliente</p>
+    <p class="text-sm mt-1">{{ error }}</p>
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-12 gap-6">
+
+    <div class="col-span-12 xl:col-span-8">
+      <form action="/clients/new" method="POST" id="clientForm"
+        class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">👤</div>
+          <div>
+            <h3 class="font-bold text-lg text-purple-700">Datos personales</h3>
+            <p class="text-sm text-gray-500">Información principal del contacto</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-semibold mb-2" for="name">
+              Nombre <span class="text-red-500">*</span>
+            </label>
+            <input type="text" id="name" name="name" value="{{ f.get('name', '') }}" required autofocus
+              placeholder="Ej. Juan Pérez"
+              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2" for="phone">Teléfono</label>
+            <input type="tel" id="phone" name="phone" value="{{ f.get('phone', '') }}"
+              placeholder="Ej. 099 123 4567"
+              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2" for="email">Correo</label>
+            <input type="email" id="email" name="email" value="{{ f.get('email', '') }}"
+              placeholder="cliente@correo.com"
+              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2" for="ruc_ci">RUC / Cédula</label>
+            <input type="text" id="ruc_ci" name="ruc_ci" value="{{ f.get('ruc_ci', '') }}"
+              placeholder="Opcional, debe ser único"
+              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+            <p class="text-xs text-gray-400 mt-1">Si lo ingresas, no puede repetirse en otro cliente.</p>
+          </div>
+        </div>
+
+        <div class="border-t mt-6 pt-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">🏢</div>
+            <div>
+              <h3 class="font-bold text-lg text-purple-700">Información comercial</h3>
+              <p class="text-sm text-gray-500">Datos empresariales y clasificación</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-semibold mb-2" for="company">Empresa</label>
+              <input type="text" id="company" name="company" value="{{ f.get('company', '') }}"
+                placeholder="Nombre comercial o razón social"
+                class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2" for="client_type">
+                Tipo de cliente <span class="text-red-500">*</span>
+              </label>
+              <select id="client_type" name="client_type"
+                class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                {% set selected_type = f.get('client_type', 'minorista') %}
+                <option value="minorista" {% if selected_type == 'minorista' %}selected{% endif %}>Minorista</option>
+                <option value="mayorista" {% if selected_type == 'mayorista' %}selected{% endif %}>Mayorista</option>
+                <option value="frecuente" {% if selected_type == 'frecuente' %}selected{% endif %}>Frecuente</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t mt-6 pt-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">📍</div>
+                <div>
+                  <h3 class="font-bold text-lg text-purple-700">Ubicación</h3>
+                  <p class="text-sm text-gray-500">Dirección de entrega o facturación</p>
+                </div>
+              </div>
+              <label class="block text-sm font-semibold mb-2" for="address">Dirección</label>
+              <textarea id="address" name="address" rows="5"
+                placeholder="Calle, número, ciudad, referencia…"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition">{{ f.get('address', '') }}</textarea>
+            </div>
+
+            <div>
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">📝</div>
+                <div>
+                  <h3 class="font-bold text-lg text-purple-700">Observaciones</h3>
+                  <p class="text-sm text-gray-500">Notas internas sobre el cliente</p>
+                </div>
+              </div>
+              <label class="block text-sm font-semibold mb-2" for="observations">Observaciones</label>
+              <textarea id="observations" name="observations" rows="5"
+                placeholder="Preferencias, horarios, contacto alterno…"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition">{{ f.get('observations', '') }}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 flex flex-wrap gap-4">
+          <button type="submit"
+            class="bg-purple-700 hover:bg-purple-800 text-white px-8 py-3 rounded-xl transition font-semibold">
+            Guardar Cliente
+          </button>
+          <a href="/clients" class="bg-gray-200 hover:bg-gray-300 px-8 py-3 rounded-xl transition">
+            Cancelar
+          </a>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="col-span-12 xl:col-span-4">
+      <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 lg:sticky lg:top-6">
+        <h3 class="text-lg font-bold mb-4">Vista previa</h3>
+
+        <div class="flex items-start gap-4 pb-5 border-b">
+          <div class="w-14 h-14 rounded-3xl bg-purple-100 flex items-center justify-center shrink-0">
+            <span class="text-2xl text-purple-600" id="previewInitials">?</span>
+          </div>
+          <div class="min-w-0">
+            <p class="font-bold text-xl text-gray-900 truncate" id="previewName">Nuevo cliente</p>
+            <span id="previewTypeBadge"
+              class="inline-block mt-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
+              Minorista
+            </span>
+            <p class="text-sm text-gray-500 mt-2 truncate" id="previewCompany">Sin empresa</p>
+          </div>
+        </div>
+
+        <div class="py-4 space-y-3 text-sm text-gray-600 border-b">
+          <p class="flex items-center gap-2">
+            <span>📞</span>
+            <span id="previewPhone">Sin teléfono</span>
+          </p>
+          <p class="flex items-center gap-2">
+            <span>✉️</span>
+            <span id="previewEmail" class="truncate">Sin correo</span>
+          </p>
+          <p class="flex items-start gap-2">
+            <span class="shrink-0">📍</span>
+            <span id="previewAddress">Sin dirección</span>
+          </p>
+        </div>
+
+        <div class="pt-5">
+          <p class="text-sm font-semibold text-gray-700 mb-3">Antes de guardar</p>
+          <ul class="text-sm text-gray-500 space-y-2">
+            <li class="flex gap-2"><span class="text-purple-600">✓</span> El nombre es obligatorio</li>
+            <li class="flex gap-2"><span class="text-purple-600">✓</span> RUC/CI único si lo registras</li>
+            <li class="flex gap-2"><span class="text-purple-600">✓</span> Podrás crear cotizaciones después</li>
+          </ul>
+        </div>
+
+        <div class="mt-6 rounded-2xl bg-purple-50 border border-purple-100 p-4 text-sm text-purple-800">
+          <p class="font-semibold">Clientes registrados</p>
+          <p class="text-2xl font-bold mt-1">{{ total_clients|default(0) }}</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  var typeLabels = {
+    minorista: "Minorista",
+    mayorista: "Mayorista",
+    frecuente: "Frecuente",
+  };
+
+  function initials(name) {
+    var parts = (name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
+  function placeholder(value, fallback) {
+    var v = (value || "").trim();
+    return v || fallback;
+  }
+
+  function syncPreview() {
+    var name = document.getElementById("name").value.trim();
+    var company = document.getElementById("company").value.trim();
+    var phone = document.getElementById("phone").value.trim();
+    var email = document.getElementById("email").value.trim();
+    var address = document.getElementById("address").value.trim();
+    var clientType = document.getElementById("client_type").value;
+
+    document.getElementById("previewName").textContent = name || "Nuevo cliente";
+    document.getElementById("previewInitials").textContent = initials(name);
+    document.getElementById("previewCompany").textContent = company || "Sin empresa";
+    document.getElementById("previewPhone").textContent = placeholder(phone, "Sin teléfono");
+    document.getElementById("previewEmail").textContent = placeholder(email, "Sin correo");
+    document.getElementById("previewAddress").textContent = placeholder(address, "Sin dirección");
+    document.getElementById("previewTypeBadge").textContent = typeLabels[clientType] || clientType;
+  }
+
+  ["name", "company", "phone", "email", "address", "client_type"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", syncPreview);
+      el.addEventListener("change", syncPreview);
+    }
+  });
+
+  syncPreview();
+})();
+</script>
+
+{% endblock %}

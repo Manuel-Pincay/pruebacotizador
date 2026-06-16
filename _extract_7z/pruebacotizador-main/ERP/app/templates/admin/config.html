@@ -1,0 +1,477 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- HEADER -->
+    <div class="mb-8">
+
+        <div class="flex justify-between items-center mb-6">
+
+            <div>
+
+                <h1 class="text-4xl font-bold text-gray-900 mb-2">
+                    ⚙️ Configuración de Empresa
+                </h1>
+
+                <p class="text-gray-600">
+                    Personaliza los datos y estilos de tu empresa
+                </p>
+
+            </div>
+
+            <!-- ACCIONES -->
+            <div class="flex gap-3">
+            <a 
+                href="/secretadmin/storage"
+                class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-5 py-2 rounded-xl font-semibold transition"
+            >
+                Almacenamiento
+            </a>
+            <a 
+                href="/secretadmin/logout"
+                class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-semibold transition"
+            >
+                Cerrar Sesión
+            </a>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- SUCCESS MESSAGE -->
+    {% if request.query_params.get('success') %}
+
+    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl mb-6 flex items-center">
+
+        <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+
+        Configuración guardada exitosamente
+
+    </div>
+
+    {% endif %}
+
+    <!-- FORM -->
+    <form method="post" action="/secretadmin/config/save" enctype="multipart/form-data" class="space-y-6">
+
+        <!-- COMPANY INFO -->
+        <div class="bg-white rounded-2xl shadow p-6">
+
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <span class="bg-purple-100 text-purple-700 rounded-lg p-2 mr-3">🏢</span>
+                Información de la Empresa
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- COMPANY NAME -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Nombre de la Empresa
+                    </label>
+
+                    <input
+                        type="text"
+                        name="company_name"
+                        value="{{ config.company_name }}"
+                        required
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none transition"
+                        placeholder="Ej: SISTEMA ERP"
+                    >
+
+                </div>
+
+                <!-- IVA DEFAULT -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        IVA por Defecto (%)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="iva_default"
+                        value="{{ config.iva_default }}"
+                        min="0"
+                        max="100"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none transition"
+                    >
+
+                </div>
+
+                <!-- QUOTATION VALIDITY DAYS -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Validez de Cotización (días)
+                    </label>
+
+                    <input
+                        type="number"
+                        name="quotation_validity_days"
+                        value="{{ config.quotation_validity_days }}"
+                        min="1"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none transition"
+                    >
+
+                </div>
+
+                <!-- FOOTER TEXT -->
+                <div class="md:col-span-2">
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Texto del Pie de Página
+                    </label>
+
+                    <input
+                        type="text"
+                        name="quotation_footer_text"
+                        value="{{ config.quotation_footer_text }}"
+                        required
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none transition"
+                    >
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- REMITENTE GUÍAS DE ENVÍO -->
+        <div class="bg-white rounded-2xl shadow p-6">
+
+            <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                <span class="bg-purple-100 text-purple-700 rounded-lg p-2 mr-3">📦</span>
+                Remitente en guías de envío
+            </h2>
+            <p class="text-sm text-gray-500 mb-6">
+                Estos datos aparecen solo en las guías. Deje el nombre vacío si no desea mostrar remitente en la etiqueta.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Nombre remitente (guías)
+                    </label>
+                    <input type="text" name="guide_sender_name"
+                        value="{{ config.guide_sender_name or '' }}"
+                        placeholder="Vacío = no mostrar nombre en guía"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Ciudad</label>
+                    <input type="text" name="guide_sender_city"
+                        value="{{ config.guide_sender_city or 'Manta' }}"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">País / región</label>
+                    <input type="text" name="guide_sender_region"
+                        value="{{ config.guide_sender_region or 'Ecuador' }}"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Teléfono remitente</label>
+                    <input type="text" name="guide_sender_phone"
+                        value="{{ config.guide_sender_phone or '' }}"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Dirección remitente</label>
+                    <input type="text" name="guide_sender_address"
+                        value="{{ config.guide_sender_address or '' }}"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none" />
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGO -->
+        <div class="bg-white rounded-2xl shadow p-6">
+
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <span class="bg-purple-100 text-purple-700 rounded-lg p-2 mr-3">🖼️</span>
+                Logo de la Empresa
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- CURRENT LOGO -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Logo Actual
+                    </label>
+
+                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 bg-gray-50 flex items-center justify-center min-h-[200px]">
+
+                        {% set logo_src = logo_image_url(config.logo) %}
+                        {% if logo_src %}
+
+                        <img 
+                            src="{{ logo_src }}" 
+                            alt="Logo"
+                            class="max-h-40 max-w-full object-contain"
+                        >
+
+                        {% else %}
+
+                        <div class="text-center">
+
+                            <svg class="w-16 h-16 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
+                            </svg>
+
+                            <p class="text-gray-500">Sin logo</p>
+
+                        </div>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+                <!-- UPLOAD NEW LOGO -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Cargar Nuevo Logo
+                    </label>
+
+                    <input
+                        type="file"
+                        name="logo"
+                        accept=".jpg,.jpeg,.png,.webp"
+                        class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-purple-500 focus:outline-none transition"
+                    >
+
+                    <p class="text-xs text-gray-500 mt-2">
+                        Formatos soportados: PNG, JPG, GIF. Máximo 5MB
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- COLORS -->
+        <div class="bg-white rounded-2xl shadow p-6">
+
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <span class="bg-purple-100 text-purple-700 rounded-lg p-2 mr-3">🎨</span>
+                Personalización de Colores
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                <!-- PRIMARY COLOR -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Color Primario
+                    </label>
+
+                    <div class="flex gap-2">
+
+                        <input
+                            type="color"
+                            name="primary_color"
+                            value="{{ config.primary_color }}"
+                            class="w-14 h-12 rounded-xl cursor-pointer border-2 border-gray-300"
+                        >
+
+                        <input
+                            type="text"
+                            value="{{ config.primary_color }}"
+                            readonly
+                            class="flex-1 border-2 border-gray-300 rounded-xl p-2 text-sm bg-gray-50"
+                        >
+
+                    </div>
+
+                    <p class="text-xs text-gray-500 mt-2">Color principal de la interfaz</p>
+
+                </div>
+
+                <!-- SECONDARY COLOR -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Color Secundario
+                    </label>
+
+                    <div class="flex gap-2">
+
+                        <input
+                            type="color"
+                            name="secondary_color"
+                            value="{{ config.secondary_color }}"
+                            class="w-14 h-12 rounded-xl cursor-pointer border-2 border-gray-300"
+                        >
+
+                        <input
+                            type="text"
+                            value="{{ config.secondary_color }}"
+                            readonly
+                            class="flex-1 border-2 border-gray-300 rounded-xl p-2 text-sm bg-gray-50"
+                        >
+
+                    </div>
+
+                    <p class="text-xs text-gray-500 mt-2">Color de fondo y acentos</p>
+
+                </div>
+
+                <!-- ACCENT COLOR -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Color de Acento
+                    </label>
+
+                    <div class="flex gap-2">
+
+                        <input
+                            type="color"
+                            name="accent_color"
+                            value="{{ config.accent_color }}"
+                            class="w-14 h-12 rounded-xl cursor-pointer border-2 border-gray-300"
+                        >
+
+                        <input
+                            type="text"
+                            value="{{ config.accent_color }}"
+                            readonly
+                            class="flex-1 border-2 border-gray-300 rounded-xl p-2 text-sm bg-gray-50"
+                        >
+
+                    </div>
+
+                    <p class="text-xs text-gray-500 mt-2">Color para detalles</p>
+
+                </div>
+
+                <!-- FONT COLOR -->
+                <div>
+
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Color de Texto
+                    </label>
+
+                    <div class="flex gap-2">
+
+                        <input
+                            type="color"
+                            name="font_color"
+                            value="{{ config.font_color }}"
+                            class="w-14 h-12 rounded-xl cursor-pointer border-2 border-gray-300"
+                        >
+
+                        <input
+                            type="text"
+                            value="{{ config.font_color }}"
+                            readonly
+                            class="flex-1 border-2 border-gray-300 rounded-xl p-2 text-sm bg-gray-50"
+                        >
+
+                    </div>
+
+                    <p class="text-xs text-gray-500 mt-2">Color del texto principal</p>
+
+                </div>
+
+            </div>
+
+            <!-- COLOR PREVIEW -->
+            <div class="mt-8 pt-8 border-t border-gray-200">
+
+                <h3 class="font-semibold text-gray-900 mb-4">Vista Previa de Colores</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    <div
+                        id="preview_primary"
+                        style="background-color: {{ config.primary_color }}"
+                        class="h-20 rounded-xl shadow flex items-center justify-center text-white font-bold"
+                    >
+                        Color Primario
+                    </div>
+
+                    <div
+                        id="preview_secondary"
+                        style="background-color: {{ config.secondary_color }}"
+                        class="h-20 rounded-xl shadow flex items-center justify-center font-bold"
+                    >
+                        Color Secundario
+                    </div>
+
+                    <div
+                        id="preview_accent"
+                        style="background-color: {{ config.accent_color }}"
+                        class="h-20 rounded-xl shadow flex items-center justify-center text-white font-bold"
+                    >
+                        Color de Acento
+                    </div>
+
+                    <div
+                        id="preview_font"
+                        style="color: {{ config.font_color }}"
+                        class="h-20 rounded-xl shadow flex items-center justify-center bg-gray-100 font-bold"
+                    >
+                        Color de Texto
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- SAVE BUTTON -->
+        <div class="flex gap-4">
+
+            <button
+                type="submit"
+                class="flex-1 btn-primary font-semibold p-4 rounded-xl transition duration-200"
+            >
+                💾 Guardar Cambios
+            </button>
+
+            <button
+                type="button"
+                onclick="window.location.href='/'"
+                class="flex-1 btn-secondary font-semibold p-4 rounded-xl transition duration-200"
+            >
+                Ir al Sistema
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+
+<script>
+
+// Update color previews in real-time
+document.querySelectorAll('input[type="color"]').forEach(input => {
+    input.addEventListener('change', function() {
+        const colorName = this.name;
+        const previewId = 'preview_' + colorName.split('_')[0];
+        const previewElement = document.getElementById(previewId);
+        if (previewElement) {
+            previewElement.style.backgroundColor = this.value;
+        }
+    });
+});
+
+</script>
+
+{% endblock %}

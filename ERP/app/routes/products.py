@@ -32,6 +32,7 @@ from app.utils.image_storage import (
     UploadValidationError,
     delete_product_files,
     product_image_url,
+    read_upload_bytes,
     read_upload_bytes_sync,
     save_product_image,
     validate_upload_filename,
@@ -318,6 +319,9 @@ async def edit_product_page(
             "themes": themes,
             "thicknesses": thicknesses,
             "units": units,
+            "user": user,
+            "saved": request.query_params.get("saved") == "1",
+            "error": request.query_params.get("error"),
         },
     )
 
@@ -345,12 +349,15 @@ async def update_product(
     cost: float = Form(...),
     stock: int = Form(0),
     custom: str = Form("no"),
+    image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
 
     user = role_required(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
+
+    edit_url = f"/products/{product_id}/edit"
 
     try:
 
@@ -359,6 +366,15 @@ async def update_product(
         if not product:
 
             return RedirectResponse(url="/products", status_code=302)
+
+        code = (code or "").strip()
+        name = (name or "").strip()
+
+        if not code or not name:
+            return RedirectResponse(
+                url=f"{edit_url}?error=campos",
+                status_code=302,
+            )
 
         # ==========================
         # VALIDATE DUPLICATE CODE
@@ -372,19 +388,9 @@ async def update_product(
 
         if existing_product:
 
-            return HTMLResponse(
-                content=f"""
-                <script>
-
-                    alert(
-                        'Ya existe un producto con el código {code}'
-                    );
-
-                    window.history.back();
-
-                </script>
-                """,
-                status_code=400,
+            return RedirectResponse(
+                url=f"{edit_url}?error=code",
+                status_code=302,
             )
 
         # ==========================
@@ -398,6 +404,24 @@ async def update_product(
             formatted_size = f"{size} {size_unit}"
 
         # ==========================
+        # IMAGE
+        # ==========================
+
+        if image and image.filename:
+            try:
+                validate_upload_filename(image.filename)
+                data = await read_upload_bytes(image, 5 * 1024 * 1024)
+                image_name = save_product_image(data)
+                if product.image:
+                    delete_product_files(product.image)
+                product.image = image_name
+            except UploadValidationError:
+                return RedirectResponse(
+                    url=f"{edit_url}?error=imagen",
+                    status_code=302,
+                )
+
+        # ==========================
         # UPDATE PRODUCT
         # ==========================
 
@@ -405,7 +429,7 @@ async def update_product(
 
         product.name = name
 
-        product.description = description
+        product.description = (description or "").strip()
 
         product.category = category
 
@@ -429,7 +453,16 @@ async def update_product(
 
         db.commit()
 
-        return RedirectResponse(url="/products", status_code=302)
+        try:
+            log_activity(
+                db,
+                "Producto actualizado",
+                product.name or "Producto",
+            )
+        except Exception:
+            pass
+
+        return RedirectResponse(url=f"{edit_url}?saved=1", status_code=302)
 
     except Exception as e:
 
@@ -437,17 +470,9 @@ async def update_product(
 
         print("ERROR UPDATE PRODUCT:", str(e))
 
-        return HTMLResponse(
-            content=f"""
-            <h1>
-                Error actualizando producto
-            </h1>
-
-            <p>
-                {str(e)}
-            </p>
-            """,
-            status_code=500,
+        return RedirectResponse(
+            url=f"{edit_url}?error=guardar",
+            status_code=302,
         )
 
     # =====================================

@@ -1,0 +1,458 @@
+{% extends 'layouts/base.html' %}
+{% from "components/production_status_badge.html" import production_status_badge %}
+
+{% block content %}
+
+{# Valores por defecto si el servidor aún no recargó la ruta actualizada #}
+{% set production_stages = production_stages if production_stages is defined else ['pendiente', 'diseno', 'produccion', 'envio', 'entregado'] %}
+{% set status_labels = status_labels if status_labels is defined else {
+    'pendiente': 'Pendiente', 'diseno': 'Diseño', 'produccion': 'Producción',
+    'envio': 'Envío', 'entregado': 'Entregado'
+} %}
+{% set current_status = current_status if current_status is defined else (order.status or 'pendiente')|lower %}
+{% set fabrication = fabrication if fabrication is defined else {} %}
+{% set can_edit_fabrication = can_edit_fabrication if can_edit_fabrication is defined else false %}
+{% set can_manage_order = can_manage_order if can_manage_order is defined else true %}
+{% set fabrication_complete = fabrication_complete if fabrication_complete is defined else false %}
+{% set current_status_index = current_status_index if current_status_index is defined else 0 %}
+{% set delivery_meta = delivery_meta if delivery_meta is defined else {
+    'date': none, 'label': 'Sin fecha', 'days_until': none,
+    'is_overdue': false, 'is_today': false, 'urgency': 'none'
+} %}
+{% set saved = saved if saved is defined else false %}
+
+{% if saved %}
+<div class="mb-6 rounded-xl bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm font-medium">
+    Cambios guardados correctamente.
+</div>
+{% endif %}
+
+{% if fab_error is defined and fab_error %}
+<div class="mb-6 rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm font-medium">
+    {{ fab_error }}
+</div>
+{% endif %}
+
+<!-- HEADER -->
+<div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+    <div>
+        <div class="flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/production/" class="hover:text-purple-700">Producción</a>
+            <span>/</span>
+            <span>Orden #{{ order.id }}</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Orden #{{ order.id }}</h1>
+            {{ production_status_badge(order.status, 'md') }}
+            {% if order.priority == 'alta' %}
+            <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">Prioridad alta</span>
+            {% elif order.priority == 'urgente' %}
+            <span class="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-semibold">Urgente</span>
+            {% endif %}
+        </div>
+        <p class="text-gray-500 mt-1">
+            Cotización
+            <a href="/quotations/{{ order.quotation_id }}" class="text-purple-700 hover:underline font-medium">#{{ order.quotation_id }}</a>
+            {% if order.quotation and order.quotation.status %}
+            · Cotización {{ order.quotation.status|capitalize }}
+            {% endif %}
+        </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="/production/kanban" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Kanban</a>
+        <a href="/production/calendar" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">Calendario</a>
+        <a href="/quotations/{{ order.quotation_id }}/pdf" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm">PDF cotización</a>
+        {% if fabrication_complete or current_status in ['produccion', 'envio', 'entregado'] %}
+        <a href="/production/{{ order.id }}/fabrication/print" target="_blank"
+            class="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-sm font-medium">
+            Hoja de fabricación PDF
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- PROGRESO -->
+<div class="bg-white rounded-2xl shadow-sm p-5 mb-6 overflow-x-auto">
+    <p class="text-sm font-medium text-gray-500 mb-4">Avance del pedido</p>
+    <div class="flex items-center min-w-[640px] gap-1">
+        {% for stage in production_stages %}
+        {% set idx = loop.index0 %}
+        {% set is_done = idx < current_status_index %}
+        {% set is_current = idx == current_status_index %}
+        <div class="flex items-center flex-1 min-w-0">
+            <div class="flex flex-col items-center flex-1 min-w-0">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+                    {% if is_done %}bg-green-500 text-white
+                    {% elif is_current %}bg-purple-700 text-white ring-4 ring-purple-100
+                    {% else %}bg-gray-200 text-gray-500{% endif %}">
+                    {% if is_done %}✓{% else %}{{ loop.index }}{% endif %}
+                </div>
+                <span class="text-[11px] mt-1.5 text-center truncate w-full px-0.5
+                    {% if is_current %}text-purple-700 font-semibold{% elif is_done %}text-green-700{% else %}text-gray-400{% endif %}">
+                    {{ status_labels.get(stage, stage) }}
+                </span>
+            </div>
+            {% if not loop.last %}
+            <div class="h-0.5 flex-1 mx-1 mb-5 {% if idx < current_status_index %}bg-green-400{% else %}bg-gray-200{% endif %}"></div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% if next_status is defined and next_status %}
+    <div class="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p class="text-sm text-gray-600">
+            Siguiente paso: <strong>{{ next_status_label }}</strong>
+            {% if next_status_hint %}<span class="text-gray-400">· {{ next_status_hint }}</span>{% endif %}
+        </p>
+        <a href="/production/{{ order.id }}/advance"
+            class="inline-flex justify-center bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-xl text-sm font-medium">
+            Avanzar a {{ next_status_label }} →
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <!-- COLUMNA PRINCIPAL -->
+    <div class="xl:col-span-2 space-y-6">
+
+        <!-- ENTREGA + CLIENTE -->
+        <div class="grid md:grid-cols-2 gap-4">
+            <div class="bg-white rounded-2xl shadow-sm p-5 border-l-4
+                {% if delivery_meta.urgency == 'overdue' %}border-red-500
+                {% elif delivery_meta.urgency == 'today' %}border-yellow-500
+                {% elif delivery_meta.urgency == 'soon' %}border-orange-400
+                {% else %}border-green-500{% endif %}">
+                <p class="text-sm text-gray-500">Fecha de entrega</p>
+                <p class="text-2xl font-bold text-slate-900 mt-1">{{ delivery_meta.label }}</p>
+                {% if delivery_meta.days_until is not none %}
+                <p class="text-sm mt-1
+                    {% if delivery_meta.is_overdue %}text-red-600 font-semibold
+                    {% elif delivery_meta.is_today %}text-yellow-700 font-semibold
+                    {% elif delivery_meta.days_until <= 3 %}text-orange-600
+                    {% else %}text-gray-500{% endif %}">
+                    {% if delivery_meta.is_overdue %}
+                    Atrasada {{ delivery_meta.days_until * -1 }} día(s)
+                    {% elif delivery_meta.is_today %}
+                    Entrega hoy
+                    {% elif delivery_meta.days_until == 1 %}
+                    Falta 1 día
+                    {% else %}
+                    Faltan {{ delivery_meta.days_until }} días
+                    {% endif %}
+                </p>
+                {% endif %}
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm p-5">
+                <p class="text-sm text-gray-500">Cliente</p>
+                <p class="text-lg font-bold text-slate-900 mt-1">{{ order.quotation.client.name }}</p>
+                {% if order.quotation.client.company %}
+                <p class="text-sm text-gray-500">{{ order.quotation.client.company }}</p>
+                {% endif %}
+                <div class="mt-3 space-y-1 text-sm">
+                    {% if order.quotation.client.address %}
+                    <p class="text-gray-600">📍 {{ order.quotation.client.address }}</p>
+                    {% endif %}
+                    {% if order.quotation.client.phone %}
+                    <p class="text-gray-600">📞 {{ order.quotation.client.phone }}</p>
+                    {% endif %}
+                    {% if order.quotation.client.email %}
+                    <p class="text-gray-600">✉️ {{ order.quotation.client.email }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- PRODUCTOS -->
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-slate-900">Productos a fabricar</h2>
+                <span class="text-sm text-gray-500">{{ order.quotation.items|length }} ítem(s)</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                        <tr>
+                            <th class="text-left p-4">Producto</th>
+                            <th class="text-left p-4">Cant.</th>
+                            <th class="text-left p-4">Medida</th>
+                            <th class="text-left p-4">Color</th>
+                            <th class="text-left p-4">Logo</th>
+                            <th class="text-left p-4">Forma</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for item in order.quotation.items %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-4 font-medium text-slate-900">{{ item.detail }}</td>
+                            <td class="p-4 font-bold text-purple-700">{{ item.quantity }}</td>
+                            <td class="p-4">{{ item.measure or '—' }}</td>
+                            <td class="p-4">{{ item.color or '—' }}</td>
+                            <td class="p-4">
+                                {% if item.logo %}
+                                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">Sí</span>
+                                {% else %}
+                                <span class="text-gray-400">No</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4">{{ item.theme or '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- DATOS DE FABRICACIÓN -->
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-indigo-100">
+            <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">Datos para fabricación / impresión</h2>
+                    <p class="text-sm text-gray-500 mt-0.5">Información que recibe producción antes de imprimir</p>
+                </div>
+                {% if fabrication_complete %}
+                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">Completo</span>
+                {% elif can_edit_fabrication %}
+                <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold">Pendiente de completar</span>
+                {% endif %}
+            </div>
+
+            {% if can_edit_fabrication %}
+            <form action="/production/{{ order.id }}/fabrication/" method="POST" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Archivo final *</label>
+                    <input type="text" name="file_name" value="{{ fabrication.file_name or '' }}"
+                        placeholder="Ej: TOPPER_001.ai"
+                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Material *</label>
+                        <select name="material" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                            <option value="">Seleccionar...</option>
+                            {% for material in materials %}
+                            <option value="{{ material }}" {% if fabrication.material == material %}selected{% endif %}>{{ material }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Medida *</label>
+                        <input type="text" name="size" list="fabSizeOptions" value="{{ fabrication.size or '' }}"
+                            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                        <datalist id="fabSizeOptions">{% for size in sizes %}<option value="{{ size }}"></option>{% endfor %}</datalist>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
+                        <input type="text" name="usb_reference" list="fabUsbOptions" value="{{ fabrication.usb_reference or '' }}"
+                            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                        <datalist id="fabUsbOptions">{% for usb in usb_references %}<option value="{{ usb }}"></option>{% endfor %}</datalist>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Copias *</label>
+                        <input type="number" name="copies" min="1" value="{{ fabrication.copies or 1 }}"
+                            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones diseño</label>
+                    <textarea name="detail" rows="3" placeholder="Instrucciones para impresión..."
+                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">{{ fabrication.detail or '' }}</textarea>
+                </div>
+                <div class="flex flex-wrap gap-3 pt-2">
+                    <button type="submit" name="action" value="save"
+                        class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium">
+                        Guardar datos
+                    </button>
+                    <button type="submit" name="action" value="approve"
+                        class="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium">
+                        Enviar a producción →
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400">Para pasar a producción se requiere archivo, material, medida y copias.</p>
+            </form>
+            {% else %}
+            <div class="p-5">
+                {% if fabrication.file_name or fabrication.material %}
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div><dt class="text-gray-500">Archivo</dt><dd class="font-mono font-semibold text-slate-900 mt-0.5">{{ fabrication.file_name or '—' }}</dd></div>
+                    <div><dt class="text-gray-500">Material</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.material or '—' }}</dd></div>
+                    <div><dt class="text-gray-500">Medida</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.size or '—' }}</dd></div>
+                    <div><dt class="text-gray-500">USB</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.usb_reference or '—' }}</dd></div>
+                    <div><dt class="text-gray-500">Copias</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.copies or '—' }}</dd></div>
+                    <div><dt class="text-gray-500">Diseñador</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.assigned_to_name or order.designer or '—' }}</dd></div>
+                </dl>
+                {% if fabrication.detail %}
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                    <p class="text-sm text-gray-500 mb-1">Observaciones</p>
+                    <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ fabrication.detail }}</p>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-sm text-gray-500">Aún no hay datos de fabricación registrados.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if history is defined and history %}
+        <div class="bg-white rounded-2xl shadow-sm p-5">
+            <h2 class="text-lg font-bold text-slate-900 mb-3">Historial</h2>
+            <ul class="space-y-3">
+                {% for entry in history|reverse %}
+                <li class="text-sm border-l-2 border-purple-200 pl-3">
+                    <span class="font-medium text-slate-900">{{ entry.status_label }}</span>
+                    {% if entry.notes %}<span class="text-gray-500"> — {{ entry.notes }}</span>{% endif %}
+                    <p class="text-xs text-gray-400 mt-0.5">
+                        {{ entry.created_by_name or 'Sistema' }}
+                        {% if entry.created_at %} · {{ entry.created_at.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                    </p>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="space-y-6">
+
+        <!-- ENVÍO -->
+        <div class="bg-white rounded-2xl shadow-sm p-5">
+            <h2 class="text-lg font-bold text-slate-900 mb-3">Guía de envío</h2>
+            {% if shipment %}
+            <div class="rounded-xl bg-blue-50 p-4 mb-4">
+                <p class="text-sm text-gray-500">Número de guía</p>
+                <p class="font-bold text-lg text-slate-900">{{ shipment.guide_number }}</p>
+                <p class="text-sm text-gray-500 mt-1">Estado: {{ shipment.status or '—' }}</p>
+            </div>
+            <a href="/shipments/{{ shipment.id }}/label?size=a4&print=1"
+                target="_blank" rel="noopener noreferrer"
+                class="flex w-full justify-center bg-blue-700 hover:bg-blue-800 text-white px-4 py-3 rounded-xl text-sm font-medium mb-2">
+                Imprimir guía A4
+            </a>
+            <a href="/shipments/{{ shipment.id }}/label?size=a5&print=1"
+                target="_blank" rel="noopener noreferrer"
+                class="flex w-full justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl text-sm font-medium mb-2">
+                Imprimir guía A5
+            </a>
+            <a href="/shipments/{{ shipment.id }}/edit"
+                class="flex w-full justify-center border border-gray-200 hover:bg-gray-50 px-4 py-2 rounded-xl text-sm">
+                Editar destinatario
+            </a>
+            {% else %}
+            <p class="text-sm text-gray-500 mb-4">Aún no hay guía registrada.</p>
+            <a href="/shipments/quotation/{{ order.quotation_id }}/label?size=a4&print=1"
+                target="_blank" rel="noopener noreferrer"
+                class="flex w-full justify-center bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-xl text-sm font-medium mb-2">
+                Imprimir guía A4 (cotización)
+            </a>
+            <a href="/shipments/new/{{ order.quotation_id }}"
+                class="flex w-full justify-center bg-blue-700 hover:bg-blue-800 text-white px-4 py-3 rounded-xl text-sm font-medium">
+                + Crear guía de envío
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- GESTIÓN -->
+        {% if can_manage_order %}
+        <form action="/production/{{ order.id }}/update/" method="POST" class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+            <h2 class="text-lg font-bold text-slate-900">Gestión de la orden</h2>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Diseñador</label>
+                <input type="text" name="designer" value="{{ order.designer or '' }}"
+                    placeholder="Nombre del diseñador"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fabricador</label>
+                <input type="text" name="fabricator" value="{{ order.fabricator or '' }}"
+                    placeholder="Nombre del fabricador"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de entrega</label>
+                <input type="date" name="delivery_date"
+                    value="{% if delivery_meta.date %}{{ delivery_meta.date.strftime('%Y-%m-%d') }}{% endif %}"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                <select name="priority" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                    <option value="baja" {% if order.priority == 'baja' %}selected{% endif %}>🟢 Baja</option>
+                    <option value="media" {% if order.priority == 'media' or not order.priority %}selected{% endif %}>🟡 Media</option>
+                    <option value="alta" {% if order.priority == 'alta' %}selected{% endif %}>🔴 Alta</option>
+                    <option value="urgente" {% if order.priority == 'urgente' %}selected{% endif %}>🚨 Urgente</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                <select name="status" id="status-select" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                    {% for stage in production_stages %}
+                    <option value="{{ stage }}" {% if current_status == stage %}selected{% endif %}>
+                        {{ status_labels.get(stage, stage) }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p id="status-hint" class="text-xs text-gray-400 mt-1"></p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                <textarea name="observations" rows="4" placeholder="Notas internas de producción..."
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">{{ order.observations or '' }}</textarea>
+            </div>
+
+            {% if order.started_at or order.created_at %}
+            <div class="text-xs text-gray-400 space-y-1 pt-2 border-t border-gray-100">
+                {% if order.created_at %}
+                <p>Creada: {{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                {% endif %}
+                {% if order.started_at %}
+                <p>Iniciada: {{ order.started_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                {% endif %}
+                {% if order.completed_at %}
+                <p>Completada: {{ order.completed_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <button type="submit"
+                class="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded-xl font-medium transition">
+                Guardar cambios
+            </button>
+        </form>
+        {% else %}
+        <div class="bg-white rounded-2xl shadow-sm p-5 text-sm text-gray-500">
+            <p class="font-medium text-slate-900 mb-1">Gestión de la orden</p>
+            <p>Como diseñador puedes editar los datos de fabricación arriba. Producción gestiona el avance del pedido.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    const hints = {
+        'diseno': 'En diseño — complete los datos de fabricación.',
+        'produccion': 'Requiere datos de fabricación completos.',
+        'envio': 'Requiere guía de envío creada.',
+    };
+    const select = document.getElementById('status-select');
+    const hint = document.getElementById('status-hint');
+    function updateHint() {
+        if (select && hint) hint.textContent = hints[select.value] || '';
+    }
+    if (select) {
+        select.addEventListener('change', updateHint);
+        updateHint();
+    }
+</script>
+
+{% endblock %}

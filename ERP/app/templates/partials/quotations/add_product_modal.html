@@ -1,4 +1,4 @@
-<form action="/quotations/{{ quotation_id }}/add-product" method="POST" id="addProductForm">
+<form action="/quotations/{{ quotation_id }}/add-product" method="POST" id="addProductForm" enctype="multipart/form-data">
     <div class="space-y-5">
         <!-- TIPO -->
 
@@ -50,6 +50,12 @@
                 <label class="block mb-2 font-medium"> Precio unitario </label>
 
                 <input type="number" step="0.01" name="custom_price" class="w-full border rounded-xl p-3" />
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium"> Imagen </label>
+                <input type="file" name="product_image" accept=".png,.jpg,.jpeg,.webp"
+                    class="w-full border rounded-xl p-3 text-sm" />
             </div>
         </div>
 

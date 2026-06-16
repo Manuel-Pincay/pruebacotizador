@@ -1,0 +1,7 @@
+{% macro condensed_status_badge(status, label=None) %}
+{% set code = (status or 'pendiente')|lower %}
+{% set colors = tracking_status_colors.get(code, ('bg-gray-100', 'text-gray-700')) %}
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {{ colors[0] }} {{ colors[1] }}">
+    {{ label or code|replace('_', ' ')|title }}
+</span>
+{% endmacro %}

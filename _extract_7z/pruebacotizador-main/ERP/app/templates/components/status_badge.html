@@ -1,0 +1,41 @@
+{% macro status_badge(status) %}
+
+{% if status == 'pendiente' %}
+
+<span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs">
+    Pendiente
+</span>
+
+{% elif status == 'aprobada' %}
+
+<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs">
+    Aprobada
+</span>
+
+{% elif status == 'produccion' %}
+
+<span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs">
+    Producción
+</span>
+
+{% elif status == 'enviada' or status == 'enviado' %}
+
+<span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs">
+    Enviada
+</span>
+
+{% elif status == 'entregada' or status == 'entregado' %}
+
+<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs">
+    Entregada
+</span>
+
+{% else %}
+
+<span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs">
+    {{ status }}
+</span>
+
+{% endif %}
+
+{% endmacro %}

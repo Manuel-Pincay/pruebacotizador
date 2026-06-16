@@ -1,0 +1,68 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="erp-container p-4 md:p-6 space-y-6">
+
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Seguimiento Comercial</h1>
+            <p class="text-gray-500 text-sm mt-1">Pipeline de cotizaciones por etapa</p>
+        </div>
+        <a href="/quotations/new" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2">
+            + Nueva cotización
+        </a>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {% for stage in pipeline %}
+        <a href="/quotations/?status={{ stage.key }}"
+           class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-purple-300 transition">
+            <div class="text-2xl font-bold text-purple-700">{{ stage.count }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ stage.label }}</div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div class="p-4 border-b font-semibold text-gray-700">
+            Cotizaciones activas (pendientes y en curso)
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="p-3 text-left">#</th>
+                        <th class="p-3 text-left">Cliente</th>
+                        <th class="p-3 text-left">Estado</th>
+                        <th class="p-3 text-right">Total</th>
+                        <th class="p-3 text-left">Entrega</th>
+                        <th class="p-3"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in active_quotations %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-3 font-medium">#{{ q.id }}</td>
+                        <td class="p-3">{{ q.client.name if q.client else '-' }}</td>
+                        <td class="p-3">
+                            {% from "components/status_badge.html" import status_badge %}
+                            {{ status_badge(q.status) }}
+                        </td>
+                        <td class="p-3 text-right font-semibold">${{ "%.2f"|format(q.total or 0) }}</td>
+                        <td class="p-3">{{ q.delivery_date.strftime('%d/%m/%Y') if q.delivery_date else '-' }}</td>
+                        <td class="p-3">
+                            <a href="/quotations/{{ q.id }}" class="text-purple-600 hover:underline text-xs">Ver</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-gray-400">Sin cotizaciones activas</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

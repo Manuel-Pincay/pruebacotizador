@@ -1,0 +1,439 @@
+{% extends 'layouts/base.html' %}
+{% from "components/condensed_status_badge.html" import condensed_status_badge %}
+{% from "components/pagination.html" import render_pagination %}
+{% from "components/design_carousel.html" import design_carousel %}
+{% from "components/design_carousel_scripts.html" import design_carousel_scripts %}
+
+{% block content %}
+
+<div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3 mb-3">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Condensado de Producción</h1>
+        <p class="text-gray-500 mt-1">Planificación operativa de producción</p>
+    </div>
+    {% if user.role != 'disenador' %}
+    <div class="flex flex-wrap gap-2">
+        <a href="/production/condensed/export/excel?{{ export_query }}"
+            class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium">
+            Exportar Excel
+        </a>
+        <a href="/production/condensed/export/pdf?{{ export_query }}"
+            class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium">
+            Exportar PDF
+        </a>
+    </div>
+    {% else %}
+    <div class="flex flex-wrap gap-2">
+        <a href="/design/pending?filter=mine" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium">Mis diseños</a>
+        <a href="/design/pending" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium">Diseños pendientes</a>
+        <a href="/design/orders" class="px-4 py-2 rounded-xl bg-purple-700 text-white hover:bg-purple-800 text-sm font-medium">Datos de fabricación</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2 mb-3">
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-gray-400">
+        <div class="text-[10px] text-gray-500 leading-tight">Productos pendientes</div>
+        <div class="text-xl font-bold text-slate-900">{{ kpis.pending_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-purple-600">
+        <div class="text-[10px] text-gray-500 leading-tight">En producción</div>
+        <div class="text-xl font-bold text-purple-700">{{ kpis.in_production_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-green-500">
+        <div class="text-[10px] text-gray-500 leading-tight">Productos listos</div>
+        <div class="text-xl font-bold text-green-700">{{ kpis.ready_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-red-500">
+        <div class="text-[10px] text-gray-500 leading-tight">Productos atrasados</div>
+        <div class="text-xl font-bold text-red-600">{{ kpis.overdue_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-orange-500 col-span-2 sm:col-span-1">
+        <div class="text-[10px] text-gray-500 leading-tight">Unidades pendientes</div>
+        <div class="text-xl font-bold text-orange-600">{{ kpis.pending_units }}</div>
+    </div>
+</div>
+
+<form method="GET" action="/production/condensed" class="bg-white rounded-xl border border-gray-200 px-3 py-2 mb-3 shadow-sm">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 items-end">
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Fecha</label>
+            <select name="date_basis" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="delivery" {% if filters.date_basis == 'delivery' %}selected{% endif %}>Entrega</option>
+                <option value="quotation" {% if filters.date_basis == 'quotation' %}selected{% endif %}>Cotización</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Mes</label>
+            <select name="month" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                {% set month_names = {
+                    1: 'Ene', 2: 'Feb', 3: 'Mar', 4: 'Abr',
+                    5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Ago',
+                    9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dic'
+                } %}
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if filters.month == m %}selected{% endif %}>{{ month_names[m] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Año</label>
+            <input type="number" name="year" value="{{ filters.year or '' }}" min="2020" max="2100"
+                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" placeholder="{{ today.year }}" />
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Cliente</label>
+            <select name="client_id" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                {% for client in clients %}
+                <option value="{{ client.id }}" {% if filters.client_id == client.id %}selected{% endif %}>
+                    {{ client.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Estado</label>
+            <select name="production_status" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                {% for code, label in tracking_statuses %}
+                <option value="{{ code }}" {% if filters.production_status == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Pers.</label>
+            <select name="custom_filter" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                <option value="yes" {% if filters.custom_filter == 'yes' %}selected{% endif %}>Sí</option>
+                <option value="no" {% if filters.custom_filter == 'no' %}selected{% endif %}>No</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Ordenar</label>
+            <select name="group_by" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="order" {% if filters.group_by == 'order' %}selected{% endif %}>Cotización</option>
+                <option value="delivery" {% if filters.group_by == 'delivery' %}selected{% endif %}>Entrega</option>
+                <option value="client" {% if filters.group_by == 'client' %}selected{% endif %}>Cliente</option>
+                <option value="product" {% if filters.group_by == 'product' %}selected{% endif %}>Producto</option>
+            </select>
+        </div>
+        <div class="col-span-2 sm:col-span-3 lg:col-span-4 xl:col-span-2">
+            <label class="block text-[11px] text-gray-500 mb-0.5">Buscar</label>
+            <input type="text" name="search" value="{{ filters.search }}" placeholder="Cliente, producto, color..."
+                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+        </div>
+        <div class="col-span-2 sm:col-span-3 lg:col-span-4 xl:col-span-2 flex gap-1.5 items-end justify-end">
+            <a href="/production/condensed" class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs whitespace-nowrap">Limpiar</a>
+            <button type="submit" class="px-4 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium whitespace-nowrap">
+                Filtrar
+            </button>
+        </div>
+    </div>
+    {% if active_filters %}
+    <div class="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
+        <span class="text-[11px] text-gray-400">Activos:</span>
+        {% for label in active_filters %}
+        <span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100 text-[11px]">{{ label }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</form>
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[1100px] text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="text-left p-3 w-44 align-bottom" rowspan="2">Orden</th>
+                    <th class="text-left p-3 border-l border-gray-200" colspan="7">Detalle productos</th>
+                    <th class="text-left p-3 w-44 align-bottom border-l border-gray-200" rowspan="2">Imagen</th>
+                    <th class="text-left p-3 w-36 align-bottom border-l border-gray-200" rowspan="2">Acciones</th>
+                </tr>
+                <tr>
+                    <th class="text-left p-3 w-10 border-l border-gray-200">#</th>
+                    <th class="text-left p-3">Cant.</th>
+                    <th class="text-left p-3">Producto</th>
+                    <th class="text-left p-3">Medida</th>
+                    <th class="text-left p-3">Forma</th>
+                    <th class="text-left p-3">Color</th>
+                    <th class="text-left p-3">Pers.</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set ns = namespace(last_section='') %}
+                {% for order in order_groups %}
+                {% if filters.group_by != 'order' and order.section_label and order.section_label != ns.last_section %}
+                {% set ns.last_section = order.section_label %}
+                <tr class="bg-slate-100 border-y border-slate-200">
+                    <td colspan="10" class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        {% if filters.group_by == 'client' %}Cliente{% elif filters.group_by == 'delivery' %}Entrega{% else %}Producto{% endif %}:
+                        {{ order.section_label }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% set is_late = order.delivery_date and order.delivery_date < today %}
+                {% for row in order.products %}
+                <tr class="border-t hover:bg-gray-50 cursor-pointer bg-white {% if loop.first %}border-t-2 border-purple-200{% endif %}{% if loop.last %} border-b-2 border-purple-100{% endif %}"
+                    onclick="openCondensedDetail({{ order.quotation_id }})">
+                    {% if loop.first %}
+                    <td class="p-4 align-top bg-purple-50 border-r border-purple-100" rowspan="{{ order.products_count }}"
+                        onclick="event.stopPropagation()">
+                        <div class="space-y-2">
+                            <div class="text-lg font-bold text-purple-900">{{ order.order_label }}</div>
+                            <div class="text-purple-700 text-xs">
+                                Cotización
+                                <a href="/quotations/{{ order.quotation_id }}" class="font-semibold hover:underline">#{{ order.quotation_id }}</a>
+                            </div>
+                            <div class="font-medium text-slate-800">{{ order.client_name }}</div>
+                            <div class="text-xs text-purple-800 space-y-0.5 pt-1 border-t border-purple-100">
+                                <div>Fecha cot.: {{ order.quotation_date.strftime('%d/%m/%Y') if order.quotation_date else '—' }}</div>
+                                <div class="{% if is_late %}text-red-600 font-semibold{% endif %}">
+                                    Entrega: {{ order.delivery_date.strftime('%d/%m/%Y') if order.delivery_date else '—' }}
+                                </div>
+                                <div class="font-semibold">{{ order.products_count }} producto(s)</div>
+                            </div>
+                        </div>
+                    </td>
+                    {% endif %}
+                    <td class="p-3 pl-4 text-gray-500 font-medium border-l border-gray-100">{{ row.item_number }}</td>
+                    <td class="p-3 font-semibold">{{ row.quantity }}</td>
+                    <td class="p-3 font-medium text-slate-800">{{ row.product_name }}</td>
+                    <td class="p-3">{{ row.measure }}</td>
+                    <td class="p-3">{{ row.theme }}</td>
+                    <td class="p-3">{{ row.color }}</td>
+                    <td class="p-3">{{ 'Sí' if row.is_custom else 'No' }}</td>
+                    {% if loop.first %}
+                    <td class="p-3 align-top border-l border-gray-100 w-44" rowspan="{{ order.products_count }}"
+                        onclick="event.stopPropagation()">
+                        {{ design_carousel(order.design_urls, 'carousel-order-' ~ order.quotation_id, compact=true) }}
+                        {% if order.design_urls|length > 0 %}
+                        <p class="text-[10px] text-gray-400 text-center mt-1">{{ order.design_urls|length }} / 4</p>
+                        {% endif %}
+                    </td>
+                    <td class="p-3 align-top border-l border-gray-100" rowspan="{{ order.products_count }}"
+                        onclick="event.stopPropagation()">
+                        <div class="flex flex-col items-start gap-2">
+                            {{ condensed_status_badge(order.production_status, order.production_status_label) }}
+                            {% if user.role != 'disenador' %}
+                            <button type="button"
+                                onclick="openStatusModal({{ order.quotation_id }}, '{{ order.production_status }}')"
+                                class="text-xs px-3 py-1.5 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 font-medium whitespace-nowrap">
+                                Cambiar Estado
+                            </button>
+                            {% else %}
+                            <a href="/design/pending" class="text-xs text-purple-700 hover:underline">Ver diseños</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="10" class="p-10 text-center text-gray-400">
+                        {% if active_filters %}
+                        No hay órdenes que coincidan con los filtros seleccionados.
+                        <div class="mt-2">
+                            <a href="/production/condensed" class="text-purple-700 hover:underline">Limpiar filtros</a>
+                        </div>
+                        {% else %}
+                        No hay órdenes de producción disponibles.
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination.total > 0 %}
+    <div class="p-4 border-t bg-gray-50/50 text-sm text-gray-500">
+        {{ pagination.total }} orden(es) · {{ kpis.visible_products }} producto(s) visibles · Página {{ pagination.page }} de {{ pagination.pages }}
+    </div>
+    <div class="p-4 border-t">
+        {{ render_pagination(pagination.page, pagination.pages, pagination.total, '/production/condensed', filter_params) }}
+    </div>
+    {% endif %}
+</div>
+
+<div id="condensedDetailPanel"
+    class="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl border-l border-gray-200 transform translate-x-full transition-transform duration-300 z-50 flex flex-col">
+    <div class="flex items-center justify-between p-5 border-b">
+        <h2 class="text-xl font-bold">Detalle de producción</h2>
+        <button type="button" onclick="closeCondensedDetail()" class="text-2xl leading-none">✕</button>
+    </div>
+    <div id="condensedDetailContent" class="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
+        <div class="text-center text-gray-400 py-10">Selecciona una fila</div>
+    </div>
+</div>
+<div id="condensedOverlay" onclick="closeCondensedDetail()"
+    class="fixed inset-0 bg-black/40 hidden z-40"></div>
+
+<div id="statusModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[60] p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div class="flex justify-between items-center p-5 border-b">
+            <h3 class="text-lg font-bold">Cambiar estado</h3>
+            <button type="button" onclick="closeStatusModal()" class="text-xl">✕</button>
+        </div>
+        <form id="statusForm" class="p-5 space-y-4">
+            <input type="hidden" id="statusQuotationId" />
+            <div>
+                <label class="block text-sm text-gray-500 mb-1">Estado producción</label>
+                <select id="statusSelect" name="status" class="w-full border rounded-xl p-2.5">
+                    {% for code, label in tracking_statuses %}
+                    <option value="{{ code }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-500 mb-1">Asignado a</label>
+                <input type="text" id="statusAssignedTo" name="assigned_to" class="w-full border rounded-xl p-2.5"
+                    placeholder="Nombre del responsable" />
+            </div>
+            <div>
+                <label class="block text-sm text-gray-500 mb-1">Notas internas</label>
+                <textarea id="statusNotes" name="notes" rows="3" class="w-full border rounded-xl p-2.5"></textarea>
+            </div>
+            <div id="statusError" class="hidden text-red-600 text-sm"></div>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeStatusModal()" class="px-4 py-2 rounded-xl border">Cancelar</button>
+                <button type="button" onclick="submitStatusChange()"
+                    class="px-4 py-2 rounded-xl bg-purple-700 text-white hover:bg-purple-800">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="designPreviewModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[70] p-4"
+    onclick="closeDesignPreview()">
+    <div class="max-w-5xl max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
+        <img id="designPreviewImage" src="" alt="Diseño ampliado" class="max-w-full rounded-2xl shadow-2xl" />
+    </div>
+</div>
+
+<script>
+    async function openCondensedDetail(quotationId) {
+        const panel = document.getElementById("condensedDetailPanel");
+        const overlay = document.getElementById("condensedOverlay");
+        const content = document.getElementById("condensedDetailContent");
+        content.innerHTML = '<div class="text-center py-10 text-gray-400">Cargando...</div>';
+
+        panel.classList.remove("translate-x-full");
+        overlay.classList.remove("hidden");
+
+        const response = await fetch(`/production/condensed/orders/${quotationId}/detail`);
+        if (!response.ok) {
+            content.innerHTML = '<div class="text-red-600">No se pudo cargar el detalle.</div>';
+            return;
+        }
+
+        const data = await response.json();
+        const productsHtml = (data.products || []).map((product, index) => `
+            <div class="border rounded-xl p-3">
+                <p class="font-semibold">${index + 1}. ${product.product_name} × ${product.quantity}</p>
+                <p class="text-gray-600 text-xs mt-1">
+                    ${product.measure || '—'} · ${product.theme || '—'} · ${product.color || '—'}
+                    · ${product.is_custom ? 'Personalizado' : 'Catálogo'}
+                </p>
+            </div>
+        `).join('');
+
+        const designsHtml = (data.design_urls || []).length
+            ? (data.design_urls || []).map((url, index) => `
+                <button type="button" onclick="openDesignPreview('${url}')" class="block w-full mb-2">
+                    <img src="${url}" class="w-full rounded-xl border" alt="Diseño ${index + 1}" />
+                </button>
+            `).join('')
+            : '<div class="border-2 border-dashed rounded-xl p-6 text-center text-gray-400">Sin diseño</div>';
+
+        content.innerHTML = `
+            <div class="space-y-3">
+                <h3 class="font-bold text-base text-slate-800">Cotización #${data.quotation_id}</h3>
+                <div class="grid grid-cols-2 gap-2 text-gray-600">
+                    <span>Estado cotización:</span><span class="font-medium text-slate-800">${data.quotation_status || '—'}</span>
+                    <span>Fecha cotización:</span><span>${data.quotation_date ? new Date(data.quotation_date).toLocaleDateString() : '—'}</span>
+                    <span>Fecha entrega:</span><span>${data.delivery_date ? new Date(data.delivery_date).toLocaleDateString() : '—'}</span>
+                    <span>Total:</span><span>$${Number(data.total || 0).toFixed(2)}</span>
+                    <span>Estado producción:</span><span class="font-medium">${data.production_status_label}</span>
+                </div>
+            </div>
+            <hr />
+            <div class="space-y-2">
+                <h3 class="font-bold text-base text-slate-800">Cliente</h3>
+                <p class="font-medium">${data.client_name}</p>
+                <p class="text-gray-600">${data.client_phone || '—'}</p>
+                <p class="text-gray-600">${data.client_address || '—'}</p>
+                ${data.client_observations ? `<p class="text-gray-500 italic">${data.client_observations}</p>` : ''}
+            </div>
+            <hr />
+            <div class="space-y-2">
+                <h3 class="font-bold text-base text-slate-800">Productos (${(data.products || []).length})</h3>
+                ${productsHtml}
+            </div>
+            <hr />
+            <div class="space-y-2">
+                <h3 class="font-bold text-base text-slate-800">Diseños de referencia</h3>
+                ${designsHtml}
+            </div>
+            <hr />
+            <div class="space-y-2">
+                <h3 class="font-bold text-base text-slate-800">Notas internas</h3>
+                <p class="text-gray-600">${data.notes || 'Sin notas'}</p>
+                <button type="button" onclick="openStatusModal(${data.quotation_id}, '${data.production_status}')"
+                    class="mt-2 px-4 py-2 rounded-xl bg-purple-700 text-white text-sm hover:bg-purple-800">
+                    Cambiar Estado
+                </button>
+            </div>
+        `;
+    }
+
+    function closeCondensedDetail() {
+        document.getElementById("condensedDetailPanel").classList.add("translate-x-full");
+        document.getElementById("condensedOverlay").classList.add("hidden");
+    }
+
+    function openStatusModal(quotationId, currentStatus) {
+        document.getElementById("statusQuotationId").value = quotationId;
+        document.getElementById("statusSelect").value = currentStatus || "pendiente";
+        document.getElementById("statusNotes").value = "";
+        document.getElementById("statusAssignedTo").value = "";
+        document.getElementById("statusError").classList.add("hidden");
+        const modal = document.getElementById("statusModal");
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+    }
+
+    function closeStatusModal() {
+        const modal = document.getElementById("statusModal");
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+    }
+
+    async function submitStatusChange() {
+        const quotationId = document.getElementById("statusQuotationId").value;
+        const formData = new FormData();
+        formData.append("status", document.getElementById("statusSelect").value);
+        formData.append("notes", document.getElementById("statusNotes").value);
+        formData.append("assigned_to", document.getElementById("statusAssignedTo").value);
+
+        const response = await fetch(`/production/condensed/orders/${quotationId}/status`, {
+            method: "POST",
+            body: formData,
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            location.reload();
+            return;
+        }
+
+        const errorBox = document.getElementById("statusError");
+        errorBox.textContent = result.message || "No se pudo actualizar el estado.";
+        errorBox.classList.remove("hidden");
+    }
+</script>
+
+{{ design_carousel_scripts() }}
+
+{% endblock %}

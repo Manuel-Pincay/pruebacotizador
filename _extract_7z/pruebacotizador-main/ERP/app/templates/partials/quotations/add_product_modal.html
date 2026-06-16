@@ -1,0 +1,223 @@
+<form action="/quotations/{{ quotation_id }}/add-product" method="POST" id="addProductForm">
+    <div class="space-y-5">
+        <!-- TIPO -->
+
+        <div>
+            <label class="block mb-2 font-medium"> Tipo de producto </label>
+
+            <select id="product_type" name="product_type" class="w-full border rounded-xl p-3"
+                onchange="toggleProductType()">
+                <option value="catalogo">Producto del catálogo</option>
+
+                <option value="personalizado">Producto personalizado</option>
+            </select>
+        </div>
+
+        <!-- PRODUCTO CATALOGO -->
+
+        <div id="catalog_section">
+            <label class="block mb-2 font-medium"> Producto </label>
+
+            <div class="relative">
+                <input type="text" id="product_search_modal" placeholder="Buscar producto..." autocomplete="off"
+                    class="w-full border rounded-xl p-3" />
+
+                <div id="product_results_modal"
+                    class="hidden absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg max-h-72 overflow-y-auto">
+                </div>
+            </div>
+
+            <input type="hidden" id="product_id_modal" name="product_id" />
+            <input type="hidden" id="product_price_modal" />
+        </div>
+
+        <!-- PRODUCTO PERSONALIZADO -->
+
+        <div id="custom_section" class="hidden space-y-4">
+            <div>
+                <label class="block mb-2 font-medium"> Nombre del producto </label>
+
+             <input
+    id="detail_modal"
+    type="text"
+    name="detail"
+    placeholder="Ej: Topper personalizado"
+    class="w-full border rounded-xl p-3"
+/>
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium"> Precio unitario </label>
+
+                <input type="number" step="0.01" name="custom_price" class="w-full border rounded-xl p-3" />
+            </div>
+        </div>
+
+        <!-- CANTIDAD -->
+
+        <div>
+            <label class="block mb-2 font-medium"> Cantidad </label>
+
+            <input type="number" name="quantity" value="1" min="1" required class="w-full border rounded-xl p-3" />
+        </div>
+
+        <!-- TEMATICA -->
+
+        <div>
+            <label class="block mb-2 font-medium"> Temática </label>
+
+            <input type="text" id="theme_modal" name="theme" class="w-full border rounded-xl p-3"
+                placeholder="Ej: Feliz cumpleaños" />
+        </div>
+
+        <!-- COLOR -->
+
+        <div>
+            <label class="block mb-2 font-medium"> Color </label>
+
+            <input type="text" id="color_modal" name="color" class="w-full border rounded-xl p-3"
+                placeholder="Ej: Dorado" />
+        </div>
+
+        <!-- MEDIDA -->
+
+        <div>
+            <label class="block mb-2 font-medium"> Medida </label>
+
+            <input type="text" id="measure_modal" name="measure" class="w-full border rounded-xl p-3"
+                placeholder="Ej: 20 cm" />
+        </div>
+
+        <!-- LOGO -->
+
+        <div>
+            <label class="flex items-center gap-3">
+                <input type="checkbox" name="logo" value="true" />
+
+                <span> Incluye logo del cliente </span>
+            </label>
+        </div>
+
+        <!-- BOTONES -->
+
+        <div class="flex justify-end gap-3 pt-4">
+            <button type="button" onclick="closeItemModal()"
+                class="border border-gray-300 px-5 py-3 rounded-xl hover:bg-gray-50">
+                Cancelar
+            </button>
+
+            <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl">
+                Agregar Producto
+            </button>
+        </div>
+    </div>
+</form>
+
+<script>
+    function toggleProductType() {
+        const type = document.getElementById("product_type").value;
+
+        const catalog = document.getElementById("catalog_section");
+
+        const custom = document.getElementById("custom_section");
+
+        if (type === "personalizado") {
+            catalog.classList.add("hidden");
+
+            custom.classList.remove("hidden");
+        } else {
+            catalog.classList.remove("hidden");
+
+            custom.classList.add("hidden");
+        }
+    }
+    // =====================================
+    // BUSQUEDA PRODUCTOS MODAL
+    // =====================================
+
+    const searchInput = document.getElementById("product_search_modal");
+
+    const resultsBox = document.getElementById("product_results_modal");
+
+    searchInput.addEventListener("input", async function () {
+        const query = this.value.trim();
+
+        if (query.length < 1) {
+            resultsBox.innerHTML = "";
+
+            resultsBox.classList.add("hidden");
+
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/products/search?q=${encodeURIComponent(query)}`,
+            );
+
+            const products = await response.json();
+
+            resultsBox.innerHTML = "";
+
+            if (products.length === 0) {
+                resultsBox.innerHTML = `
+                    <div class="p-3 text-gray-500">
+                        No se encontraron productos
+                    </div>
+                `;
+
+                resultsBox.classList.remove("hidden");
+
+                return;
+            }
+
+            products.forEach((product) => {
+                const div = document.createElement("div");
+
+                div.className = "p-3 border-b hover:bg-gray-100 cursor-pointer";
+
+                div.innerHTML = `
+                    <div class="font-semibold">
+                        ${product.name}
+                    </div>
+
+                    <div class="text-sm text-gray-500">
+                        $${product.price}
+                    </div>
+                `;
+
+                div.onclick = () => selectModalProduct(product);
+
+                resultsBox.appendChild(div);
+            });
+
+            resultsBox.classList.remove("hidden");
+        } catch (error) {
+            console.error(error);
+        }
+    });
+
+    function selectModalProduct(product) {
+        console.log("PRODUCTO COMPLETO");
+
+        console.log(product);
+
+        document.getElementById("product_search_modal").value = product.name;
+
+        document.getElementById("product_id_modal").value = product.id;
+
+        document.getElementById("theme_modal").value = product.theme || "";
+
+        document.getElementById("measure_modal").value = product.measure || "";
+
+        document.getElementById("color_modal").value = product.color || "";
+
+        document.getElementById("product_results_modal").classList.add("hidden");
+    }
+
+    document.addEventListener("click", function (event) {
+        if (!event.target.closest("#catalog_section")) {
+            document.getElementById("product_results_modal").classList.add("hidden");
+        }
+    });
+</script>

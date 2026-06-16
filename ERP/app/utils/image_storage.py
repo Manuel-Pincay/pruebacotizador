@@ -254,6 +254,31 @@ def resolve_design_path(filename: str | None) -> str | None:
     return str(path) if path else None
 
 
+def resolve_product_path(filename: str | None) -> str | None:
+    """Ruta en disco para PDF de imagen de producto."""
+    if not filename:
+        return None
+    stem = Path(filename).stem
+    path = _file_exists(
+        PRODUCTS_DIR / filename,
+        PRODUCTS_DIR / f"{stem}.webp",
+    )
+    return str(path) if path else None
+
+
+def quotation_item_image_path(item) -> str | None:
+    """Prioridad: imagen del ítem → catálogo → None."""
+    custom = getattr(item, "product_image", None)
+    if custom:
+        path = resolve_product_path(custom)
+        if path:
+            return path
+    product = getattr(item, "product", None)
+    if product and getattr(product, "image", None):
+        return resolve_product_path(product.image)
+    return None
+
+
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:

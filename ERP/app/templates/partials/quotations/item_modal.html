@@ -1,6 +1,7 @@
 <form
     action="/quotations/quotation-items/{{ item.id }}/edit"
     method="POST"
+    enctype="multipart/form-data"
 >
 
     <div class="space-y-5">
@@ -18,6 +19,27 @@
                 name="quantity"
                 value="{{ item.quantity }}"
                 class="w-full border rounded-xl p-3"
+                min="1"
+            >
+
+        </div>
+
+        <div>
+
+            <label
+                class="block mb-2 font-medium"
+            >
+                Precio unitario
+            </label>
+
+            <input
+                type="number"
+                step="0.01"
+                name="unit_price"
+                value="{{ item.unit_price }}"
+                class="w-full border rounded-xl p-3"
+                min="0"
+                required
             >
 
         </div>
@@ -93,6 +115,16 @@
 
             </label>
 
+        </div>
+
+        <div>
+            <label class="block mb-2 font-medium">Imagen del producto</label>
+            {% set item_img = product_image_url(item.product_image, thumb=true) if item.product_image else none %}
+            {% if item_img %}
+            <img src="{{ item_img }}" alt="Imagen producto" class="h-16 w-16 object-cover rounded-lg border mb-2" />
+            {% endif %}
+            <input type="file" name="product_image" accept=".png,.jpg,.jpeg,.webp"
+                class="w-full border rounded-xl p-3 text-sm" />
         </div>
 
         <button

@@ -45,63 +45,77 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
     )
 
 
+def _login_context(db: Session, *, error: str = "", username: str = "") -> dict:
+    config = db.query(CompanyConfig).first()
+    company_name = config.company_name if config else "SISTEMA ERP"
+    return {
+        "error": error,
+        "username": username,
+        "company_name": company_name,
+    }
+
+
 @router.post("/login")
 async def login(
     request: Request,
-    username: str = Form(...),
-    password: str = Form(...),
+    username: str = Form(""),
+    password: str = Form(""),
     db: Session = Depends(get_db)
 ):
+    username_clean = username.strip()
+    password_clean = password.strip()
 
-    user = db.query(User).filter(
-        User.username == username
-    ).first()
-
-    if not user:
-
-        config = db.query(CompanyConfig).first()
-        company_name = config.company_name if config else "SISTEMA ERP"
-
+    if not username_clean or not password_clean:
         return templates.TemplateResponse(
             request=request,
             name="auth/login.html",
-            context={
-                "error": "Usuario incorrecto",
-                "company_name": company_name
-            }
+            context=_login_context(
+                db,
+                error="Ingrese usuario y contraseña.",
+                username=username_clean,
+            ),
+        )
+
+    user = db.query(User).filter(
+        User.username == username_clean
+    ).first()
+
+    if not user:
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/login.html",
+            context=_login_context(
+                db,
+                error="Usuario incorrecto",
+                username=username_clean,
+            ),
         )
 
     valid = verify_password(
-        password,
+        password_clean,
         user.password
     )
 
     if not valid:
-
-        config = db.query(CompanyConfig).first()
-        company_name = config.company_name if config else "SISTEMA ERP"
-
         return templates.TemplateResponse(
             request=request,
             name="auth/login.html",
-            context={
-                "error": "Contraseña incorrecta",
-                "company_name": company_name
-            }
+            context=_login_context(
+                db,
+                error="Contraseña incorrecta",
+                username=username_clean,
+            ),
         )
 
     if not getattr(user, "active", True):
-
-        config = db.query(CompanyConfig).first()
-        company_name = config.company_name if config else "SISTEMA ERP"
-
         return templates.TemplateResponse(
             request=request,
             name="auth/login.html",
-            context={
-                "error": "Usuario inactivo. Contacte al administrador.",
-                "company_name": company_name
-            }
+            context=_login_context(
+                db,
+                error="Usuario inactivo. Contacte al administrador.",
+                username=username_clean,
+            ),
         )
 
     response = RedirectResponse(

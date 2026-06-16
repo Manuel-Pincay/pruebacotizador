@@ -103,6 +103,38 @@ def _user_label(user: User | None) -> str:
     return user.full_name or user.username or "—"
 
 
+def _deduct_inventory_for_quotation(db: Session, quotation: Quotation) -> None:
+    from app.models.inventory_movement import InventoryMovement
+    from app.models.product import Product
+
+    if not quotation or not quotation.items:
+        return
+    for item in quotation.items:
+        if not item.product_id:
+            continue
+        product = db.query(Product).filter(Product.id == item.product_id).first()
+        if not product:
+            continue
+        previous_stock = product.stock or 0
+        new_stock = previous_stock - (item.quantity or 0)
+        if new_stock < 0:
+            raise ValueError(
+                f"Stock insuficiente para {product.name}. "
+                f"Disponible: {previous_stock}, solicitado: {item.quantity}."
+            )
+        product.stock = new_stock
+        db.add(
+            InventoryMovement(
+                product_id=product.id,
+                movement_type="salida",
+                quantity=-item.quantity,
+                previous_stock=previous_stock,
+                new_stock=new_stock,
+                reason=f"Cotización #{quotation.id} → Producción",
+            )
+        )
+
+
 def log_history(
     db: Session,
     order: ProductionOrder,
@@ -220,11 +252,14 @@ def transition_status(
         order.design_completed_at = now
         order.design_completed_by = user.id if user else None
 
+    quotation = order.quotation
+    if target == "produccion" and quotation:
+        _deduct_inventory_for_quotation(db, quotation)
+
     order.status = target
     order.updated_at = now
     log_history(db, order, status=target, notes=notes, user_id=user.id if user else None)
 
-    quotation = order.quotation
     if quotation:
         if target == "produccion":
             quotation.status = "produccion"

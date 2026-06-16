@@ -27,6 +27,7 @@ class Quotation(Base):
     discount = Column(Float)
     iva = Column(Float)
     total = Column(Float)
+    shipping_cost = Column(Float, default=0)
     status = Column(String)
     delivery_date = Column(Date)
     design_file = Column(String)
@@ -77,3 +78,14 @@ class Quotation(Base):
     @property
     def pending_balance(self) -> float:
         return float(self.total or 0) - self.total_paid
+
+    @property
+    def payment_status(self) -> str:
+        """sin_abono | parcial | pagada"""
+        paid = self.total_paid
+        total = float(self.total or 0)
+        if paid <= 0:
+            return "sin_abono"
+        if paid >= total:
+            return "pagada"
+        return "parcial"

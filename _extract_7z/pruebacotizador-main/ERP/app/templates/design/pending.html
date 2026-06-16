@@ -1,0 +1,85 @@
+{% extends 'layouts/base.html' %}
+{% from "components/design_status_badge.html" import design_status_badge %}
+{% from "components/design_carousel.html" import design_carousel %}
+{% from "components/design_carousel_scripts.html" import design_carousel_scripts %}
+
+{% block content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Diseños</h1>
+        <p class="text-gray-500 mt-1">Productos personalizados — flujo lineal con producción</p>
+    </div>
+    <a href="/design/orders" class="px-4 py-2 rounded-xl bg-purple-700 text-white text-sm font-medium hover:bg-purple-800">
+        Datos de fabricación
+    </a>
+</div>
+
+<div class="flex flex-wrap gap-2 mb-4">
+    <a href="/design/pending?filter=mine" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'mine' %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">Mis diseños</a>
+    <a href="/design/pending?filter=pending" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'pending' %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">Pendiente / Diseño</a>
+    <a href="/design/pending?filter=diseno" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'diseno' %}bg-indigo-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">En diseño</a>
+    <a href="/design/pending?filter=produccion" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'produccion' %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">Producción</a>
+    <a href="/design/pending?filter=envio" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'envio' %}bg-blue-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">Envío</a>
+    <a href="/design/pending?filter=entregado" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'entregado' %}bg-green-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">Entregado</a>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[1100px] text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="text-left p-3">Cotización</th>
+                    <th class="text-left p-3">Cliente</th>
+                    <th class="text-left p-3">Producto</th>
+                    <th class="text-left p-3">Cant.</th>
+                    <th class="text-left p-3">Entrega</th>
+                    <th class="text-left p-3 w-40">Imagen</th>
+                    <th class="text-left p-3">Estado orden</th>
+                    <th class="text-left p-3">Diseñador</th>
+                    <th class="text-left p-3">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="border-t hover:bg-gray-50">
+                    <td class="p-3 font-medium">#{{ row.quotation_id }}</td>
+                    <td class="p-3">{{ row.client_name }}</td>
+                    <td class="p-3 font-medium text-slate-800">{{ row.product_name }}</td>
+                    <td class="p-3">{{ row.quantity }}</td>
+                    <td class="p-3">{{ row.delivery_date.strftime('%d/%m/%Y') if row.delivery_date else '—' }}</td>
+                    <td class="p-3">
+                        {{ design_carousel(row.design_urls, 'carousel-pending-' ~ row.item_id, compact=true) }}
+                    </td>
+                    <td class="p-3">{{ design_status_badge(row.design_status, row.design_status_label) }}</td>
+                    <td class="p-3">{{ row.assigned_to }}</td>
+                    <td class="p-3 whitespace-nowrap">
+                        <a href="/design/items/{{ row.item_id }}" class="text-purple-700 hover:underline font-medium">Revisar</a>
+                        <span class="text-gray-300 mx-1">|</span>
+                        {% if row.production_order_id %}
+                        <a href="/design/orders/{{ row.production_order_id }}" class="text-indigo-700 hover:underline font-medium">Fabricación</a>
+                        {% else %}
+                        <a href="/design/orders/for-item/{{ row.item_id }}" class="text-indigo-700 hover:underline font-medium">Fabricación</a>
+                        {% endif %}
+                        {% if row.production_order_id %}
+                        <span class="text-gray-300 mx-1">|</span>
+                        <a href="/production/{{ row.production_order_id }}" class="text-slate-600 hover:underline font-medium">Producción</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="p-10 text-center text-gray-400">No hay registros con este filtro.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ design_carousel_scripts() }}
+<div id="designPreviewModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[70] p-4" onclick="closeDesignPreview()">
+    <div class="max-w-5xl max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
+        <img id="designPreviewImage" src="" alt="Diseño ampliado" class="max-w-full rounded-2xl shadow-2xl" />
+    </div>
+</div>
+{% endblock %}

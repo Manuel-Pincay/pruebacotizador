@@ -14,6 +14,7 @@ from reportlab.platypus.flowables import HRFlowable
 
 from app.models.company_config import CompanyConfig
 from app.utils.image_storage import resolve_design_path
+from app.services.quotation_design_service import get_design_filenames
 
 from app.services.pdf_sections import (
     build_header,
@@ -104,10 +105,14 @@ def generate_quotation_pdf(quotation, items, client, db=None):
     elements.append(Spacer(1, 18))
 
     # ====================================
-    # DESIGN IMAGE
-    image_path = resolve_design_path(quotation.design_file)
+    # DESIGN IMAGES + TOTALS
+    design_paths = [
+        path
+        for filename in get_design_filenames(quotation)
+        if (path := resolve_design_path(filename))
+    ]
 
-    elements.append(build_design_totals_section(quotation, config, image_path))
+    elements.append(build_design_totals_section(quotation, config, design_paths))
 
     elements.append(Spacer(1, 12))
 

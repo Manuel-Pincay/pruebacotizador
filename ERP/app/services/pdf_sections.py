@@ -1,12 +1,14 @@
 from reportlab.platypus import Table, TableStyle, Paragraph, Image, Spacer
 
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
 
 from reportlab.platypus.flowables import HRFlowable
 
 import os
+
+from app.utils.image_storage import quotation_item_image_path
 
 
 def build_header(quotation, config, styles):
@@ -162,45 +164,64 @@ def build_client_section(quotation, config, styles):
 
 
 # seccion tabla de productos
+def _pdf_cell_text(text, style) -> Paragraph:
+    safe = (str(text) if text not in (None, "") else "-").replace("&", "&amp;")
+    return Paragraph(safe, style)
+
+
+def _pdf_product_cell(item, style):
+    product_name = item.detail or (
+        item.product.name if getattr(item, "product", None) else "-"
+    )
+    parts = []
+    image_path = quotation_item_image_path(item)
+    if image_path and os.path.exists(image_path):
+        try:
+            thumb = Image(image_path)
+            thumb._restrictSize(42, 42)
+            parts.append(thumb)
+        except Exception:
+            pass
+    parts.append(_pdf_cell_text(product_name, style))
+    return parts if len(parts) > 1 else parts[0]
+
+
 def build_products_table(items, config):
+
+    styles = getSampleStyleSheet()
+    table_cell_style = ParagraphStyle(
+        name="TableCell",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        wordWrap="CJK",
+    )
 
     data = [
         ["CANT.", "PRODUCTO", "MEDIDA", "TEMÁTICA", "COLOR", "LOGO", "V. UNIT", "TOTAL"]
     ]
 
     for item in items:
-
-        product_name = item.detail or (
-            item.product.name if getattr(item, "product", None) else "-"
-        )
-
         logo_display = "Sí" if item.logo else "-"
 
         data.append(
             [
-                str(item.quantity),
-                product_name,
-                item.measure or "-",
-                item.theme or "-",
-                item.color or "-",
-                logo_display,
-                f"${item.unit_price:.2f}",
-                f"${item.total:.2f}",
+                _pdf_cell_text(item.quantity, table_cell_style),
+                _pdf_product_cell(item, table_cell_style),
+                _pdf_cell_text(item.measure, table_cell_style),
+                _pdf_cell_text(item.theme, table_cell_style),
+                _pdf_cell_text(item.color, table_cell_style),
+                _pdf_cell_text(logo_display, table_cell_style),
+                _pdf_cell_text(f"${item.unit_price:.2f}", table_cell_style),
+                _pdf_cell_text(f"${item.total:.2f}", table_cell_style),
             ]
         )
 
     table = Table(
         data,
-        colWidths=[
-            40,  # cantidad
-            135,  # producto
-            65,  # medida
-            95,  # temática
-            65,  # color
-            45,  # logo
-            55,  # unitario
-            60,  # total
-        ],
+        colWidths=[32, 165, 48, 88, 52, 32, 58, 55],
+        repeatRows=1,
     )
 
     table.setStyle(
@@ -211,13 +232,13 @@ def build_products_table(items, config):
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, 0), 9),
-                ("TOPPADDING", (0, 0), (-1, 0), 12),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("TOPPADDING", (0, 0), (-1, 0), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
                 # BODY
                 ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
                 ("FONTSIZE", (0, 1), (-1, -1), 8),
                 ("TEXTCOLOR", (0, 1), (-1, -1), colors.black),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
                 ("ALIGN", (6, 1), (7, -1), "RIGHT"),
                 ("FONTNAME", (7, 1), (7, -1), "Helvetica-Bold"),
@@ -229,10 +250,10 @@ def build_products_table(items, config):
                     [colors.white, colors.HexColor("#FAFAFA")],
                 ),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E5E7EB")),
-                ("TOPPADDING", (0, 1), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 1), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 10),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
             ]
         )
     )
@@ -240,56 +261,60 @@ def build_products_table(items, config):
     return table
 
 
-def build_design_totals_section(quotation, config, image_path=None):
+def build_design_totals_section(quotation, config, design_paths=None):
 
     styles = getSampleStyleSheet()
 
     # ===================================
-    # IMAGEN DE REFERENCIA
+    # IMÁGENES DE REFERENCIA
     # ===================================
 
-    if image_path:
+    paths = [p for p in (design_paths or []) if p and os.path.exists(p)]
+    image_elements = []
 
+    for path in paths[:4]:
         try:
+            img = Image(path)
+            img._restrictSize(110, 80)
+            image_elements.append(img)
+        except Exception:
+            continue
 
-            design_image = Image(image_path)
+    if image_elements:
+        if len(image_elements) == 1:
+            image_row = [image_elements[0]]
+        else:
+            image_row = image_elements
 
-            design_image._restrictSize(240, 160)
-
-        except:
-
-            design_image = Paragraph("Sin imagen disponible", styles["Normal"])
-
-    else:
-
-        design_image = Paragraph("Sin imagen de referencia", styles["Normal"])
-
-    image_card = Table(
-        [
+        image_card = Table(
             [
-                Paragraph(
-                    "<b>IMAGEN DE REFERENCIA / DISEÑO PERSONALIZADO</b>",
-                    styles["BodyText"],
-                )
+                [
+                    Paragraph(
+                        "<b>IMÁGENES DE REFERENCIA</b>",
+                        styles["BodyText"],
+                    )
+                ],
+                [Table([image_row], colWidths=[350 / len(image_row)] * len(image_row))],
+                [Paragraph("Referencia enviada por el cliente.", styles["BodyText"])],
             ],
-            [design_image],
-            [Paragraph("Referencia enviada por el cliente.", styles["BodyText"])],
-        ],
-        colWidths=[350],
-    )
-
-    image_card.setStyle(
-        TableStyle(
-            [
-                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E5E7EB")),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.white),
-                ("TOPPADDING", (0, 0), (-1, -1), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-                ("LEFTPADDING", (0, 0), (-1, -1), 10),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-            ]
+            colWidths=[350],
         )
-    )
+    else:
+        image_card = None
+
+    if image_card:
+        image_card.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E5E7EB")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.white),
+                    ("TOPPADDING", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
 
     # ===================================
     # RESUMEN
@@ -301,12 +326,18 @@ def build_design_totals_section(quotation, config, image_path=None):
 
     iva_amount = subtotal * quotation.iva / 100
 
+    shipping = float(getattr(quotation, "shipping_cost", None) or 0)
+
+    summary_rows = [
+        ["SUBTOTAL", f"${subtotal:.2f}"],
+        ["DESCUENTO", f"{discount:.2f}%"],
+        [f"IVA ({quotation.iva:.2f}%)", f"${iva_amount:.2f}"],
+    ]
+    if shipping > 0:
+        summary_rows.append(["ENVÍO", f"${shipping:.2f}"])
+
     summary_table = Table(
-        [
-            ["SUBTOTAL", f"${subtotal:.2f}"],
-            ["DESCUENTO", f"{discount:.2f}%"],
-            [f"IVA ({quotation.iva:.2f}%)", f"${iva_amount:.2f}"],
-        ],
+        summary_rows,
         colWidths=[90, 60],
     )
 
@@ -361,7 +392,10 @@ def build_design_totals_section(quotation, config, image_path=None):
     # CONTENEDOR FINAL
     # ===================================
 
-    layout = Table([[image_card, totals_card]], colWidths=[380, 150])
+    if image_card:
+        layout = Table([[image_card, totals_card]], colWidths=[380, 150])
+    else:
+        layout = Table([[totals_card]], colWidths=[530])
 
     layout.setStyle(
         TableStyle(

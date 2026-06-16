@@ -1,0 +1,60 @@
+{% from "components/production_status_badge.html" import production_status_badge %}
+
+{% macro kanban_order_card(order, column, user, show_status=false, move_query='') %}
+{% set q = order.quotation %}
+{% set items = q.items if q else [] %}
+{% set del_raw = order.delivery_date or (q.delivery_date if q else none) %}
+{% set del_dt = del_raw.date() if del_raw and del_raw.__class__.__name__ == 'datetime' else del_raw %}
+{% set is_late = today is defined and del_dt and del_dt < today and (order.status or '') not in ['enviado', 'entregado'] %}
+{% set is_today = today is defined and del_dt and del_dt == today %}
+{% set del_label = del_dt.strftime('%d/%m/%Y') if del_dt else 'Sin fecha' %}
+
+<div class="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-200 hover:shadow-md transition">
+    <div class="flex items-start justify-between gap-2 mb-2">
+        <a href="/production/{{ order.id }}" class="text-sm font-bold text-purple-700 hover:underline">Orden #{{ order.id }}</a>
+        <div class="flex flex-wrap items-center gap-1 shrink-0 justify-end">
+            {% if show_status %}{{ production_status_badge(order.status) }}{% endif %}
+            {% set pri = order.priority or 'media' %}
+            {% if pri in ['alta', 'urgente'] %}
+            <span class="text-[10px] font-bold uppercase rounded-full px-2 py-0.5
+                {% if pri == 'urgente' %}bg-red-100 text-red-700{% else %}bg-orange-100 text-orange-700{% endif %}">{{ pri }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <p class="text-xs text-gray-400 mb-1">Cot. #{{ order.quotation_id }}</p>
+    <p class="font-semibold text-slate-900 text-sm">
+        {% if items and items|length > 0 %}{{ items[0].detail }}{% if items|length > 1 %} <span class="text-gray-400 font-normal">+{{ items|length - 1 }}</span>{% endif %}{% else %}Sin productos{% endif %}
+    </p>
+    <p class="text-sm text-gray-500 mt-2 truncate">{{ q.client.name if q and q.client else 'Sin cliente' }}</p>
+
+    {% if order.designer or order.fabricator %}
+    <div class="flex flex-wrap gap-1 mt-2 text-[11px]">
+        {% if order.designer %}<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">🎨 {{ order.designer }}</span>{% endif %}
+        {% if order.fabricator %}<span class="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">🏭 {{ order.fabricator }}</span>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-1.5 mt-2 text-xs text-gray-600">
+        {% if is_late %}<span class="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">Atrasada</span>
+        {% elif is_today %}<span class="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700">Hoy</span>{% endif %}
+        <span>📅 {{ del_label }}</span>
+    </div>
+
+    {% if user.role != 'produccion' %}
+    <p class="mt-3 font-bold text-slate-900">${{ '%.2f'|format(q.total or 0 if q else 0) }}</p>
+    {% endif %}
+
+    <div class="mt-3 space-y-2">
+        <a href="/production/{{ order.id }}" class="block text-center border border-gray-200 hover:bg-gray-50 py-2 rounded-lg text-xs">Ver detalle</a>
+        {% if column.next_status and column.action_label %}
+        <a href="/production/move/{{ order.id }}/{{ column.next_status }}?return=kanban{{ move_query|e }}"
+            class="block text-center text-white py-2 rounded-lg text-xs font-medium {{ column.action_class }}">
+            {{ column.action_label }}
+        </a>
+        {% elif column.status == 'entregado' %}
+        <span class="block text-center bg-green-50 text-green-700 py-2 rounded-lg text-xs font-medium">Completada</span>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

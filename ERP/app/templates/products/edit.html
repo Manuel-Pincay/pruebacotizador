@@ -12,6 +12,30 @@
     </div>
   </div>
 
+  {% if saved %}
+  <div class="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+    Cambios guardados correctamente.
+  </div>
+  {% endif %}
+
+  {% if error == 'code' %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    Ya existe otro producto con ese código.
+  </div>
+  {% elif error == 'campos' %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    Código y nombre son obligatorios.
+  </div>
+  {% elif error == 'imagen' %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    La imagen no es válida. Use PNG, JPG o WEBP (máx. 5 MB).
+  </div>
+  {% elif error == 'guardar' %}
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    No se pudo guardar el producto. Intente de nuevo.
+  </div>
+  {% endif %}
+
   <form action="/products/{{ product.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-6">
     <!-- INFORMACION GENERAL -->
 
@@ -167,28 +191,26 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
       <h2 class="text-base font-semibold mb-3 text-gray-700">Detalles</h2>
 
-      {% set img = product_image_url(product.image) %}
-      {% if img %}
-
-      <div class="mb-4">
-
-        <img src="{{ img }}" class="w-40 h-40 object-cover rounded-xl border" />
-
+      {% set img = product_image_url(product.image, thumb=true) or product_image_url(product.image) %}
+      <div id="current_image_wrap" class="mb-4 {% if not img %}hidden{% endif %}">
+        <p class="text-xs font-medium text-gray-500 mb-2">Imagen actual</p>
+        <img id="current_image" src="{{ img or '' }}" alt="Imagen del producto"
+          class="w-32 h-32 object-cover rounded-xl border border-gray-200" />
       </div>
 
-      {% endif %}
-
       <div class="mb-5">
+        <img id="new_image_preview" class="hidden w-32 h-32 object-cover rounded-xl border border-purple-200 mb-3" alt="Vista previa" />
         <label class="block mb-2"> Cambiar Imagen </label>
 
         <input type="file" name="image" id="imageInput" accept=".jpg,.jpeg,.png,.webp"
             class="w-full border border-gray-200 px-3 py-2 rounded-lg" />
+        <p class="text-xs text-gray-400 mt-1">PNG, JPG o WEBP. Máx. 5 MB.</p>
       </div>
 
       <div>
         <label class="block mb-2"> Descripción </label>
 
-        <textarea name="description" rows="5" class="w-full border border-gray-200 p-3 rounded-xl">{{ product.description }}</textarea>
+        <textarea name="description" rows="5" class="w-full border border-gray-200 p-3 rounded-xl">{{ product.description or '' }}</textarea>
       </div>
     </div>
 
@@ -204,14 +226,21 @@
 
 <script>
   const imageInput = document.getElementById('imageInput');
-  const preview = document.getElementById('preview');
+  const newPreview = document.getElementById('new_image_preview');
+  const currentWrap = document.getElementById('current_image_wrap');
 
-  if (imageInput) {
+  if (imageInput && newPreview) {
     imageInput.addEventListener('change', function (e) {
       const file = e.target.files[0];
-      if (!file) return;
-      preview.src = URL.createObjectURL(file);
-      preview.classList.remove('hidden');
+      if (!file) {
+        newPreview.src = '';
+        newPreview.classList.add('hidden');
+        if (currentWrap) currentWrap.classList.remove('hidden');
+        return;
+      }
+      newPreview.src = URL.createObjectURL(file);
+      newPreview.classList.remove('hidden');
+      if (currentWrap) currentWrap.classList.add('hidden');
     });
   }
 </script>
