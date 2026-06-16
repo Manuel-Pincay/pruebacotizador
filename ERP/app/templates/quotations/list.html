@@ -27,193 +27,84 @@
         </a>
     </div>
 </div>
-<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-6 mb-8">
-    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
-        <p class="text-gray-500 text-xs sm:text-sm">Total</p>
-        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ total_quotations }}</h2>
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 mb-3">
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-slate-400">
+        <div class="text-[10px] text-gray-500 leading-tight">Total</div>
+        <div class="text-xl font-bold text-slate-900">{{ total_quotations }}</div>
     </div>
-
-    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
-        <p class="text-green-600 text-xs sm:text-sm">Aprobadas</p>
-        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ approved_quotations }}</h2>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-green-500">
+        <div class="text-[10px] text-green-600 leading-tight">Aprobadas</div>
+        <div class="text-xl font-bold text-green-700">{{ approved_quotations }}</div>
     </div>
-
-    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
-        <p class="text-yellow-600 text-xs sm:text-sm">Pendientes</p>
-        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ pending_quotations }}</h2>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-yellow-500">
+        <div class="text-[10px] text-yellow-600 leading-tight">Pendientes</div>
+        <div class="text-xl font-bold text-yellow-700">{{ pending_quotations }}</div>
     </div>
-
-    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
-        <p class="text-purple-600 text-xs sm:text-sm">Producción</p>
-        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ production_quotations }}</h2>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-purple-600">
+        <div class="text-[10px] text-purple-600 leading-tight">Producción</div>
+        <div class="text-xl font-bold text-purple-700">{{ production_quotations }}</div>
     </div>
-
-    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
-        <p class="text-blue-600 text-xs sm:text-sm">Enviadas</p>
-        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ sent_quotations }}</h2>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-blue-500">
+        <div class="text-[10px] text-blue-600 leading-tight">Enviadas</div>
+        <div class="text-xl font-bold text-blue-700">{{ sent_quotations }}</div>
     </div>
-
-    <div class="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
-        <p class="text-green-700 text-xs sm:text-sm">Entregadas</p>
-        <h2 class="text-2xl sm:text-4xl font-bold mt-2">{{ delivered_quotations }}</h2>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-emerald-500">
+        <div class="text-[10px] text-emerald-700 leading-tight">Entregadas</div>
+        <div class="text-xl font-bold text-emerald-700">{{ delivered_quotations }}</div>
     </div>
 </div>
 <!-- FILTROS -->
 
 <form method="GET">
 
-    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8">
+    <div class="bg-white rounded-xl border border-gray-200 px-3 py-2 mb-3 shadow-sm">
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 items-end">
 
 
-            
             <!-- CLIENTE -->
-
             <div>
-
-                <label class="block text-sm text-gray-500 mb-2">
-                    Cliente
-                </label>
-
-                <select name="client_id" class="w-full border border-gray-200 rounded-xl px-4 py-3">
-
-                    <option value="">
-                        Todos los clientes
-                    </option>
-
+                <label class="block text-[11px] text-gray-500 mb-0.5">Cliente</label>
+                <select name="client_id" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                    <option value="">Todos</option>
                     {% for client in clients %}
-
-                    <option
-    value="{{ client.id }}"
-    {% if client_id == client.id %}
-    selected
-    {% endif %}
->
-    {{ client.name }}
-</option>
-
+                    <option value="{{ client.id }}" {% if client_id == client.id %}selected{% endif %}>{{ client.name }}</option>
                     {% endfor %}
-
                 </select>
-
             </div>
 
             <!-- ESTADO -->
-
             <div>
-
-                <label class="block text-sm text-gray-500 mb-2">
-                    Estado
-                </label>
-
-                <select
-    name="status"
-    class="w-full border border-gray-200 rounded-xl px-4 py-3"
->
-
-    <option value="">
-        Todos los estados
-    </option>
-
-    <option
-        value="pendiente"
-        {% if status == "pendiente" %}selected{% endif %}
-    >
-        Pendiente
-    </option>
-
-    <option
-        value="aprobada"
-        {% if status == "aprobada" %}selected{% endif %}
-    >
-        Aprobada
-    </option>
-
-    <option
-        value="produccion"
-        {% if status == "produccion" %}selected{% endif %}
-    >
-        Producción
-    </option>
-
-    <option
-        value="enviada"
-        {% if status == "enviada" %}selected{% endif %}
-    >
-        Enviada
-    </option>
-
-    <option
-        value="entregada"
-        {% if status == "entregada" %}selected{% endif %}
-    >
-        Entregada
-    </option>
-
-    <option
-        value="cancelada"
-        {% if status == "cancelada" %}selected{% endif %}
-    >
-        Cancelada
-    </option>
-
-</select>
-
+                <label class="block text-[11px] text-gray-500 mb-0.5">Estado</label>
+                <select name="status" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                    <option value="">Todos</option>
+                    <option value="pendiente" {% if status == "pendiente" %}selected{% endif %}>Pendiente</option>
+                    <option value="aprobada" {% if status == "aprobada" %}selected{% endif %}>Aprobada</option>
+                    <option value="produccion" {% if status == "produccion" %}selected{% endif %}>Producción</option>
+                    <option value="enviada" {% if status == "enviada" %}selected{% endif %}>Enviada</option>
+                    <option value="entregada" {% if status == "entregada" %}selected{% endif %}>Entregada</option>
+                    <option value="cancelada" {% if status == "cancelada" %}selected{% endif %}>Cancelada</option>
+                </select>
             </div>
 
             <!-- FECHA INICIO -->
-
             <div>
-
-                <label class="block text-sm text-gray-500 mb-2">
-                    Fecha inicio
-                </label>
-
-                <input
-    type="date"
-    name="start_date"
-    value="{{ start_date }}"
-    class="w-full border border-gray-200 rounded-xl px-4 py-3"
->
+                <label class="block text-[11px] text-gray-500 mb-0.5">Fecha inicio</label>
+                <input type="date" name="start_date" value="{{ start_date }}"
+                    class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
             </div>
 
             <!-- FECHA FIN -->
-
             <div>
-
-                <label class="block text-sm text-gray-500 mb-2">
-                    Fecha fin
-                </label>
-
-                <input
-    type="date"
-    name="end_date"
-    value="{{ end_date }}"
-    class="w-full border border-gray-200 rounded-xl px-4 py-3"
->
-
+                <label class="block text-[11px] text-gray-500 mb-0.5">Fecha fin</label>
+                <input type="date" name="end_date" value="{{ end_date }}"
+                    class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
             </div>
 
-            <!-- BUSCAR -->
-
-            <div class="flex items-end">
-
-                <button type="submit" class="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded-xl">
-                    Buscar
-                </button>
-
-            </div>
-
-            <!-- LIMPIAR -->
-
-            <div class="flex items-end">
-
-                <a href="/quotations"
-                    class="w-full border border-gray-200 hover:bg-gray-50 py-3 rounded-xl text-center">
-                    Limpiar
-                </a>
-
+            <!-- BUSCAR / LIMPIAR -->
+            <div class="col-span-2 flex gap-1.5 items-end justify-end">
+                <a href="/quotations" class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs whitespace-nowrap">Limpiar</a>
+                <button type="submit" class="px-4 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium whitespace-nowrap">Filtrar</button>
             </div>
 
         </div>

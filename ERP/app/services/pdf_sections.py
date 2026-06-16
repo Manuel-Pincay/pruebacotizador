@@ -494,6 +494,49 @@ def build_benefits_section(config):
 
     return table
 
+def build_payment_status_section(quotation, config):
+
+    total = float(quotation.total or 0)
+    total_paid = quotation.total_paid
+    pending = quotation.pending_balance
+
+    styles = getSampleStyleSheet()
+
+    content = Paragraph(
+        f"""
+        <font size="9">
+        <b>ESTADO DE PAGO</b>
+        <br/><br/>
+        Total: <b>${total:.2f}</b>
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        Abonado: <b>${total_paid:.2f}</b>
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        Saldo: <b>${pending:.2f}</b>
+        </font>
+        """,
+        styles["BodyText"],
+    )
+
+    table = Table(
+        [[content]],
+        colWidths=[530],
+    )
+
+    table.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E5E7EB")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F5F3FF")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+
+    return table
+
 def build_notes_section(config):
 
     styles = getSampleStyleSheet()

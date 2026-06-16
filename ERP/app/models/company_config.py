@@ -31,6 +31,12 @@ class CompanyConfig(Base):
 
     iva_default = Column(Integer, default=19)
 
+    guide_sender_name = Column(String, nullable=True)
+    guide_sender_city = Column(String, default="Manta")
+    guide_sender_region = Column(String, default="Ecuador")
+    guide_sender_phone = Column(String, nullable=True)
+    guide_sender_address = Column(String, nullable=True)
+
     created_at = Column(DateTime, default=datetime.now)
 
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

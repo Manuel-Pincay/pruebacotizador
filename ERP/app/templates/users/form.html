@@ -115,6 +115,10 @@
                     Producción
                 </option>
 
+                <option value="disenador" {% if edit_mode and edit_user.role == 'disenador' %}selected{% endif %}>
+                    Diseñador
+                </option>
+
                 <option value="despacho" {% if edit_mode and edit_user.role in ['despacho', 'transporte'] %}selected{% endif %}>
                     Despacho
                 </option>

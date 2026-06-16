@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.company_config import CompanyConfig
-from app.config.settings import settings
+from app.auth.security import verify_admin_password
 from app.auth.session import (
     admin_cookie_options,
     is_admin_session_valid,
@@ -96,7 +96,7 @@ async def verify_password(
     db: Session = Depends(get_db)
 ):
     """Verify admin password"""
-    if password == settings.secretadmin_password:
+    if verify_admin_password(password):
         get_or_create_config(db)
         response = RedirectResponse(
             url="/secretadmin/config",
@@ -172,6 +172,11 @@ async def save_config(
     quotation_validity_days: int = Form(default=15),
     quotation_footer_text: str = Form(...),
     iva_default: int = Form(default=19),
+    guide_sender_name: str = Form(""),
+    guide_sender_city: str = Form("Manta"),
+    guide_sender_region: str = Form("Ecuador"),
+    guide_sender_phone: str = Form(""),
+    guide_sender_address: str = Form(""),
     logo: UploadFile = File(None),
     request: Request = Request,
     db: Session = Depends(get_db)
@@ -193,6 +198,11 @@ async def save_config(
     config.quotation_validity_days = quotation_validity_days
     config.quotation_footer_text = quotation_footer_text
     config.iva_default = iva_default
+    config.guide_sender_name = guide_sender_name.strip() or None
+    config.guide_sender_city = guide_sender_city.strip() or "Manta"
+    config.guide_sender_region = guide_sender_region.strip() or "Ecuador"
+    config.guide_sender_phone = guide_sender_phone.strip() or None
+    config.guide_sender_address = guide_sender_address.strip() or None
 
     # Handle logo upload
     if logo and logo.filename:

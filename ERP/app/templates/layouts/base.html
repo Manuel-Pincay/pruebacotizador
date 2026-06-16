@@ -68,6 +68,39 @@ lucide.createIcons();
         visibility: visible;
       }
 
+      @media (max-width: 767px) {
+        #sidebar {
+          transform: translateX(-100%);
+        }
+        #sidebar.sidebar-mobile-open {
+          transform: translateX(0);
+          z-index: 10000;
+        }
+        #sidebar-overlay.is-visible {
+          z-index: 9999;
+        }
+      }
+
+      @media (min-width: 768px) {
+        #sidebar {
+          transform: translateX(0);
+        }
+      }
+
+      .sidebar-submenu-toggle .sidebar-chevron {
+        transition: transform 0.2s ease;
+      }
+
+      .sidebar-submenu-toggle[aria-expanded="true"] .sidebar-chevron {
+        transform: rotate(180deg);
+      }
+
+      .sidebar-nav-link.is-active,
+      .sidebar-submenu-link.is-active {
+        background-color: rgba(255, 255, 255, 0.18);
+        font-weight: 600;
+      }
+
       /* Override common Tailwind purple classes to use configured colors */
       .bg-purple-700 { background-color: var(--primary) !important; }
       .hover\:bg-purple-800:hover { background-color: var(--accent) !important; }
@@ -186,6 +219,8 @@ lucide.createIcons();
         type="button"
         onclick="toggleSidebar()"
         aria-label="Abrir menú"
+        aria-expanded="false"
+        aria-controls="sidebar"
         class="shrink-0 bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -209,7 +244,7 @@ lucide.createIcons();
     <div class="flex min-h-screen w-full">
       <aside
         id="sidebar"
-        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-[var(--sidebar-width)] max-w-[85vw] h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300"
+        class="shrink-0 fixed md:sticky top-0 z-50 md:z-auto w-[var(--sidebar-width)] max-w-[85vw] h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col shadow-2xl transition-transform duration-300"
       >
         <!-- LOGO -->
 
@@ -266,229 +301,237 @@ lucide.createIcons();
 
         <nav class="flex-1 p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto" id="sidebarNav">
           {% set current_role = user.role if user is defined and user else '' %}
+          {% set nav_path = request.url.path if request is defined else '' %}
+
+          {% macro nav_active(href) -%}
+            {%- if href == '/' -%}
+              {%- if nav_path == '/' %} is-active{%- endif -%}
+            {%- elif href == '/quotations' -%}
+              {%- if nav_path == '/quotations' or (nav_path.startswith('/quotations/') and not nav_path.startswith('/quotations/tracking')) %} is-active{%- endif -%}
+            {%- elif href == '/design/dashboard' -%}
+              {%- if nav_path == '/design/dashboard' %} is-active{%- endif -%}
+            {%- elif nav_path == href or nav_path.startswith(href + '/') or (href.endswith('/') and nav_path.startswith(href)) -%}
+             is-active
+            {%- endif -%}
+          {%- endmacro %}
+
+          {% macro sub_active(href) -%}
+            {%- if nav_path == href or nav_path.startswith(href + '/') or (href.endswith('/') and nav_path.startswith(href)) -%}
+             is-active
+            {%- endif -%}
+          {%- endmacro %}
 
           {% if current_role == 'produccion' %}
-          <a
-            href="/"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 📊 </span>
-
-            <span> Dashboard Producción </span>
+          {% set prod_order_active = nav_path in ['/production', '/production/'] or (nav_path.startswith('/production/') and nav_path.split('/')[2].isdigit() if nav_path.split('/')|length > 2 else false) %}
+          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
+            <span>📊</span>
+            <span>Dashboard Producción</span>
           </a>
-
-          <a
-            href="/production/"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 🗂️ </span>
-
-            <span> Órdenes de Producción </span>
+          <a href="/production/kanban" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/kanban') }}">
+            <span>📋</span>
+            <span>Kanban</span>
+          </a>
+          <a href="/production/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if prod_order_active %} is-active{% endif %}">
+            <span>🗂️</span>
+            <span>Órdenes de Producción</span>
+          </a>
+          <a href="/production/fabrication-condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/fabrication-condensed') }}">
+            <span>🖨️</span>
+            <span>Condensado Fabricación</span>
           </a>
 
           {% elif current_role == 'ventas' %}
-          <a
-            href="/"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 📊 </span>
-
-            <span> Dashboard </span>
+          {% set ventas_catalog_open = nav_path.startswith('/clients') or nav_path.startswith('/products') %}
+          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
+            <span>📊</span>
+            <span>Dashboard</span>
           </a>
-
-          <a
-            href="/quotations"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 📄 </span>
-
-            <span> Cotizaciones </span>
+          <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
+            <span>📄</span>
+            <span>Cotizaciones</span>
           </a>
-
-          <a
-            href="/quotations/tracking"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 📈 </span>
-
-            <span> Seguimiento Comercial </span>
+          <a href="/quotations/tracking" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations/tracking') }}">
+            <span>📈</span>
+            <span>Seguimiento Comercial</span>
           </a>
-
+          <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
+            <span>🚚</span>
+            <span>Guías de Envío</span>
+          </a>
+          <a href="/production/condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/condensed') }}">
+            <span>🏭</span>
+            <span>Condensado Producción</span>
+          </a>
+          <a href="/production/fabrication-condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/fabrication-condensed') }}">
+            <span>🖨️</span>
+            <span>Condensado Fabricación</span>
+          </a>
           <div>
             <button
-              onclick="toggleSidebarMenu('databaseMenu')"
-              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+              aria-controls="databaseMenu"
+              aria-expanded="{{ 'true' if ventas_catalog_open else 'false' }}"
             >
               <div class="flex items-center gap-3">
-                <span> 📚 </span>
-
-                <span> Base de Datos </span>
+                <span>📚</span>
+                <span>Catálogo</span>
               </div>
-
-              <span> ▼ </span>
+              <span class="sidebar-chevron text-xs">▼</span>
             </button>
-
-            <div id="databaseMenu" class="hidden ml-6 mt-2 space-y-2">
-              <a
-                href="/clients"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                👥 Clientes
-              </a>
-
-              <a
-                href="/products"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                📦 Productos
-              </a>
+            <div id="databaseMenu" class="sidebar-submenu {% if not ventas_catalog_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+              <a href="/clients" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/clients') }}">👥 Clientes</a>
+              <a href="/products" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/products') }}">📦 Productos</a>
             </div>
           </div>
+
+          {% elif current_role == 'disenador' %}
+          {% set design_prod_open = nav_path.startswith('/design') or nav_path.startswith('/production/condensed') or nav_path.startswith('/production/fabrication-condensed') %}
+          <a href="/design/dashboard" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/design/dashboard') }}">
+            <span>🎨</span>
+            <span>Dashboard Diseño</span>
+          </a>
+          <div>
+            <button
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+              aria-controls="designProductionMenu"
+              aria-expanded="{{ 'true' if design_prod_open else 'false' }}"
+            >
+              <div class="flex items-center gap-3">
+                <span>🏭</span>
+                <span>Producción</span>
+              </div>
+              <span class="sidebar-chevron text-xs">▼</span>
+            </button>
+            <div id="designProductionMenu" class="sidebar-submenu {% if not design_prod_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+              <a href="/design/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/pending') }}">⏳ Diseños Pendientes</a>
+              <a href="/design/orders" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/orders') }}">🖨️ Datos de fabricación</a>
+              <a href="/production/condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/condensed') }}">📋 Condensado Producción</a>
+              <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado Fabricación</a>
+            </div>
+          </div>
+          <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
+            <span>🚚</span>
+            <span>Guías de Envío</span>
+          </a>
+          <a href="/design/profile" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/design/profile') }}">
+            <span>👤</span>
+            <span>Perfil</span>
+          </a>
+
+          {% elif current_role in ['despacho', 'transporte'] %}
+          <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
+            <span>🚚</span>
+            <span>Guías de Envío</span>
+          </a>
+          <a href="/shipments/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments/quotations') }}">
+            <span>📦</span>
+            <span>Cotizaciones para guía</span>
+          </a>
 
           {% elif current_role == 'admin' %}
-          <a
-            href="/"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 📊 </span>
-
-            <span> Dashboard </span>
+          {% set production_menu_open = nav_path.startswith('/production') %}
+          {% set design_menu_open = nav_path.startswith('/design') %}
+          {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') or nav_path.startswith('/product-settings') or nav_path.startswith('/imports') %}
+          {% set system_menu_open = nav_path.startswith('/users') or nav_path.startswith('/inventory') or nav_path.startswith('/secretadmin') %}
+          {% set admin_prod_order_active = nav_path in ['/production', '/production/'] or (nav_path.startswith('/production/') and nav_path.split('/')[2].isdigit() if nav_path.split('/')|length > 2 else false) %}
+          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
+            <span>📊</span>
+            <span>Dashboard</span>
           </a>
-
-          <a
-            href="/quotations"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 📄 </span>
-
-            <span> Cotizaciones </span>
+          <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
+            <span>📄</span>
+            <span>Cotizaciones</span>
           </a>
-
-          <a
-            href="/production/kanban"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 🗂️ </span>
-
-            <span> Kanban </span>
+          <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
+            <span>🚚</span>
+            <span>Guías de Envío</span>
           </a>
-
           <div>
             <button
-              onclick="toggleSidebarMenu('databaseMenu')"
-              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if production_menu_open %} is-active{% endif %}"
+              aria-controls="productionMenu"
+              aria-expanded="{{ 'true' if production_menu_open else 'false' }}"
             >
               <div class="flex items-center gap-3">
-                <span> 📚 </span>
-
-                <span> Base de Datos </span>
+                <span>🏭</span>
+                <span>Producción</span>
               </div>
-
-              <span> ▼ </span>
+              <span class="sidebar-chevron text-xs">▼</span>
             </button>
-
-            <div id="databaseMenu" class="hidden ml-6 mt-2 space-y-2">
-              <a
-                href="/clients"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                👥 Clientes
-              </a>
-
-              <a
-                href="/products"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                📦 Productos
-              </a>
-              <a
-                href="/product-settings"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                ⚙️ Configuración de productos
-              </a>
+            <div id="productionMenu" class="sidebar-submenu {% if not production_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+              <a href="/production/kanban" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/kanban') }}">📋 Kanban</a>
+              <a href="/production/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{% if admin_prod_order_active %} is-active{% endif %}">📝 Órdenes</a>
+              <a href="/production/calendar" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/calendar') }}">🗓️ Calendario</a>
+              <a href="/production/condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/condensed') }}">📄 Condensado Producción</a>
+              <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado Fabricación</a>
+            </div>
+          </div>
+          <div>
+            <button
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if design_menu_open %} is-active{% endif %}"
+              aria-controls="adminDesignMenu"
+              aria-expanded="{{ 'true' if design_menu_open else 'false' }}"
+            >
+              <div class="flex items-center gap-3">
+                <span>🎨</span>
+                <span>Diseño</span>
+              </div>
+              <span class="sidebar-chevron text-xs">▼</span>
+            </button>
+            <div id="adminDesignMenu" class="sidebar-submenu {% if not design_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+              <a href="/design/dashboard" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/dashboard') }}">📊 Dashboard</a>
+              <a href="/design/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/pending') }}">⏳ Diseños Pendientes</a>
+              <a href="/design/orders" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/orders') }}">🖨️ Datos de fabricación</a>
+            </div>
+          </div>
+          <div>
+            <button
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if catalog_menu_open %} is-active{% endif %}"
+              aria-controls="databaseMenu"
+              aria-expanded="{{ 'true' if catalog_menu_open else 'false' }}"
+            >
+              <div class="flex items-center gap-3">
+                <span>📚</span>
+                <span>Catálogo</span>
+              </div>
+              <span class="sidebar-chevron text-xs">▼</span>
+            </button>
+            <div id="databaseMenu" class="sidebar-submenu {% if not catalog_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+              <a href="/clients" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/clients') }}">👥 Clientes</a>
+              <a href="/products" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/products') }}">📦 Productos</a>
+              <a href="/product-settings" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/product-settings') }}">⚙️ Config. productos</a>
+              <a href="/imports/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/imports') }}">📥 Importar Excel</a>
+            </div>
+          </div>
+          <div>
+            <button
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if system_menu_open %} is-active{% endif %}"
+              aria-controls="systemMenu"
+              aria-expanded="{{ 'true' if system_menu_open else 'false' }}"
+            >
+              <div class="flex items-center gap-3">
+                <span>🛠️</span>
+                <span>Sistema</span>
+              </div>
+              <span class="sidebar-chevron text-xs">▼</span>
+            </button>
+            <div id="systemMenu" class="sidebar-submenu {% if not system_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+              <a href="/users" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/users') }}">👤 Usuarios</a>
+              <a href="/inventory" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory') }}">📦 Inventario</a>
+              <a href="/secretadmin/config" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/secretadmin') }}">⚙️ Configuración</a>
             </div>
           </div>
 
-          <div>
-            <button
-              onclick="toggleSidebarMenu('productionMenu')"
-              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-            >
-              <div class="flex items-center gap-3">
-                <span> 🏭 </span>
-
-                <span> Producción </span>
-              </div>
-
-              <span> ▼ </span>
-            </button>
-
-            <div id="productionMenu" class="hidden ml-6 mt-2 space-y-2">
-              <a
-                href="/production/"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                📝 Ordenes
-              </a>
-              <a
-                href="/production/kanban"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                📋 Kanban
-              </a>
-              <a
-                href="/production/calendar"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                🗓️ Calendario
-              </a>
-            </div>
-          </div>
-
-          <div>
-            <button
-              onclick="toggleSidebarMenu('systemMenu')"
-              class="w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-            >
-              <div class="flex items-center gap-3">
-                <span> 🛠️ </span>
-
-                <span> Sistema </span>
-              </div>
-
-              <span> ▼ </span>
-            </button>
-
-            <div id="systemMenu" class="hidden ml-6 mt-2 space-y-2">
-              <a
-                href="/shipments"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                🚚 Despachos
-              </a>
-              <a
-                href="/users"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                👤 Usuarios
-              </a>
-              <a
-                href="/secretadmin/config"
-                class="block px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                ⚙️ Configuración
-              </a>
-            </div>
-          </div>
           {% else %}
-          <a
-            href="/"
-            class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-          >
-            <span> 📊 </span>
-
-            <span> Dashboard </span>
+          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
+            <span>📊</span>
+            <span>Dashboard</span>
           </a>
           {% endif %}
         </nav>
@@ -510,60 +553,106 @@ lucide.createIcons();
 
       <!-- MAIN -->
 
-      <main class="flex-1 w-full min-w-0 pt-[3.75rem] md:pt-0 px-3 sm:px-5 md:px-6 py-4 sm:py-6 max-w-[1800px] mx-auto">
+      <main class="flex-1 w-full min-w-0 pt-[3.75rem] md:pt-0 px-3 sm:px-5 md:px-6 py-4 sm:py-6 max-w-[1800px] mx-auto {% block main_class %}{% endblock %}">
     {% block content %}
     {% endblock %}
 </main>
     </div>
 
     <script>
-      function toggleSidebarMenu(id) {
-        const menu = document.getElementById(id);
-        menu.classList.toggle("hidden");
-      }
-
-      function isMobileSidebar() {
-        return window.matchMedia("(max-width: 767px)").matches;
-      }
-
-      function openSidebar() {
+      (function () {
         const sidebar = document.getElementById("sidebar");
         const overlay = document.getElementById("sidebar-overlay");
-        sidebar.classList.remove("-translate-x-full");
-        overlay.classList.add("is-visible");
-        document.body.classList.add("sidebar-open");
-      }
+        const nav = document.getElementById("sidebarNav");
+        const toggleBtn = document.getElementById("sidebarToggle");
+        const mobileQuery = window.matchMedia("(max-width: 767px)");
 
-      function closeSidebar() {
-        const sidebar = document.getElementById("sidebar");
-        const overlay = document.getElementById("sidebar-overlay");
-        sidebar.classList.add("-translate-x-full");
-        overlay.classList.remove("is-visible");
-        document.body.classList.remove("sidebar-open");
-      }
-
-      function toggleSidebar() {
-        const sidebar = document.getElementById("sidebar");
-        if (sidebar.classList.contains("-translate-x-full")) {
-          openSidebar();
-        } else {
-          closeSidebar();
+        function isMobileSidebar() {
+          return mobileQuery.matches;
         }
-      }
 
-      document.getElementById("sidebarNav")?.addEventListener("click", function (event) {
-        if (!isMobileSidebar()) return;
-        const link = event.target.closest("a[href]");
-        if (link) closeSidebar();
-      });
+        function openSidebar() {
+          if (!isMobileSidebar() || !sidebar) return;
+          sidebar.classList.add("sidebar-mobile-open");
+          overlay?.classList.add("is-visible");
+          document.body.classList.add("sidebar-open");
+          toggleBtn?.setAttribute("aria-expanded", "true");
+        }
 
-      window.addEventListener("resize", function () {
-        if (!isMobileSidebar()) {
+        function closeSidebar() {
+          sidebar?.classList.remove("sidebar-mobile-open");
+          overlay?.classList.remove("is-visible");
           document.body.classList.remove("sidebar-open");
-          document.getElementById("sidebar-overlay").classList.remove("is-visible");
-          document.getElementById("sidebar").classList.remove("-translate-x-full");
+          toggleBtn?.setAttribute("aria-expanded", "false");
         }
-      });
+
+        function toggleSidebar() {
+          if (sidebar?.classList.contains("sidebar-mobile-open")) {
+            closeSidebar();
+          } else {
+            openSidebar();
+          }
+        }
+
+        window.toggleSidebar = toggleSidebar;
+        window.closeSidebar = closeSidebar;
+
+        function toggleSidebarMenu(button) {
+          const menuId = button.getAttribute("aria-controls");
+          const menu = menuId ? document.getElementById(menuId) : null;
+          if (!menu) return;
+
+          const willOpen = menu.classList.contains("hidden");
+
+          nav?.querySelectorAll(".sidebar-submenu").forEach(function (panel) {
+            if (panel === menu) return;
+            panel.classList.add("hidden");
+            const otherBtn = nav.querySelector('[aria-controls="' + panel.id + '"]');
+            if (otherBtn) otherBtn.setAttribute("aria-expanded", "false");
+          });
+
+          menu.classList.toggle("hidden", !willOpen);
+          button.setAttribute("aria-expanded", willOpen ? "true" : "false");
+        }
+
+        window.toggleSidebarMenu = function (menuId) {
+          const button = nav?.querySelector('[aria-controls="' + menuId + '"]');
+          if (button) toggleSidebarMenu(button);
+        };
+
+        nav?.querySelectorAll(".sidebar-submenu-toggle").forEach(function (button) {
+          button.addEventListener("click", function () {
+            toggleSidebarMenu(button);
+          });
+        });
+
+        nav?.querySelectorAll(".sidebar-submenu-link.is-active").forEach(function (link) {
+          const panel = link.closest(".sidebar-submenu");
+          const button = panel ? nav.querySelector('[aria-controls="' + panel.id + '"]') : null;
+          if (panel) panel.classList.remove("hidden");
+          if (button) button.setAttribute("aria-expanded", "true");
+        });
+
+        nav?.addEventListener("click", function (event) {
+          if (!isMobileSidebar()) return;
+          const link = event.target.closest("a[href]");
+          if (link && link.getAttribute("href") !== "#") {
+            closeSidebar();
+          }
+        });
+
+        mobileQuery.addEventListener("change", function (event) {
+          if (!event.matches) {
+            closeSidebar();
+          }
+        });
+
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape" && isMobileSidebar()) {
+            closeSidebar();
+          }
+        });
+      })();
     </script>
 
     

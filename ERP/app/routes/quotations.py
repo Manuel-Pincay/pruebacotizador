@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -17,8 +17,17 @@ from app.models.product import Product
 from app.models.production_order import ProductionOrder
 from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
+from app.models.quotation_payment import QuotationPayment
 from app.services.production_helpers import ensure_production_order, cancel_stale_pending_quotations
-from app.services.quotation_service import recalculate_quotation
+from app.services.product_service import create_custom_product_from_quotation, resolve_custom_product_id
+from app.services.quotation_design_service import (
+    MAX_QUOTATION_DESIGNS,
+    DesignLimitError,
+    add_design_image,
+    delete_design_image,
+    get_design_urls,
+    sync_legacy_design_file,
+)
 from app.utils.activity import log_activity
 from app.utils.context import get_global_config
 from app.utils.pdf import generate_quotation_pdf
@@ -27,10 +36,14 @@ from app.config.settings import settings
 from app.utils.pagination import build_page_url, paginate_query
 from app.utils.image_storage import (
     UploadValidationError,
+    delete_payment_receipt,
     design_image_url,
     read_upload_bytes,
     save_design_image,
     validate_upload_filename,
+    payment_receipt_url,
+    is_payment_receipt_pdf,
+    is_payment_receipt_image,
 )
 
 router = APIRouter(prefix="/quotations", tags=["quotations"])
@@ -39,12 +52,25 @@ templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["inject_global_config"] = get_global_config
 templates.env.globals["build_page_url"] = build_page_url
 templates.env.globals["design_image_url"] = design_image_url
+templates.env.globals["payment_receipt_url"] = payment_receipt_url
+templates.env.globals["is_payment_receipt_pdf"] = is_payment_receipt_pdf
+templates.env.globals["is_payment_receipt_image"] = is_payment_receipt_image
 
 QUOTATION_ROLES = ["admin", "ventas"]
 
 
 def _purge_quotation(db: Session, quotation: Quotation) -> None:
-    """Elimina ítems y órdenes de producción ligadas antes de borrar la cotización."""
+    """Elimina ítems, pagos y órdenes de producción ligadas antes de borrar la cotización."""
+    payments = (
+        db.query(QuotationPayment)
+        .filter(QuotationPayment.quotation_id == quotation.id)
+        .all()
+    )
+    for payment in payments:
+        delete_payment_receipt(payment.transfer_receipt)
+    db.query(QuotationPayment).filter(
+        QuotationPayment.quotation_id == quotation.id
+    ).delete(synchronize_session=False)
     db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete(
         synchronize_session=False
     )
@@ -259,6 +285,7 @@ async def create_quotation(
     total: float = Form(...),
     items: str = Form(...),
     design_file: UploadFile = File(None),
+    design_files: Annotated[list[UploadFile], File()] = [],
     db: Session = Depends(get_db),
 ):
     user = _require_quotation_access(request)
@@ -285,16 +312,13 @@ async def create_quotation(
             parsed_delivery_date = datetime.strptime(delivery_date, "%Y-%m-%d").date()
 
         filename = None
+        uploads: list[UploadFile] = []
         if design_file and design_file.filename:
-            try:
-                validate_upload_filename(design_file.filename)
-                data = await read_upload_bytes(design_file, 10 * 1024 * 1024)
-                filename = save_design_image(data)
-            except UploadValidationError as exc:
-                return JSONResponse(
-                    status_code=400,
-                    content={"message": str(exc)},
-                )
+            uploads.append(design_file)
+        for upload in design_files:
+            if upload.filename:
+                uploads.append(upload)
+        uploads = uploads[:MAX_QUOTATION_DESIGNS]
 
         quotation = Quotation(
             client_id=client_id,
@@ -303,18 +327,42 @@ async def create_quotation(
             delivery_date=parsed_delivery_date,
             iva=iva,
             total=total,
-            design_file=filename,
+            design_file=None,
             status="pendiente",
         )
 
         db.add(quotation)
         db.flush()
 
+        for upload in uploads:
+            try:
+                validate_upload_filename(upload.filename)
+                data = await read_upload_bytes(upload, 10 * 1024 * 1024)
+                design = add_design_image(db, quotation, data)
+                if not filename:
+                    filename = design.filename
+            except (UploadValidationError, DesignLimitError) as exc:
+                db.rollback()
+                return JSONResponse(
+                    status_code=400,
+                    content={"message": str(exc)},
+                )
+
+        if filename:
+            quotation.design_file = filename
+
         for item in items_data:
+            product_id = resolve_custom_product_id(
+                db,
+                item_data=item,
+            )
+            if product_id is None:
+                product_id = _normalize_product_id(item.get("product_id"))
+
             db.add(
                 QuotationItem(
                     quotation_id=quotation.id,
-                    product_id=_normalize_product_id(item.get("product_id")),
+                    product_id=product_id,
                     quantity=item.get("quantity", 1),
                     detail=item.get("detail", ""),
                     measure=item.get("measure", ""),
@@ -486,15 +534,34 @@ async def quotation_detail(
         .options(
             joinedload(Quotation.client),
             joinedload(Quotation.items).joinedload(QuotationItem.product),
+            joinedload(Quotation.payments),
+            joinedload(Quotation.designs),
         )
         .filter(Quotation.id == quotation_id)
         .first()
     )
 
+    if quotation:
+        sync_legacy_design_file(db, quotation)
+        db.commit()
+        db.refresh(quotation)
+
+    if quotation and quotation.payments:
+        quotation.payments.sort(
+            key=lambda payment: payment.payment_date or datetime.min,
+            reverse=True,
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="quotations/detail.html",
-        context={"quotation": quotation, "user": user},
+        context={
+            "quotation": quotation,
+            "user": user,
+            "design_urls": get_design_urls(quotation) if quotation else [],
+            "max_designs": MAX_QUOTATION_DESIGNS,
+            "designs_count": len(quotation.designs) if quotation else 0,
+        },
     )
 
 
@@ -672,10 +739,17 @@ async def update_quotation(
     items_data = json.loads(items)
 
     for item in items_data:
+        product_id = resolve_custom_product_id(
+            db,
+            item_data=item,
+        )
+        if product_id is None:
+            product_id = _normalize_product_id(item.get("product_id"))
+
         db.add(
             QuotationItem(
                 quotation_id=quotation.id,
-                product_id=item.get("product_id"),
+                product_id=product_id,
                 quantity=item.get("quantity", 1),
                 detail=item.get("detail", ""),
                 unit_price=item.get("price", 0.0),
@@ -762,7 +836,7 @@ async def production_quotation(
 async def shipping_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
-    user = role_required(request, ["admin", "despacho", "transporte"])
+    user = role_required(request, ["admin", "despacho", "transporte", "ventas", "disenador"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -782,7 +856,7 @@ async def shipping_quotation(
 async def delivered_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
-    user = role_required(request, ["admin", "despacho", "transporte"])
+    user = role_required(request, ["admin", "despacho", "transporte", "ventas", "disenador"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -804,7 +878,12 @@ async def quotation_pdf(
         return user
 
     try:
-        quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+        quotation = (
+            db.query(Quotation)
+            .options(joinedload(Quotation.payments))
+            .filter(Quotation.id == quotation_id)
+            .first()
+        )
         if not quotation:
             return HTMLResponse(content="<h1>Cotización no encontrada</h1>", status_code=404)
 
@@ -891,9 +970,19 @@ async def add_product_to_quotation(
             total=quantity * product.price,
         )
     else:
+        custom_product = create_custom_product_from_quotation(
+            db,
+            name=detail,
+            description=detail,
+            color=color,
+            size=measure,
+            theme=theme,
+            price=custom_price,
+        )
+
         item = QuotationItem(
             quotation_id=quotation.id,
-            product_id=None,
+            product_id=custom_product.id if custom_product else None,
             detail=detail.strip(),
             quantity=quantity,
             theme=theme,
@@ -908,3 +997,54 @@ async def add_product_to_quotation(
     db.commit()
     recalculate_quotation(quotation, db)
     return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
+
+
+@router.post("/{quotation_id}/designs")
+async def upload_quotation_design(
+    quotation_id: int,
+    request: Request,
+    design_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return JSONResponse(status_code=404, content={"message": "Cotización no encontrada."})
+
+    try:
+        sync_legacy_design_file(db, quotation)
+        validate_upload_filename(design_file.filename)
+        data = await read_upload_bytes(design_file, 10 * 1024 * 1024)
+        add_design_image(db, quotation, data)
+        db.commit()
+        return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+    except (UploadValidationError, DesignLimitError, ValueError) as exc:
+        db.rollback()
+        return JSONResponse(status_code=400, content={"message": str(exc)})
+
+
+@router.post("/{quotation_id}/designs/{design_id}/delete")
+async def remove_quotation_design(
+    quotation_id: int,
+    design_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    try:
+        delete_design_image(db, quotation, design_id)
+        db.commit()
+    except ValueError:
+        db.rollback()
+
+    return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)

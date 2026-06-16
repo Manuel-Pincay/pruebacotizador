@@ -3,276 +3,141 @@
 {% block content %}
 
 <div class="max-w-5xl mx-auto">
-
-    <div class="flex justify-between items-center mb-8">
-
-        <div>
-
-            <h1 class="text-2xl md:text-3xl font-bold">
-                Nueva Guía de Envío
-            </h1>
-
-            <p class="text-gray-500 mt-2">
-                Generar etiqueta logística para despacho
-            </p>
-
-        </div>
-
+    <div class="mb-8">
+        <a href="{% if edit_mode %}/shipments/{% else %}/shipments/quotations{% endif %}" class="text-sm text-purple-700 hover:underline">
+            ← Volver
+        </a>
+        <h1 class="text-2xl md:text-3xl font-bold mt-2">
+            {% if edit_mode %}Editar guía {{ existing.guide_number }}{% else %}Nueva guía de envío{% endif %}
+        </h1>
+        <p class="text-gray-500 mt-2">
+            Cotización #{{ quotation.id }} · Puede modificar el destinatario antes de imprimir
+        </p>
     </div>
+
+    {% if status_info %}
+    <div class="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado interno</span>
+        <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            Cotización: {{ status_info.quotation_status_label }}
+        </span>
+        <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-slate-200 text-slate-800">
+            Producción: {{ status_info.production_status_label }}
+        </span>
+        <span class="text-xs text-slate-500 w-full sm:w-auto sm:ml-auto">No se imprime en la etiqueta</span>
+    </div>
+    {% endif %}
 
     <div class="bg-white rounded-2xl shadow p-8">
+        <form method="POST"
+            action="{% if edit_mode %}/shipments/{{ existing.id }}/update{% else %}/shipments/create{% endif %}">
 
-        <form
-            method="POST"
-            action="/shipments/create"
-        >
-
-            <!-- QUOTATION -->
-
-            <input
-                type="hidden"
-                name="quotation_id"
-                value="{{ quotation.id }}"
-            >
-
-            <!-- CLIENT INFO -->
+            {% if not edit_mode %}
+            <input type="hidden" name="quotation_id" value="{{ quotation.id }}" />
+            {% endif %}
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                 <div>
-
-                    <label class="block mb-2 font-semibold">
-                        Cliente
-                    </label>
-
-                    <input
-                        type="text"
-                        name="customer_name"
-                        value="{{ client.name or '' }}"
-                        required
-                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-
+                    <label class="block mb-2 font-semibold">Destinatario *</label>
+                    <input type="text" name="customer_name" required
+                        value="{{ existing.customer_name if edit_mode and existing else (client.name or '') }}"
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500" />
                 </div>
-
                 <div>
-
-                    <label class="block mb-2 font-semibold">
-                        Teléfono
-                    </label>
-
-                    <input
-    type="tel"
-    name="customer_phone"
-    value="{{ client.phone or '' }}"
-    placeholder="0999999999"
-    pattern="[0-9]+"
-    required
-    class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
->
-
+                    <label class="block mb-2 font-semibold">Cédula / RUC</label>
+                    <input type="text" name="customer_id_number"
+                        value="{{ existing.customer_id_number if edit_mode and existing else (client.ruc_ci or '') }}"
+                        placeholder="Ej: 1312345678"
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500" />
                 </div>
-
             </div>
-
-            <!-- DESTINATION -->
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-
                 <div>
-
-                    <label class="block mb-2 font-semibold">
-                        Ciudad Destino
-                    </label>
-
-                    <input
-                        type="text"
-                        name="destination_city"
-                        placeholder="Quito"
-                        required
-                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-
+                    <label class="block mb-2 font-semibold">Teléfono *</label>
+                    <input type="tel" name="customer_phone" required pattern="[0-9+ -]+"
+                        value="{{ existing.customer_phone if edit_mode and existing else (client.phone or '') }}"
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500" />
                 </div>
-
                 <div>
-
-                    <label class="block mb-2 font-semibold">
-                        Transportadora
-                    </label>
-
-                    <select
-                        name="carrier"
-                        required
-                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-
-                        <option value="">
-                            Seleccionar transportadora
-                        </option>
-
-                        <option value="Servientrega">
-                            Servientrega
-                        </option>
-
-                        <option value="Tramaco">
-                            Tramaco
-                        </option>
-
-                        <option value="Coactur">
-                            Coactur
-                        </option>
-
-                        <option value="Reina del Camino">
-                            Reina del Camino
-                        </option>
-
-                        <option value="Trans Esmeraldas">
-                            Trans Esmeraldas
-                        </option>
-
-                        <option value="Vía Cargo">
-                            Vía Cargo
-                        </option>
-
-                        <option value="Otro">
-                            Otro
-                        </option>
-
-                    </select>
-
+                    <label class="block mb-2 font-semibold">Ciudad destino *</label>
+                    <input type="text" name="destination_city" required placeholder="Quito"
+                        value="{{ existing.destination_city if edit_mode and existing else '' }}"
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500" />
                 </div>
-
             </div>
 
-            <!-- ADDRESS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div>
+                    <label class="block mb-2 font-semibold">Transportadora *</label>
+                    <select name="carrier" required class="w-full border border-gray-300 rounded-xl p-3">
+                        <option value="">Seleccionar...</option>
+                        {% set carriers = ['Servientrega', 'Tramaco', 'Coactur', 'Reina del Camino', 'Trans Esmeraldas', 'Vía Cargo', 'Otro'] %}
+                        {% set sel = existing.carrier if edit_mode and existing else '' %}
+                        {% for c in carriers %}
+                        <option value="{{ c }}" {% if sel == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block mb-2 font-semibold">Bultos *</label>
+                    <input type="number" name="boxes" min="1" required
+                        value="{{ existing.boxes if edit_mode and existing else 1 }}"
+                        class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500" />
+                </div>
+            </div>
 
             <div class="mt-6">
-
-                <label class="block mb-2 font-semibold">
-                    Dirección Destino
-                </label>
-
-                <textarea
-    name="destination_address"
-    rows="4"
-    placeholder="Dirección completa del cliente"
-    required
-    class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
->{{ client.address or '' }}</textarea>
-
+                <label class="block mb-2 font-semibold">Dirección destino *</label>
+                <textarea name="destination_address" rows="3" required
+                    class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500"
+                    placeholder="Dirección completa del destinatario">{% if edit_mode and existing %}{{ existing.destination_address }}{% else %}{{ client.address or '' }}{% endif %}</textarea>
             </div>
 
-            <!-- EXTRA -->
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-
-                <div>
-
-                    <label class="block mb-2 font-semibold">
-                        Bultos
-                    </label>
-
-                    <input
-                        type="number"
-                        name="boxes"
-                        min="1"
-                        value="1"
-                        required
-                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-
-                </div>
-
-                <div>
-
-                    <label class="block mb-2 font-semibold">
-                        Observaciones
-                    </label>
-
-                    <input
-                        type="text"
-                        name="notes"
-                        placeholder="Frágil MDF / No apilar"
-                        class="w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-
-                </div>
-
+            <div class="mt-6">
+                <label class="block mb-2 font-semibold">Observaciones</label>
+                <input type="text" name="notes" placeholder="Frágil / No apilar"
+                    value="{{ existing.notes if edit_mode and existing else '' }}"
+                    class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500" />
             </div>
 
-            <!-- ACTIONS -->
-
-            <div class="flex justify-end mt-10">
-
-                <button
-                    type="submit"
-                    class="bg-purple-700 hover:bg-purple-800 text-white px-8 py-3 rounded-xl font-semibold transition"
-                >
-                    Generar Guía
+            <div class="flex flex-wrap justify-end gap-3 mt-10">
+                {% if not edit_mode %}
+                <a href="/shipments/quotation/{{ quotation.id }}/label?size=a4&print=1"
+                    target="_blank" rel="noopener noreferrer"
+                    class="px-6 py-3 rounded-xl border border-gray-300 hover:bg-gray-50 font-medium text-sm">
+                    Vista previa A4
+                </a>
+                {% endif %}
+                <button type="submit"
+                    class="bg-purple-700 hover:bg-purple-800 text-white px-8 py-3 rounded-xl font-semibold">
+                    {% if edit_mode %}Guardar y ver guía{% else %}Generar guía{% endif %}
                 </button>
-
             </div>
-
         </form>
-
     </div>
 
+    {% if edit_mode and existing %}
+    <div class="mt-8 bg-white rounded-2xl shadow p-8 border border-red-100">
+        <h2 class="text-lg font-bold text-red-800 mb-2">Zona de eliminación</h2>
+        <p class="text-sm text-gray-600 mb-4">
+            Elimina permanentemente la guía {{ existing.guide_number }}. Requiere clave de administrador.
+        </p>
+        <form method="POST" action="/shipments/{{ existing.id }}/delete"
+            onsubmit="return confirm('¿Eliminar la guía {{ existing.guide_number }}? Esta acción no se puede deshacer.');"
+            class="flex flex-wrap items-end gap-3">
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Clave de administrador</label>
+                <input type="password" name="admin_password" required autocomplete="off"
+                    class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-red-400" />
+            </div>
+            <button type="submit"
+                class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold">
+                Eliminar guía
+            </button>
+        </form>
+    </div>
+    {% endif %}
 </div>
-<script>
-
-document.querySelector("form").addEventListener(
-    "submit",
-    function(event) {
-
-        let valid = true
-
-        let requiredFields = [
-
-            "customer_name",
-            "customer_phone",
-            "destination_city",
-            "destination_address",
-            "carrier",
-            "boxes"
-
-        ]
-
-        requiredFields.forEach(fieldName => {
-
-            let field = document.querySelector(
-                `[name="${fieldName}"]`
-            )
-
-            field.classList.remove(
-                "border-red-500"
-            )
-
-            if (!field.value.trim()) {
-
-                valid = false
-
-                field.classList.add(
-                    "border-red-500"
-                )
-
-            }
-
-        })
-
-        if (!valid) {
-
-            event.preventDefault()
-
-            alert(
-                "Completa todos los campos obligatorios."
-            )
-
-        }
-
-    }
-)
-
-</script>
 
 {% endblock %}

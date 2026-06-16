@@ -8,6 +8,7 @@ from collections import defaultdict
 
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 
 from fastapi.templating import Jinja2Templates
 
@@ -42,6 +43,38 @@ from app.services.production_helpers import (
     week_start,
     status_column_config,
 )
+from app.services.production_order_service import (
+    DESIGN_MATERIALS,
+    DESIGN_SIZES,
+    USB_REFERENCES,
+    PRODUCTION_STATUS_SEQUENCE,
+    approve_design,
+    build_history_list,
+    build_order_dict,
+    export_design_sheet_pdf,
+    fabrication_data_complete,
+    get_production_order,
+    normalize_status,
+    update_design_fields,
+)
+from app.services.kanban_service import (
+    KPI_KEYS,
+    build_kanban_table_rows,
+    build_status_kanban_board,
+    compute_kanban_kpis,
+    filter_orders,
+    filter_orders_by_week,
+    get_order_panel_detail,
+    list_filter_options,
+    load_kanban_orders,
+    monday_to_week_input,
+    parse_kanban_week,
+    validate_kanban_move,
+    week_header_label,
+)
+from app.auth.design_permissions import can_edit_design_order, can_view_design_order
+
+PRODUCTION_DETAIL_ROLES = ["admin", "produccion", "disenador"]
 
 router = APIRouter(
     prefix="/production",
@@ -166,7 +199,7 @@ async def production_page(
 
 
 # =========================================
-# KANBAN
+# KANBAN (planificación semanal + tabla)
 # =========================================
 @router.get(
     "/kanban",
@@ -181,86 +214,164 @@ async def production_kanban(
         return user
 
     prepare_production_module(db)
-    base = production_orders_base_query(db)
-
-    all_orders = (
-        _production_query(db)
-        .order_by(ProductionOrder.id.asc())
-        .all()
-    )
-    kanban_columns = build_kanban_columns(all_orders)
-    grouped = group_orders_by_status(all_orders)
-
-    active_orders_count = sum(
-        col["count"]
-        for col in kanban_columns
-        if col["status"] != "entregado"
-    )
-    urgent_orders_count = base.filter(
-        ProductionOrder.priority.in_(["alta", "urgente"])
-    ).count()
-    overdue_orders_count = base.filter(
-        ProductionOrder.delivery_date != None,
-        ProductionOrder.delivery_date < datetime.utcnow(),
-        ProductionOrder.status != "entregado",
-    ).count()
-
-    view = request.query_params.get("view", "status")
-    if view not in ("status", "week"):
-        view = "status"
-    hide_delivered = request.query_params.get("hide_delivered") == "1"
     today_date = date.today()
-    anchor_week = parse_week_anchor(request.query_params.get("week", ""), today_date)
-    prev_week = (anchor_week - timedelta(weeks=1)).strftime("%Y-%m-%d")
-    next_week = (anchor_week + timedelta(weeks=1)).strftime("%Y-%m-%d")
-    current_week = week_start(today_date).strftime("%Y-%m-%d")
+    params = request.query_params
 
-    weekly_columns = build_kanban_week_columns(
+    mode = params.get("mode", "kanban")
+    if mode not in ("table", "kanban"):
+        mode = "table"
+
+    hide_delivered = params.get("hide_delivered", "1") != "0"
+    month = params.get("month", "")
+    client_id_raw = params.get("client_id", "")
+    client_id = int(client_id_raw) if client_id_raw.isdigit() else None
+    designer = params.get("designer", "").strip()
+    status_filter = params.get("status", "").strip()
+    material = params.get("material", "").strip()
+    custom_only = params.get("custom", "") == "1"
+
+    all_orders = load_kanban_orders(db)
+    filtered = filter_orders(
         all_orders,
-        anchor_week=anchor_week,
         today=today_date,
-        hide_delivered=hide_delivered,
+        month=month,
+        client_id=client_id,
+        designer=designer,
+        status=status_filter,
+        material=material,
+        custom_only=custom_only,
+        hide_delivered=hide_delivered if mode == "table" else False,
     )
 
-    def kanban_url(**params):
+    selected_week = parse_kanban_week(params.get("week", ""), today_date)
+    week_title, week_sublabel, week_number = week_header_label(selected_week, today_date)
+    week_input_value = monday_to_week_input(selected_week)
+    prev_week = monday_to_week_input(selected_week - timedelta(weeks=1))
+    next_week = monday_to_week_input(selected_week + timedelta(weeks=1))
+
+    kanban_orders = filter_orders_by_week(filtered, selected_week) if mode == "kanban" else filtered
+
+    kpis = compute_kanban_kpis(kanban_orders if mode == "kanban" else filtered, today_date)
+    status_board = build_status_kanban_board(kanban_orders, today=today_date)
+    table_rows = build_kanban_table_rows(filtered, today_date)
+    filter_options = list_filter_options(db, all_orders)
+
+    def kanban_url(**extra):
         from urllib.parse import urlencode
-        base_params = {
-            "view": view,
-            "week": anchor_week.strftime("%Y-%m-%d"),
+        base = {
+            "mode": extra.pop("mode", mode),
+            "hide_delivered": "0" if not hide_delivered else "1",
+            "week": extra.pop("week", week_input_value),
         }
-        if hide_delivered:
-            base_params["hide_delivered"] = "1"
-        base_params.update({k: v for k, v in params.items() if v not in (None, "")})
-        return f"/production/kanban?{urlencode(base_params)}"
+        if month:
+            base["month"] = month
+        if client_id:
+            base["client_id"] = str(client_id)
+        if designer:
+            base["designer"] = designer
+        if status_filter:
+            base["status"] = status_filter
+        if material:
+            base["material"] = material
+        if custom_only:
+            base["custom"] = "1"
+        base.update({k: v for k, v in extra.items() if v not in (None, "")})
+        return f"/production/kanban?{urlencode(base)}"
 
     return templates.TemplateResponse(
         request=request,
         name="production/kanban.html",
         context={
-            "kanban_columns": kanban_columns,
-            "weekly_columns": weekly_columns,
-            "pending": grouped.get("pendiente", []),
-            "designing": grouped.get("diseño", []),
-            "producing": grouped.get("produccion", []),
-            "packed": grouped.get("empacado", []),
-            "shipped": grouped.get("enviado", []),
-            "delivered": grouped.get("entregado", []),
-            "active_orders_count": active_orders_count,
-            "urgent_orders_count": urgent_orders_count,
-            "overdue_orders_count": overdue_orders_count,
-            "today": today_date,
             "user": user,
-            "hide_delivered": hide_delivered,
-            "view": view,
-            "anchor_week": anchor_week,
-            "week_param": anchor_week.strftime("%Y-%m-%d"),
-            "prev_week_url": kanban_url(week=prev_week),
-            "next_week_url": kanban_url(week=next_week),
-            "current_week_url": kanban_url(week=current_week),
-            "status_view_url": kanban_url(view="status"),
-            "week_view_url": kanban_url(view="week"),
-        }
+            "mode": mode,
+            "today": today_date,
+            "kpis": kpis,
+            "kpi_labels": dict(KPI_KEYS),
+            "status_board": status_board,
+            "table_rows": table_rows,
+            "total_count": len(kanban_orders if mode == "kanban" else filtered),
+            "selected_week": selected_week,
+            "week_title": week_title,
+            "week_sublabel": week_sublabel,
+            "week_number": week_number,
+            "week_input_value": week_input_value,
+            "prev_week_url": kanban_url(mode=mode, week=prev_week),
+            "next_week_url": kanban_url(mode=mode, week=next_week),
+            "current_week_url": kanban_url(mode=mode, week=monday_to_week_input(today_date)),
+            "filter_options": filter_options,
+            "filters": {
+                "month": month,
+                "client_id": client_id,
+                "designer": designer,
+                "status": status_filter,
+                "material": material,
+                "custom_only": custom_only,
+                "hide_delivered": hide_delivered,
+            },
+            "table_view_url": kanban_url(mode="table"),
+            "kanban_view_url": kanban_url(mode="kanban"),
+            "clear_filters_url": kanban_url(
+                mode=mode, month="", client_id="", designer="", status="", material="", custom=""
+            ),
+        },
     )
+
+
+@router.get("/kanban/orders/{order_id}/panel")
+async def kanban_order_panel(order_id: int, request: Request, db: Session = Depends(get_db)):
+    user = role_required(request, ["admin", "produccion"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    detail = get_order_panel_detail(db, order_id)
+    if not detail:
+        return JSONResponse(status_code=404, content={"error": "Orden no encontrada."})
+    return detail
+
+
+@router.post("/kanban/orders/{order_id}/move")
+async def kanban_order_move(
+    order_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = role_required(request, ["admin", "produccion"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    body = await request.json()
+    target_status = (body.get("status") or "").strip()
+    if not target_status:
+        return JSONResponse(status_code=400, content={"success": False, "message": "Estado requerido."})
+
+    order = (
+        _production_query(db)
+        .filter(ProductionOrder.id == order_id)
+        .first()
+    )
+    if not order:
+        return JSONResponse(status_code=404, content={"success": False, "message": "Orden no encontrada."})
+
+    error = validate_kanban_move(order, target_status)
+    if error:
+        return JSONResponse(status_code=400, content={"success": False, "message": error})
+
+    if normalize_status(target_status) == "envio":
+        shipment_error = validate_shipment_for_sent(order, target_status, db)
+        if shipment_error:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Requiere guía de envío creada."},
+            )
+
+    apply_production_status_change(order, target_status, db)
+    db.commit()
+
+    return {
+        "success": True,
+        "status": normalize_status(order.status),
+        "status_label": PRODUCTION_STATUS_LABELS.get(normalize_status(order.status), order.status),
+    }
 
 # =========================================
 # CALENDARIO PRODUCCIÓN
@@ -664,25 +775,115 @@ async def update_production(
     )
 
 
+@router.post("/{order_id}/fabrication/")
+async def save_fabrication(
+    order_id: int,
+    request: Request,
+    file_name: str = Form(""),
+    material: str = Form(""),
+    size: str = Form(""),
+    usb_reference: str = Form(""),
+    detail: str = Form(""),
+    copies: int = Form(1),
+    action: str = Form("save"),
+    db: Session = Depends(get_db),
+):
+    user = role_required(request, PRODUCTION_DETAIL_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    order = db.query(ProductionOrder).filter(ProductionOrder.id == order_id).first()
+    if not order:
+        return RedirectResponse(url="/production/", status_code=302)
+
+    if user.role == "disenador" and not can_edit_design_order(user, order):
+        return RedirectResponse(url=f"/production/{order_id}", status_code=302)
+
+    try:
+        update_design_fields(
+            db,
+            order,
+            file_name=file_name,
+            material=material,
+            size=size,
+            usb_reference=usb_reference,
+            notes=detail,
+            copies=copies,
+            user=user,
+        )
+        if action == "approve":
+            order = get_production_order(db, order_id) or order
+            approve_design(db, order, user=user)
+    except ValueError as exc:
+        from urllib.parse import quote
+        return RedirectResponse(
+            url=f"/production/{order_id}?fab_error={quote(str(exc))}",
+            status_code=302,
+        )
+
+    return RedirectResponse(url=f"/production/{order_id}?saved=1", status_code=302)
+
+
+@router.get("/{order_id}/fabrication/print")
+async def print_fabrication(order_id: int, request: Request, db: Session = Depends(get_db)):
+    user = role_required(request, PRODUCTION_DETAIL_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    order = get_production_order(db, order_id)
+    if not order:
+        return RedirectResponse(url="/production/", status_code=302)
+    if user.role == "disenador" and not can_view_design_order(user, order):
+        return RedirectResponse(url="/production/", status_code=302)
+
+    client = order.quotation.client if order.quotation else None
+    data = build_order_dict(order, client_name=client.name if client else "—")
+    from fastapi.responses import StreamingResponse
+    pdf = export_design_sheet_pdf(data)
+    return StreamingResponse(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="fabricacion_OP-{order_id:04d}.pdf"'},
+    )
+
+
 # =========================================
 # DETALLE ORDEN
 # =========================================
 
-def _production_detail_context(order, request, shipment, user) -> dict:
-    current_status = (order.status or "pendiente").lower()
+def _production_detail_context(order, request, shipment, user, db) -> dict:
+    current_status = normalize_status(order.status)
     next_status = next_production_status(current_status)
+    po = get_production_order(db, order.id) if order and order.id else order
+    fab = build_order_dict(po or order) if order else {}
+    can_edit_fab = (
+        user.role in {"admin", "disenador"}
+        and current_status in {"pendiente", "diseno"}
+        and (user.role == "admin" or can_edit_design_order(user, order))
+    )
+    can_manage_order = user.role in {"admin", "produccion"}
     return {
         "order": order,
         "shipment": shipment,
         "user": user,
-        "production_stages": PRODUCTION_ORDER_STATUSES,
+        "current_status": current_status,
+        "production_stages": PRODUCTION_STATUS_SEQUENCE,
         "status_labels": PRODUCTION_STATUS_LABELS,
         "current_status_index": production_status_index(current_status),
-        "next_status": next_status,
+        "next_status": next_status if can_manage_order else None,
         "next_status_label": PRODUCTION_STATUS_LABELS.get(next_status or "", ""),
         "next_status_hint": status_requirements_hint(next_status or ""),
         "delivery_meta": production_order_delivery_meta(order),
         "saved": request.query_params.get("saved") == "1",
+        "fabrication": fab,
+        "fabrication_complete": fabrication_data_complete(order),
+        "can_edit_fabrication": can_edit_fab,
+        "can_manage_order": can_manage_order,
+        "materials": DESIGN_MATERIALS,
+        "sizes": DESIGN_SIZES,
+        "usb_references": USB_REFERENCES,
+        "history": build_history_list(po) if po else [],
+        "fab_error": request.query_params.get("fab_error", ""),
     }
 
 
@@ -698,7 +899,7 @@ async def production_detail(
 
     user = role_required(
         request,
-        ["admin", "produccion"]
+        PRODUCTION_DETAIL_ROLES
     )
 
     if isinstance(user, RedirectResponse):
@@ -713,6 +914,9 @@ async def production_detail(
     )
 
     if not order or not quotation_visible_in_production(order.quotation):
+        return RedirectResponse(url="/production/", status_code=302)
+
+    if user.role == "disenador" and not can_view_design_order(user, order):
         return RedirectResponse(url="/production/", status_code=302)
 
     if not order.delivery_date and order.quotation and order.quotation.delivery_date:
@@ -733,5 +937,5 @@ async def production_detail(
     return templates.TemplateResponse(
         request=request,
         name="production/detail.html",
-        context=_production_detail_context(order, request, shipment, user),
+        context=_production_detail_context(order, request, shipment, user, db),
     )

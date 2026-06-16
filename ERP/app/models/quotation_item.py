@@ -35,3 +35,9 @@ class QuotationItem(Base):
     "Quotation",
     back_populates="items"
     )
+    design_tracking = relationship(
+        "DesignTracking",
+        back_populates="quotation_item",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

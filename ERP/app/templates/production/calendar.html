@@ -79,10 +79,9 @@
             <option value="">Todos los estados</option>
             <option value="aprobada" {% if status == 'aprobada' %}selected{% endif %}>Aprobada (cotización)</option>
             <option value="pendiente" {% if status == 'pendiente' %}selected{% endif %}>Pendiente</option>
-            <option value="diseño" {% if status == 'diseño' %}selected{% endif %}>Diseño</option>
+            <option value="diseno" {% if status in ['diseno', 'diseño'] %}selected{% endif %}>Diseño</option>
             <option value="produccion" {% if status == 'produccion' %}selected{% endif %}>Producción</option>
-            <option value="empacado" {% if status == 'empacado' %}selected{% endif %}>Empacado</option>
-            <option value="enviado" {% if status == 'enviado' %}selected{% endif %}>Enviado</option>
+            <option value="envio" {% if status in ['envio', 'enviado'] %}selected{% endif %}>Envío</option>
             <option value="entregado" {% if status == 'entregado' %}selected{% endif %}>Entregado</option>
         </select>
 
@@ -175,14 +174,12 @@
                         {% endif %}
                         {% if st == 'pendiente' %}
                         <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">Pendiente</span>
-                        {% elif st == 'diseño' %}
+                        {% elif st in ['diseno', 'diseño'] %}
                         <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium">Diseño</span>
                         {% elif st == 'produccion' %}
                         <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-medium">Producción</span>
-                        {% elif st == 'empacado' %}
-                        <span class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-medium">Empacado</span>
-                        {% elif st == 'enviado' %}
-                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">Enviado</span>
+                        {% elif st in ['envio', 'enviado'] %}
+                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">Envío</span>
                         {% elif st == 'entregado' %}
                         <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">Entregado</span>
                         {% elif st and st != qst %}

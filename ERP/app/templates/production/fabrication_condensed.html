@@ -1,0 +1,346 @@
+{% extends 'layouts/base.html' %}
+{% from "components/condensed_status_badge.html" import condensed_status_badge %}
+{% from "components/pagination.html" import render_pagination %}
+
+{% block content %}
+
+<div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-3 mb-3">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Condensado de Fabricación</h1>
+        <p class="text-gray-500 mt-1">Todo lo que hay que producir · visible para todo el equipo</p>
+    </div>
+    <div class="flex flex-col items-end gap-1">
+        <div class="flex flex-wrap gap-2">
+            <a href="/production/fabrication-condensed/export/excel?{{ export_query }}" id="exportExcelLink"
+                class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium">
+                Exportar Excel
+            </a>
+            <a href="/production/fabrication-condensed/export/pdf?{{ export_query }}" id="exportPdfLink"
+                class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium">
+                Exportar PDF
+            </a>
+        </div>
+        <p class="text-[10px] text-gray-400">PDF: todas las órdenes del filtro en un solo archivo, agrupadas por OP</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2 mb-3">
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-gray-400">
+        <div class="text-[10px] text-gray-500 leading-tight">Productos pendientes</div>
+        <div class="text-xl font-bold text-slate-900">{{ kpis.pending_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-orange-500">
+        <div class="text-[10px] text-gray-500 leading-tight">En fabricación</div>
+        <div class="text-xl font-bold text-orange-700">{{ kpis.in_production_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-green-500">
+        <div class="text-[10px] text-gray-500 leading-tight">Listos / envío</div>
+        <div class="text-xl font-bold text-green-700">{{ kpis.ready_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-red-500">
+        <div class="text-[10px] text-gray-500 leading-tight">Productos atrasados</div>
+        <div class="text-xl font-bold text-red-600">{{ kpis.overdue_products }}</div>
+    </div>
+    <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-purple-500 col-span-2 sm:col-span-1">
+        <div class="text-[10px] text-gray-500 leading-tight">Unidades pendientes</div>
+        <div class="text-xl font-bold text-purple-600">{{ kpis.pending_units }}</div>
+    </div>
+</div>
+
+<form method="GET" action="/production/fabrication-condensed" class="bg-white rounded-xl border border-gray-200 px-3 py-2 mb-3 shadow-sm">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2 items-end">
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Mes entrega</label>
+            <select name="month" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                {% set month_names = {1:'Ene',2:'Feb',3:'Mar',4:'Abr',5:'May',6:'Jun',7:'Jul',8:'Ago',9:'Sep',10:'Oct',11:'Nov',12:'Dic'} %}
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if filters.month == m %}selected{% endif %}>{{ month_names[m] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Año</label>
+            <input type="number" name="year" value="{{ filters.year or '' }}" min="2020" max="2100"
+                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" placeholder="{{ today.year }}" />
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Cliente</label>
+            <select name="client_id" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                {% for client in clients %}
+                <option value="{{ client.id }}" {% if filters.client_id == client.id %}selected{% endif %}>{{ client.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Estado</label>
+            <select name="production_status" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                {% for code, label in tracking_statuses %}
+                <option value="{{ code }}" {% if filters.production_status == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Pers.</label>
+            <select name="custom_filter" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="">Todos</option>
+                <option value="yes" {% if filters.custom_filter == 'yes' %}selected{% endif %}>Sí</option>
+                <option value="no" {% if filters.custom_filter == 'no' %}selected{% endif %}>No</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-[11px] text-gray-500 mb-0.5">Ordenar</label>
+            <select name="group_by" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
+                <option value="order" {% if filters.group_by == 'order' %}selected{% endif %}>Cotización</option>
+                <option value="delivery" {% if filters.group_by == 'delivery' %}selected{% endif %}>Entrega</option>
+                <option value="client" {% if filters.group_by == 'client' %}selected{% endif %}>Cliente</option>
+                <option value="product" {% if filters.group_by == 'product' %}selected{% endif %}>Producto</option>
+            </select>
+        </div>
+        <div class="col-span-2 sm:col-span-3 lg:col-span-4 xl:col-span-2">
+            <label class="block text-[11px] text-gray-500 mb-0.5">Buscar</label>
+            <input type="text" name="search" value="{{ filters.search }}" placeholder="Cliente, archivo, USB..."
+                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+        </div>
+        <div class="col-span-2 sm:col-span-3 lg:col-span-4 xl:col-span-2 flex flex-wrap gap-2 items-end justify-end">
+            <label class="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer pb-1.5 whitespace-nowrap">
+                <input type="checkbox" name="show_completed" value="1" {% if filters.show_completed %}checked{% endif %}
+                    class="rounded border-gray-300 text-orange-600 focus:ring-orange-500" />
+                Ver ya realizadas
+            </label>
+            <a href="/production/fabrication-condensed" class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs whitespace-nowrap">Limpiar</a>
+            <button type="submit" class="px-4 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium whitespace-nowrap">Filtrar</button>
+        </div>
+    </div>
+    {% if active_filters %}
+    <div class="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
+        <span class="text-[11px] text-gray-400">Activos:</span>
+        {% for label in active_filters %}
+        <span class="px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-100 text-[11px]">{{ label }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</form>
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[1100px] text-xs">
+            <thead class="bg-gray-50 text-gray-500 uppercase tracking-wide">
+                <tr>
+                    <th class="text-left p-2 w-24">Orden</th>
+                    <th class="text-left p-2 w-28">Cliente</th>
+                    <th class="text-left p-2 w-20">Entrega</th>
+                    <th class="text-left p-2 bg-orange-50 border-l-2 border-orange-300 min-w-[120px]">Archivo</th>
+                    <th class="text-left p-2 bg-orange-50 min-w-[72px]">Material</th>
+                    <th class="text-left p-2 bg-orange-50 min-w-[72px]">Medida</th>
+                    <th class="text-left p-2 bg-orange-50 min-w-[88px]">USB</th>
+                    <th class="text-center p-2 bg-orange-50 w-14">Copias</th>
+                    <th class="text-left p-2 bg-orange-50 border-r-2 border-orange-300 min-w-[80px]">Diseñador</th>
+                    <th class="text-left p-2 min-w-[140px]">Productos</th>
+                    <th class="text-left p-2 w-36">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% set ns = namespace(last_section='') %}
+                {% for order in order_groups %}
+                {% if filters.group_by != 'order' and order.section_label and order.section_label != ns.last_section %}
+                {% set ns.last_section = order.section_label %}
+                <tr class="bg-slate-100">
+                    <td colspan="11" class="px-3 py-1.5 text-[10px] font-semibold uppercase text-slate-600">
+                        {{ order.section_label }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% set is_late = order.delivery_date and order.delivery_date < today %}
+                <tr class="hover:bg-orange-50/30 align-middle">
+                    <td class="p-2 align-middle">
+                        <div class="font-bold text-orange-900">{{ order.order_label }}</div>
+                        <a href="/quotations/{{ order.quotation_id }}" class="text-purple-600 hover:underline">#{{ order.quotation_id }}</a>
+                        <div class="mt-1">{{ condensed_status_badge(order.production_status, order.production_status_label) }}</div>
+                    </td>
+                    <td class="p-2 align-middle font-medium text-slate-800 max-w-[120px]">
+                        <span class="line-clamp-2" title="{{ order.client_name }}">{{ order.client_name }}</span>
+                    </td>
+                    <td class="p-2 align-middle whitespace-nowrap {% if is_late %}text-red-600 font-semibold{% else %}text-gray-700{% endif %}">
+                        {{ order.delivery_date.strftime('%d/%m/%Y') if order.delivery_date else '—' }}
+                    </td>
+                    <td class="p-2 align-middle bg-orange-50/80 border-l-2 border-orange-200 font-mono font-bold text-slate-900">
+                        {{ order.file_name or '—' }}
+                    </td>
+                    <td class="p-2 align-middle bg-orange-50/80 font-semibold text-slate-800">{{ order.material or '—' }}</td>
+                    <td class="p-2 align-middle bg-orange-50/80 font-semibold text-slate-800">{{ order.size or '—' }}</td>
+                    <td class="p-2 align-middle bg-orange-50/80 font-bold text-orange-700">{{ order.usb_reference or '—' }}</td>
+                    <td class="p-2 align-middle bg-orange-50/80 text-center font-bold text-lg text-slate-900">{{ order.copies or '—' }}</td>
+                    <td class="p-2 align-middle bg-orange-50/80 border-r-2 border-orange-200 text-gray-700">{{ order.designer or '—' }}</td>
+                    <td class="p-2 align-middle text-gray-600 leading-snug">
+                        {% for row in order.products %}{% if not loop.first %}<span class="text-gray-300 mx-1">·</span>{% endif %}<span><b class="text-slate-800">{{ row.quantity }}×</b> {{ row.product_name }}</span>{% else %}<span class="text-gray-400">—</span>{% endfor %}
+                        {% if order.notes %}
+                        <div class="text-[10px] text-gray-500 italic mt-1 line-clamp-1" title="{{ order.notes }}">{{ order.notes }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="p-2 align-middle whitespace-nowrap">
+                        <div class="flex flex-col gap-1">
+                            {% if can_fabricator_actions %}
+                            {% if order.can_mark_taken %}
+                            <button type="button" onclick="fabOrderAction({{ order.production_order_id }}, 'taken', this)"
+                                class="px-2 py-1 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-[11px] font-medium">
+                                Tomada
+                            </button>
+                            {% endif %}
+                            {% if order.can_mark_completed %}
+                            <button type="button" onclick="fabOrderAction({{ order.production_order_id }}, 'completed', this)"
+                                class="px-2 py-1 rounded-md bg-green-600 text-white hover:bg-green-700 text-[11px] font-medium">
+                                Ya realizada
+                            </button>
+                            {% endif %}
+                            {% endif %}
+                            <a href="/production/{{ order.production_order_id }}/fabrication/print" target="_blank"
+                                class="px-2 py-1 rounded-md bg-orange-600 text-white hover:bg-orange-700 text-[11px] font-medium text-center">
+                                Imprimir
+                            </a>
+                            <button type="button" onclick="openFabDetail({{ order.quotation_id }})"
+                                class="px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50 text-[11px]">
+                                Detalle
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="11" class="p-10 text-center text-gray-400">
+                        {% if active_filters %}
+                        No hay órdenes con los filtros seleccionados.
+                        {% else %}
+                        No hay órdenes de fabricación en este periodo.
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if pagination.total > 0 %}
+    <div class="p-4 border-t bg-gray-50/50 text-sm text-gray-500">
+        {{ pagination.total }} orden(es) · {{ kpis.visible_products }} producto(s) · Página {{ pagination.page }} de {{ pagination.pages }}
+    </div>
+    <div class="p-4 border-t">
+        {{ render_pagination(pagination.page, pagination.pages, pagination.total, '/production/fabrication-condensed', filter_params) }}
+    </div>
+    {% endif %}
+</div>
+
+<div id="fabDetailPanel"
+    class="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl border-l border-gray-200 transform translate-x-full transition-transform duration-300 z-50 flex flex-col">
+    <div class="flex items-center justify-between p-5 border-b">
+        <h2 class="text-xl font-bold">Detalle de fabricación</h2>
+        <button type="button" onclick="closeFabDetail()" class="text-2xl leading-none">✕</button>
+    </div>
+    <div id="fabDetailContent" class="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
+        <div class="text-center text-gray-400 py-10">Selecciona una fila</div>
+    </div>
+</div>
+<div id="fabOverlay" onclick="closeFabDetail()" class="fixed inset-0 bg-black/40 hidden z-40"></div>
+
+<script>
+(function () {
+    function syncExportLinks() {
+        const form = document.querySelector('form[action="/production/fabrication-condensed"]');
+        if (!form) return;
+        const data = new FormData(form);
+        if (!data.get('show_completed')) data.delete('show_completed');
+        const qs = new URLSearchParams(data).toString();
+        const excel = document.getElementById('exportExcelLink');
+        const pdf = document.getElementById('exportPdfLink');
+        if (!excel || !pdf) return;
+        excel.href = '/production/fabrication-condensed/export/excel' + (qs ? '?' + qs : '');
+        pdf.href = '/production/fabrication-condensed/export/pdf' + (qs ? '?' + qs : '');
+    }
+    document.querySelector('form[action="/production/fabrication-condensed"]')?.addEventListener('change', syncExportLinks);
+    document.querySelector('form[action="/production/fabrication-condensed"]')?.addEventListener('input', syncExportLinks);
+})();
+
+async function openFabDetail(quotationId) {
+    const panel = document.getElementById("fabDetailPanel");
+    const overlay = document.getElementById("fabOverlay");
+    const content = document.getElementById("fabDetailContent");
+    content.innerHTML = '<div class="text-center py-10 text-gray-400">Cargando...</div>';
+    panel.classList.remove("translate-x-full");
+    overlay.classList.remove("hidden");
+
+    const response = await fetch(`/production/fabrication-condensed/orders/${quotationId}/detail`);
+    if (!response.ok) {
+        content.innerHTML = '<div class="text-red-600">No se pudo cargar el detalle.</div>';
+        return;
+    }
+
+    const data = await response.json();
+    const fab = data.fabrication || {};
+    const productsHtml = (data.products || []).map((product) =>
+        `<span class="inline-block mr-2"><b>${product.quantity}×</b> ${product.product_name}</span>`
+    ).join('');
+
+    content.innerHTML = `
+        <div class="space-y-2">
+            <h3 class="font-bold text-lg text-orange-900">${data.order_label || ''}</h3>
+            <p class="text-gray-600">Cotización #${data.quotation_id} · ${data.client_name}</p>
+            <p>Estado: <span class="font-semibold">${data.production_status_label}</span></p>
+        </div>
+        <hr />
+        <div class="bg-orange-50 rounded-xl p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div class="col-span-2"><span class="text-gray-500">Archivo:</span> <span class="font-mono font-bold">${fab.file_name || '—'}</span></div>
+            <div><span class="text-gray-500">Material:</span> <b>${fab.material || '—'}</b></div>
+            <div><span class="text-gray-500">Medida:</span> <b>${fab.size || '—'}</b></div>
+            <div><span class="text-gray-500">USB:</span> <b class="text-orange-700">${fab.usb_reference || '—'}</b></div>
+            <div><span class="text-gray-500">Copias:</span> <b>${fab.copies || '—'}</b></div>
+            ${fab.notes ? `<div class="col-span-2 text-gray-600 italic">${fab.notes}</div>` : ''}
+            <div class="col-span-2 pt-2">
+                <a href="${fab.print_url}" target="_blank"
+                    class="inline-block px-4 py-2 rounded-xl bg-orange-600 text-white text-sm hover:bg-orange-700">
+                    Imprimir hoja
+                </a>
+            </div>
+        </div>
+        <hr />
+        <div><h4 class="font-bold mb-2 text-xs uppercase text-gray-500">Productos referencia</h4><p>${productsHtml || '—'}</p></div>
+    `;
+}
+
+function closeFabDetail() {
+    document.getElementById("fabDetailPanel").classList.add("translate-x-full");
+    document.getElementById("fabOverlay").classList.add("hidden");
+}
+
+async function fabOrderAction(orderId, action, button) {
+    if (!confirm(action === "taken"
+        ? "¿Marcar esta orden como TOMADA (pasa a producción)?"
+        : "¿Marcar como YA REALIZADA (pasa a envío)?")) {
+        return;
+    }
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "…";
+    try {
+        const body = new FormData();
+        body.append("action", action);
+        const response = await fetch(`/production/fabrication-condensed/orders/${orderId}/action`, {
+            method: "POST",
+            body,
+        });
+        const result = await response.json();
+        if (result.success) {
+            location.reload();
+            return;
+        }
+        alert(result.message || "No se pudo actualizar la orden.");
+    } catch (e) {
+        alert("Error de conexión.");
+    } finally {
+        button.disabled = false;
+        button.textContent = original;
+    }
+}
+</script>
+
+{% endblock %}

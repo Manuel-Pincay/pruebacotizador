@@ -23,9 +23,11 @@ BLOCKED_EXTENSIONS = {
 MAX_PRODUCT_BYTES = 5 * 1024 * 1024
 MAX_DESIGN_BYTES = 10 * 1024 * 1024
 MAX_LOGO_BYTES = 3 * 1024 * 1024
+MAX_PAYMENT_RECEIPT_BYTES = 10 * 1024 * 1024
 
 PRODUCT_MAX_PX = 1920
 DESIGN_MAX_PX = 1600
+PAYMENT_RECEIPT_MAX_PX = 1600
 THUMB_PX = 300
 WEBP_QUALITY = 80
 
@@ -33,6 +35,9 @@ PRODUCTS_DIR = Path("uploads/products")
 PRODUCTS_THUMBS_DIR = PRODUCTS_DIR / "thumbs"
 DESIGNS_DIR = Path("uploads/designs")
 LOGOS_DIR = Path("uploads/logos")
+PAYMENTS_DIR = Path("uploads/payments")
+
+ALLOWED_RECEIPT_EXTENSIONS = {"jpg", "jpeg", "png", "pdf"}
 
 
 class UploadValidationError(Exception):
@@ -263,3 +268,103 @@ def format_bytes(size: int) -> str:
     if size < 1024 * 1024:
         return f"{size / 1024:.1f} KB"
     return f"{size / (1024 * 1024):.2f} MB"
+
+
+def _detect_receipt_mime(data: bytes) -> str:
+    if data[:4] == b"%PDF":
+        return "application/pdf"
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    return ""
+
+
+def validate_receipt_filename(filename: str | None) -> str:
+    ext = _extension(filename)
+    if not ext:
+        raise UploadValidationError("Nombre de archivo no válido.")
+    if ext not in ALLOWED_RECEIPT_EXTENSIONS:
+        raise UploadValidationError(
+            "Formato no permitido. Use JPG, JPEG, PNG o PDF."
+        )
+    return ext
+
+
+def validate_receipt_content(ext: str, data: bytes) -> None:
+    mime = _detect_receipt_mime(data)
+    expected = {
+        "pdf": "application/pdf",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+    }
+    if mime != expected.get(ext):
+        raise UploadValidationError(
+            "El contenido del archivo no coincide con su extensión."
+        )
+
+
+def save_payment_receipt(data: bytes, ext: str) -> str:
+    """Guarda comprobante de pago. Imágenes → WEBP; PDF sin modificar."""
+    PAYMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    if ext == "pdf":
+        name = f"{uuid.uuid4()}.pdf"
+        path = PAYMENTS_DIR / name
+        path.write_bytes(data)
+        return name
+    webp_data = bytes_to_webp(data, PAYMENT_RECEIPT_MAX_PX)
+    name = _new_webp_name()
+    path = PAYMENTS_DIR / name
+    path.write_bytes(webp_data)
+    return name
+
+
+def delete_payment_receipt(filename: str | None) -> None:
+    if not filename:
+        return
+    safe_name = Path(filename).name
+    if safe_name != filename:
+        return
+    path = PAYMENTS_DIR / safe_name
+    if path.exists() and path.is_file():
+        path.unlink(missing_ok=True)
+
+
+def payment_receipt_url(filename: str | None) -> str | None:
+    if not filename:
+        return None
+    safe_name = Path(filename).name
+    path = PAYMENTS_DIR / safe_name
+    if path.exists() and path.is_file():
+        return f"/uploads/payments/{safe_name}"
+    return None
+
+
+def resolve_payment_receipt_path(filename: str | None) -> Path | None:
+    if not filename:
+        return None
+    safe_name = Path(filename).name
+    if safe_name != filename:
+        return None
+    path = (PAYMENTS_DIR / safe_name).resolve()
+    try:
+        path.relative_to(PAYMENTS_DIR.resolve())
+    except ValueError:
+        return None
+    if path.exists() and path.is_file():
+        return path
+    return None
+
+
+def is_payment_receipt_pdf(filename: str | None) -> bool:
+    if not filename:
+        return False
+    return _extension(filename) == "pdf"
+
+
+def is_payment_receipt_image(filename: str | None) -> bool:
+    if not filename:
+        return False
+    ext = _extension(filename)
+    return ext in {"jpg", "jpeg", "png", "webp"}

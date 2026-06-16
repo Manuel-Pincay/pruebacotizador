@@ -20,6 +20,7 @@ from app.services.pdf_sections import (
     build_client_section,
     build_products_table,
     build_design_totals_section,
+    build_payment_status_section,
     build_notes_section,
 )
 from io import BytesIO
@@ -107,6 +108,10 @@ def generate_quotation_pdf(quotation, items, client, db=None):
     image_path = resolve_design_path(quotation.design_file)
 
     elements.append(build_design_totals_section(quotation, config, image_path))
+
+    elements.append(Spacer(1, 12))
+
+    elements.append(build_payment_status_section(quotation, config))
 
     elements.append(Spacer(1, 20))
 

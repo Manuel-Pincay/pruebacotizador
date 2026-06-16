@@ -29,3 +29,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         )
     except Exception:
         return False
+
+
+def verify_admin_password(plain_password: str) -> bool:
+    from app.config.settings import settings
+
+    return (plain_password or "").strip() == settings.secretadmin_password

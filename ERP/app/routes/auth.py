@@ -15,8 +15,9 @@ from app.database import get_db
 from app.models.user import User
 from app.models.company_config import CompanyConfig
 
-from app.auth.security import verify_password
+from app.auth.security import verify_password, hash_password, verify_admin_password
 from app.auth.session import cookie_options, sign_user_session
+from app.auth.permissions import get_login_redirect_url
 
 router = APIRouter()
 
@@ -104,7 +105,7 @@ async def login(
         )
 
     response = RedirectResponse(
-        url="/",
+        url=get_login_redirect_url(user.role),
         status_code=302
     )
 
@@ -115,6 +116,72 @@ async def login(
     )
 
     return response
+
+
+@router.get("/login/recuperar-clave", response_class=HTMLResponse)
+async def recover_password_page(request: Request, db: Session = Depends(get_db)):
+    config = db.query(CompanyConfig).first()
+    company_name = config.company_name if config else "SISTEMA ERP"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/recover_password.html",
+        context={"company_name": company_name},
+    )
+
+
+@router.post("/login/recuperar-clave")
+async def recover_password(
+    request: Request,
+    username: str = Form(...),
+    admin_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    config = db.query(CompanyConfig).first()
+    company_name = config.company_name if config else "SISTEMA ERP"
+
+    def _render(error: str):
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/recover_password.html",
+            context={
+                "error": error,
+                "company_name": company_name,
+                "username": username.strip(),
+            },
+        )
+
+    username_clean = username.strip()
+    if not username_clean:
+        return _render("Indique el usuario.")
+
+    if not verify_admin_password(admin_password):
+        return _render("Clave de administrador incorrecta.")
+
+    if len(new_password.strip()) < 4:
+        return _render("La nueva contraseña debe tener al menos 4 caracteres.")
+
+    if new_password.strip() != confirm_password.strip():
+        return _render("Las contraseñas nuevas no coinciden.")
+
+    user = db.query(User).filter(User.username == username_clean).first()
+    if not user:
+        return _render("Usuario no encontrado.")
+
+    user.password = hash_password(new_password.strip())
+    db.commit()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/recover_password.html",
+        context={
+            "success": f"Contraseña actualizada para «{username_clean}». Ya puede iniciar sesión.",
+            "company_name": company_name,
+        },
+    )
+
 
 @router.get("/logout")
 async def logout():

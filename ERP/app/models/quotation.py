@@ -41,3 +41,39 @@ class Quotation(Base):
         "QuotationItem",
         back_populates="quotation",
     )
+    payments = relationship(
+        "QuotationPayment",
+        back_populates="quotation",
+        cascade="all, delete-orphan",
+    )
+    designs = relationship(
+        "QuotationDesign",
+        back_populates="quotation",
+        cascade="all, delete-orphan",
+        order_by="QuotationDesign.sort_order",
+    )
+    production_tracking = relationship(
+        "ProductionTracking",
+        back_populates="quotation",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    production_order = relationship(
+        "ProductionOrder",
+        back_populates="quotation",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    shipments = relationship(
+        "Shipment",
+        back_populates="quotation",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def total_paid(self) -> float:
+        return sum(float(payment.amount or 0) for payment in self.payments)
+
+    @property
+    def pending_balance(self) -> float:
+        return float(self.total or 0) - self.total_paid

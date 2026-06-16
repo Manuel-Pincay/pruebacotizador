@@ -86,26 +86,24 @@ def production_orders_base_query(db: Session):
 
 
 def validate_production_status_change(order, status: str):
-    if status == "diseño" and not order.designer:
-        return HTMLResponse(
-            content="<script>alert('Asigna un diseñador antes de pasar a Diseño.'); window.history.back();</script>",
-            status_code=400,
-        )
-    if status == "produccion" and not order.designer:
-        return HTMLResponse(
-            content="<script>alert('La orden debe tener un diseñador asignado antes de pasar a Producción.'); window.history.back();</script>",
-            status_code=400,
-        )
-    if status == "empacado" and not order.fabricator:
-        return HTMLResponse(
-            content="<script>alert('Asigna un fabricador antes de pasar a Empacado.'); window.history.back();</script>",
-            status_code=400,
-        )
+    from app.services.production_order_service import normalize_status, validate_fabrication_data
+
+    stage = normalize_status(status)
+    if stage == "produccion":
+        try:
+            validate_fabrication_data(order)
+        except ValueError as exc:
+            return HTMLResponse(
+                content=f"<script>alert('{exc}'); window.history.back();</script>",
+                status_code=400,
+            )
     return None
 
 
 def validate_shipment_for_sent(order, status: str, db: Session):
-    if status != "enviado":
+    from app.services.production_order_service import normalize_status
+
+    if normalize_status(status) != "envio":
         return None
     shipment = (
         db.query(Shipment)
@@ -123,27 +121,9 @@ def validate_shipment_for_sent(order, status: str, db: Session):
     )
 
 
-def ensure_production_order(db: Session, quotation) -> ProductionOrder | None:
-    status = (quotation.status or "").lower().strip()
-    if status in ("pendiente", "cancelada", "cancelado"):
-        return None
-
-    existing = (
-        db.query(ProductionOrder)
-        .filter(ProductionOrder.quotation_id == quotation.id)
-        .first()
-    )
-    if existing:
-        return existing
-    order = ProductionOrder(
-        quotation_id=quotation.id,
-        delivery_date=quotation.delivery_date,
-        priority="media",
-        status="pendiente",
-        observations="",
-    )
-    db.add(order)
-    return order
+def ensure_production_order(db: Session, quotation, user_id: int | None = None) -> ProductionOrder | None:
+    from app.services.production_order_service import ensure_production_order as _ensure
+    return _ensure(db, quotation, user_id=user_id)
 
 
 def order_delivery_date(order: ProductionOrder) -> date | None:
@@ -158,63 +138,49 @@ def order_delivery_date(order: ProductionOrder) -> date | None:
     return None
 
 
-COMPLETED_ORDER_STATUSES = ("enviado", "entregado")
+COMPLETED_ORDER_STATUSES = ("despachado", "entregado", "cancelado")
 
-PRODUCTION_ORDER_STATUSES = (
-    "pendiente",
-    "diseño",
-    "produccion",
-    "empacado",
-    "enviado",
-    "entregado",
+from app.services.production_order_service import (  # noqa: E402
+    PRODUCTION_ORDER_STATUSES,
+    PRODUCTION_STATUS_COLORS as _PO_COLORS,
+    PRODUCTION_STATUS_LABELS,
+    PRODUCTION_STATUS_SEQUENCE,
+    normalize_status,
+    transition_status as po_transition_status,
 )
 
-PRODUCTION_STATUS_LABELS = {
-    "pendiente": "Pendiente",
-    "diseño": "Diseño",
-    "produccion": "Producción",
-    "empacado": "Empacado",
-    "enviado": "Enviado",
-    "entregado": "Entregado",
-}
+PRODUCTION_ORDER_STATUSES = PRODUCTION_STATUS_SEQUENCE + ["cancelado"]
 
-PRODUCTION_STATUS_COLORS = {
-    "pendiente": "gray",
-    "diseño": "indigo",
-    "produccion": "purple",
-    "empacado": "orange",
-    "enviado": "blue",
-    "entregado": "green",
-}
+PRODUCTION_STATUS_COLORS = _PO_COLORS
 
 
 def next_production_status(current: str | None) -> str | None:
-    status = (current or "pendiente").lower().strip()
+    status = normalize_status(current)
     try:
-        index = PRODUCTION_ORDER_STATUSES.index(status)
+        index = PRODUCTION_STATUS_SEQUENCE.index(status)
     except ValueError:
         return None
-    if index + 1 < len(PRODUCTION_ORDER_STATUSES):
-        return PRODUCTION_ORDER_STATUSES[index + 1]
+    if index + 1 < len(PRODUCTION_STATUS_SEQUENCE):
+        return PRODUCTION_STATUS_SEQUENCE[index + 1]
     return None
 
 
 def production_status_index(status: str | None) -> int:
     try:
-        return PRODUCTION_ORDER_STATUSES.index((status or "pendiente").lower().strip())
+        return PRODUCTION_STATUS_SEQUENCE.index(normalize_status(status))
     except ValueError:
         return 0
 
 
 def sync_quotation_from_production(db: Session, order: ProductionOrder, new_status: str) -> None:
+    del db
     quotation = order.quotation
     if not quotation:
         return
-    q_status = (quotation.status or "").lower().strip()
-    stage = new_status.lower().strip()
-    if stage in ("diseño", "produccion", "empacado") and q_status == "aprobada":
+    stage = normalize_status(new_status)
+    if stage in {"produccion"}:
         quotation.status = "produccion"
-    elif stage == "enviado" and q_status in ("aprobada", "produccion"):
+    elif stage == "envio":
         quotation.status = "enviado"
     elif stage == "entregado":
         quotation.status = "entregado"
@@ -225,17 +191,7 @@ def apply_production_status_change(
     new_status: str,
     db: Session,
 ) -> None:
-    previous = (order.status or "pendiente").lower().strip()
-    stage = new_status.lower().strip()
-    now = datetime.utcnow()
-
-    if previous == "pendiente" and stage != "pendiente" and not order.started_at:
-        order.started_at = now
-    if stage == "entregado" and not order.completed_at:
-        order.completed_at = now
-
-    order.status = stage
-    sync_quotation_from_production(db, order, stage)
+    po_transition_status(db, order, new_status, force=True)
 
 
 def production_order_delivery_meta(order: ProductionOrder) -> dict:
@@ -272,64 +228,25 @@ def production_order_delivery_meta(order: ProductionOrder) -> dict:
 
 
 def status_requirements_hint(status: str) -> str:
+    from app.services.production_order_service import normalize_status
+
     hints = {
-        "diseño": "Requiere diseñador asignado.",
-        "produccion": "Requiere diseñador asignado.",
-        "empacado": "Requiere fabricador asignado.",
-        "enviado": "Requiere guía de envío creada.",
+        "produccion": "Requiere datos de fabricación completos (archivo, material, medida, copias).",
+        "envio": "Requiere guía de envío creada.",
     }
-    return hints.get(status.lower().strip(), "")
+    return hints.get(normalize_status(status), "")
 
 
-KANBAN_COLUMNS = (
+KANBAN_COLUMNS = tuple(
     {
-        "status": "pendiente",
-        "label": "Pendiente",
-        "accent": "slate",
-        "next_status": "diseño",
-        "action_label": "Pasar a Diseño",
+        "status": code,
+        "label": PRODUCTION_STATUS_LABELS.get(code, code),
+        "accent": PRODUCTION_STATUS_COLORS.get(code, "slate"),
+        "next_status": PRODUCTION_STATUS_SEQUENCE[i + 1] if i + 1 < len(PRODUCTION_STATUS_SEQUENCE) else None,
+        "action_label": f"Avanzar a {PRODUCTION_STATUS_LABELS.get(PRODUCTION_STATUS_SEQUENCE[i + 1], '—')}" if i + 1 < len(PRODUCTION_STATUS_SEQUENCE) else None,
         "action_class": "bg-purple-600 hover:bg-purple-700",
-    },
-    {
-        "status": "diseño",
-        "label": "Diseño",
-        "accent": "indigo",
-        "next_status": "produccion",
-        "action_label": "Pasar a Producción",
-        "action_class": "bg-indigo-600 hover:bg-indigo-700",
-    },
-    {
-        "status": "produccion",
-        "label": "Producción",
-        "accent": "purple",
-        "next_status": "empacado",
-        "action_label": "Pasar a Empacado",
-        "action_class": "bg-purple-700 hover:bg-purple-800",
-    },
-    {
-        "status": "empacado",
-        "label": "Empacado",
-        "accent": "orange",
-        "next_status": "enviado",
-        "action_label": "Marcar Enviado",
-        "action_class": "bg-orange-600 hover:bg-orange-700",
-    },
-    {
-        "status": "enviado",
-        "label": "Enviado",
-        "accent": "blue",
-        "next_status": "entregado",
-        "action_label": "Marcar Entregado",
-        "action_class": "bg-green-600 hover:bg-green-700",
-    },
-    {
-        "status": "entregado",
-        "label": "Entregado",
-        "accent": "green",
-        "next_status": None,
-        "action_label": None,
-        "action_class": None,
-    },
+    }
+    for i, code in enumerate(PRODUCTION_STATUS_SEQUENCE)
 )
 
 
@@ -357,7 +274,7 @@ def kanban_order_card(order: ProductionOrder) -> dict:
 def build_kanban_columns(orders: list[ProductionOrder]) -> list[dict]:
     by_status: dict[str, list[ProductionOrder]] = {col["status"]: [] for col in KANBAN_COLUMNS}
     for order in orders:
-        status = (order.status or "pendiente").lower().strip()
+        status = normalize_status(order.status)
         if status not in by_status:
             by_status.setdefault(status, []).append(order)
         else:
@@ -552,7 +469,11 @@ def build_kanban_week_columns(
     return columns
 
 
-ACTIVE_PRODUCTION_STATUSES = ("pendiente", "diseño", "produccion", "empacado")
+ACTIVE_PRODUCTION_STATUSES = tuple(
+    code for code in PRODUCTION_STATUS_SEQUENCE if code not in {"entregado", "cancelado"}
+)
+
+ADMIN_DASHBOARD_ORDERS_LIMIT = 10
 
 
 def build_dashboard_production_summary(db: Session) -> dict:
@@ -610,5 +531,6 @@ def build_dashboard_production_summary(db: Session) -> dict:
         "due_this_week": due_this_week,
         "urgent": urgent,
         "recent_items": enriched[:5],
+        "table_items": enriched[:ADMIN_DASHBOARD_ORDERS_LIMIT],
     }
 

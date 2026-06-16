@@ -6,6 +6,94 @@
 
 {% block content %}
 
+{% if role == 'produccion' %}
+
+<div class="mb-6 sm:mb-8">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div>
+            <p class="text-orange-600 font-semibold text-sm sm:text-base">🖨️ Fabricación</p>
+            <h1 class="erp-page-title mt-2">Dashboard Producción</h1>
+            <p class="text-gray-500 mt-2 text-sm sm:text-base">Resumen de lo pendiente y lo ya fabricado.</p>
+        </div>
+        <div class="sm:text-right">
+            <div class="text-sm text-gray-500">{{ company_name }}</div>
+            <div class="font-semibold">{{ user.full_name or user.username }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+    {% for card in dashboard_cards %}
+    {{ stat_card(card.title, card.value, card.icon) }}
+    {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+    <div class="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="font-bold text-xl">Pendientes</h2>
+                <a href="/production/fabrication-condensed" class="text-sm text-orange-600 hover:text-orange-800 font-medium">Ver todas →</a>
+            </div>
+            {% if fab_dash and fab_dash.pending_orders %}
+            <div class="divide-y divide-gray-100">
+                {% for order in fab_dash.pending_orders %}
+                <a href="/production/fabrication-condensed" class="block py-3 hover:bg-orange-50/50 -mx-2 px-2 rounded-lg transition">
+                    <div class="flex justify-between items-start gap-2">
+                        <div>
+                            <span class="font-semibold text-slate-900">{{ order.label }}</span>
+                            <p class="text-sm text-gray-500 mt-0.5">{{ order.client_name }}</p>
+                        </div>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">{{ order.status_label }}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1 truncate">{{ order.file_name }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Entrega: {{ order.delivery_label }}</p>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center py-8 text-gray-400">No hay órdenes pendientes de fabricar.</p>
+            {% endif %}
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="font-bold text-xl">Ya realizadas</h2>
+                <a href="/production/fabrication-condensed?show_completed=1" class="text-sm text-green-600 hover:text-green-800 font-medium">Ver todas →</a>
+            </div>
+            {% if fab_dash and fab_dash.done_orders %}
+            <div class="divide-y divide-gray-100">
+                {% for order in fab_dash.done_orders %}
+                <a href="/production/fabrication-condensed?show_completed=1" class="block py-3 hover:bg-green-50/50 -mx-2 px-2 rounded-lg transition">
+                    <div class="flex justify-between items-start gap-2">
+                        <div>
+                            <span class="font-semibold text-slate-900">{{ order.label }}</span>
+                            <p class="text-sm text-gray-500 mt-0.5">{{ order.client_name }}</p>
+                        </div>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-800">{{ order.status_label }}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1 truncate">{{ order.file_name }}</p>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center py-8 text-gray-400">Aún no hay órdenes completadas.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-bold text-xl mb-5">Acciones rápidas</h2>
+        <div class="grid grid-cols-1 gap-4">
+            {% for action in quick_actions %}
+            {{ quick_action(action.title, action.url, action.icon) }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% else %}
+
 <div class="mb-6 sm:mb-8">
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
@@ -21,7 +109,7 @@
 </div>
 
 <!-- CARDS -->
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-{{ 5 if role == 'ventas' else 4 }} gap-5 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
     {% for card in dashboard_cards %}
     {{ stat_card(card.title, card.value, card.icon) }}
     {% endfor %}
@@ -48,9 +136,118 @@
 </div>
 {% endif %}
 
-<!-- GRAFICO Y ACCIONES -->
+<!-- GRAFICO / TABLA Y ACCIONES -->
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
     <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        {% if role == 'ventas' %}
+        <div class="flex flex-col sm:flex-row flex-wrap justify-between items-start gap-3 mb-5">
+            <div>
+                <h2 class="font-bold text-xl">Cotizaciones recientes</h2>
+                <p class="text-sm text-gray-500 mt-1">Últimas {{ recent_quotations|length }} cotizaciones · acceso directo</p>
+            </div>
+            <a href="/quotations/" class="text-sm text-purple-600 hover:text-purple-800 font-medium">Ver todas →</a>
+        </div>
+
+        {% if recent_quotations %}
+        <div class="overflow-x-auto -mx-2">
+            <table class="w-full min-w-[640px] text-sm">
+                <thead class="text-xs uppercase text-gray-500 border-b border-gray-100">
+                    <tr>
+                        <th class="text-left py-3 px-2 font-semibold">#</th>
+                        <th class="text-left py-3 px-2 font-semibold">Cliente</th>
+                        <th class="text-left py-3 px-2 font-semibold">Total</th>
+                        <th class="text-left py-3 px-2 font-semibold">Estado</th>
+                        <th class="text-left py-3 px-2 font-semibold">Entrega</th>
+                        <th class="text-right py-3 px-2 font-semibold"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for quotation in recent_quotations %}
+                    <tr class="hover:bg-purple-50/40 transition">
+                        <td class="py-3 px-2 font-semibold text-slate-900">#{{ quotation.id }}</td>
+                        <td class="py-3 px-2 text-gray-700">{{ quotation.client.name if quotation.client else '—' }}</td>
+                        <td class="py-3 px-2 font-medium text-purple-700">${{ "%.2f"|format(quotation.total or 0) }}</td>
+                        <td class="py-3 px-2">{{ status_badge(quotation.status) }}</td>
+                        <td class="py-3 px-2 text-gray-600 whitespace-nowrap">
+                            {{ quotation.delivery_date.strftime('%d/%m/%Y') if quotation.delivery_date else '—' }}
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                            <a href="/quotations/{{ quotation.id }}" class="text-purple-700 hover:text-purple-900 font-medium hover:underline">Abrir</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center h-48 text-gray-400">
+            <span class="text-4xl mb-3">📄</span>
+            <p>No hay cotizaciones registradas.</p>
+            <a href="/quotations/new" class="mt-3 text-sm text-purple-600 hover:text-purple-800 font-medium">Crear cotización →</a>
+        </div>
+        {% endif %}
+
+        {% elif role == 'admin' %}
+        <div class="flex flex-col sm:flex-row flex-wrap justify-between items-start gap-3 mb-5">
+            <div>
+                <h2 class="font-bold text-xl">Órdenes de producción activas</h2>
+                <p class="text-sm text-gray-500 mt-1">{{ production_summary.active_count }} en curso · ordenadas por urgencia de entrega</p>
+            </div>
+            <a href="/production/kanban" class="text-sm text-purple-600 hover:text-purple-800 font-medium">Kanban →</a>
+        </div>
+
+        {% if production_summary.table_items %}
+        <div class="overflow-x-auto -mx-2">
+            <table class="w-full min-w-[720px] text-sm">
+                <thead class="text-xs uppercase text-gray-500 border-b border-gray-100">
+                    <tr>
+                        <th class="text-left py-3 px-2 font-semibold">Orden</th>
+                        <th class="text-left py-3 px-2 font-semibold">Cliente</th>
+                        <th class="text-left py-3 px-2 font-semibold">Estado</th>
+                        <th class="text-left py-3 px-2 font-semibold">Entrega</th>
+                        <th class="text-left py-3 px-2 font-semibold">Urgencia</th>
+                        <th class="text-right py-3 px-2 font-semibold"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for item in production_summary.table_items %}
+                    {% set order = item.order %}
+                    {% set meta = item.delivery_meta %}
+                    <tr class="hover:bg-purple-50/40 transition">
+                        <td class="py-3 px-2 font-semibold text-slate-900">OP-{{ '%04d'|format(order.id) }}</td>
+                        <td class="py-3 px-2 text-gray-700">{{ item.client_name }}</td>
+                        <td class="py-3 px-2">{{ production_status_badge(order.status) }}</td>
+                        <td class="py-3 px-2 text-gray-600 whitespace-nowrap">{{ meta.label }}</td>
+                        <td class="py-3 px-2 whitespace-nowrap">
+                            {% if meta.urgency == 'overdue' %}
+                            <span class="text-xs font-semibold text-red-600">{{ meta.days_until|abs }} día{{ 's' if meta.days_until|abs != 1 else '' }} de retraso</span>
+                            {% elif meta.urgency == 'today' %}
+                            <span class="text-xs font-semibold text-amber-600">Entrega hoy</span>
+                            {% elif meta.urgency == 'soon' %}
+                            <span class="text-xs font-medium text-orange-600">En {{ meta.days_until }} día{{ 's' if meta.days_until != 1 else '' }}</span>
+                            {% elif meta.urgency == 'normal' and meta.days_until is not none %}
+                            <span class="text-xs text-gray-500">En {{ meta.days_until }} día{{ 's' if meta.days_until != 1 else '' }}</span>
+                            {% else %}
+                            <span class="text-xs text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                            <a href="/production/{{ order.id }}" class="text-purple-700 hover:text-purple-900 font-medium hover:underline">Abrir</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center h-48 text-gray-400">
+            <span class="text-4xl mb-3">🏭</span>
+            <p>No hay órdenes activas en producción.</p>
+            <a href="/production/kanban" class="mt-3 text-sm text-purple-600 hover:text-purple-800 font-medium">Ver Kanban →</a>
+        </div>
+        {% endif %}
+
+        {% else %}
         <div class="flex flex-col sm:flex-row flex-wrap justify-between items-start gap-3 mb-5">
             <div>
                 <h2 class="font-bold text-xl">Resumen de Cotizaciones</h2>
@@ -76,6 +273,7 @@
             <p>Sin cotizaciones en los últimos 30 días</p>
         </div>
         {% endif %}
+        {% endif %}
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -89,6 +287,7 @@
 </div>
 
 <!-- LISTAS -->
+{% if role != 'ventas' %}
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div class="flex justify-between items-center mb-5">
@@ -140,7 +339,7 @@
         {% endif %}
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 {% if role == 'admin' %}hidden{% endif %}">
         <div class="flex justify-between items-center mb-5">
             <h2 class="font-bold text-xl">Producción activa</h2>
             <a href="/production/kanban" class="text-sm text-purple-600 hover:text-purple-800 font-medium">Kanban →</a>
@@ -178,8 +377,9 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 
-<div class="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+<div class="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 {% if role == 'ventas' %}hidden{% endif %}">
     <h2 class="font-bold text-xl mb-5">Actividad Reciente</h2>
 
     {% if recent_activity %}
@@ -205,7 +405,7 @@
     {% endif %}
 </div>
 
-{% if chart_total %}
+{% if chart_total and role not in ('ventas', 'admin') %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     if (typeof ApexCharts === "undefined") return;
@@ -248,6 +448,8 @@ document.addEventListener("DOMContentLoaded", function () {
     new ApexCharts(document.querySelector("#quotationChart"), options).render();
 });
 </script>
+{% endif %}
+
 {% endif %}
 
 {% endblock %}

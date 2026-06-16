@@ -3,6 +3,7 @@ from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
 
 from datetime import datetime
 
@@ -44,6 +45,7 @@ class Shipment(Base):
 
     notes = Column(String)
 
+    customer_id_number = Column(String)
 
     status = Column(
         String,
@@ -54,3 +56,5 @@ class Shipment(Base):
         DateTime,
         default=datetime.utcnow
     )
+
+    quotation = relationship("Quotation", back_populates="shipments")

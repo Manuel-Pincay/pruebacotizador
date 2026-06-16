@@ -6,7 +6,14 @@ from app.utils.cached_static import CachedStaticFiles
 from app.models.user import User
 from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
+from app.models.quotation_payment import QuotationPayment
+from app.models.quotation_design import QuotationDesign
+from app.models.design_tracking import DesignTracking
 from app.models.production_order import ProductionOrder
+from app.models.production_order_history import ProductionOrderHistory
+from app.models.design_observation import DesignObservation
+from app.models.production_order import ProductionOrder
+from app.models.production_tracking import ProductionTracking
 from app.models.inventory_movement import InventoryMovement
 from app.models.shipment import Shipment
 from app.models.company_config import CompanyConfig
@@ -23,7 +30,11 @@ from app.routes import dashboard
 from app.routes import clients
 from app.routes import products
 from app.routes import quotations
+from app.routes import payments
 from app.routes import production
+from app.routes import production_condensed
+from app.routes import fabrication_condensed
+from app.routes import design
 from app.routes import inventory
 from app.routes import shipments
 from app.routes import users
@@ -81,6 +92,10 @@ app.include_router(dashboard.router)
 app.include_router(clients.router)
 app.include_router(products.router)
 app.include_router(quotations.router)
+app.include_router(payments.router)
+app.include_router(production_condensed.router)
+app.include_router(fabrication_condensed.router)
+app.include_router(design.router)
 app.include_router(production.router)
 app.include_router(inventory.router)
 app.include_router(shipments.router)
