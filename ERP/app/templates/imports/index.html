@@ -13,7 +13,7 @@
     </h1>
 
     <p class="text-gray-500 mt-1">
-        Carga masiva de clientes y productos mediante archivos Excel.
+        Exporte, importe y administre clientes y productos mediante archivos Excel.
     </p>
 
 </div>
@@ -70,12 +70,21 @@
         <div class="space-y-4">
 
             <a
+                href="/imports/clients/export"
+                class="w-full flex items-center justify-center gap-2
+                       bg-emerald-600 hover:bg-emerald-700
+                       text-white py-2.5 rounded-lg transition"
+            >
+                📥 Descargar base de clientes
+            </a>
+
+            <a
                 href="/imports/clients/template"
                 class="w-full flex items-center justify-center gap-2
                        bg-purple-600 hover:bg-purple-700
                        text-white py-2.5 rounded-lg transition"
             >
-                📄 Descargar Plantilla
+                📄 Descargar plantilla vacía
             </a>
 
             <form
@@ -137,12 +146,21 @@
         <div class="space-y-4">
 
             <a
+                href="/imports/products/export"
+                class="w-full flex items-center justify-center gap-2
+                       bg-emerald-600 hover:bg-emerald-700
+                       text-white py-2.5 rounded-lg transition"
+            >
+                📥 Descargar base de productos
+            </a>
+
+            <a
                 href="/imports/products/template"
                 class="w-full flex items-center justify-center gap-2
                        bg-purple-600 hover:bg-purple-700
                        text-white py-2.5 rounded-lg transition"
             >
-                📄 Descargar Plantilla
+                📄 Descargar plantilla vacía
             </a>
 
             <form
@@ -186,6 +204,14 @@
     </h3>
 
     <ul class="space-y-2 text-sm text-gray-600">
+
+        <li>
+            • Use <strong>Descargar base</strong> para exportar todos los registros actuales y editarlos en Excel.
+        </li>
+
+        <li>
+            • Use la plantilla vacía solo para cargas nuevas desde cero.
+        </li>
 
         <li>
             • Utilice únicamente las plantillas generadas por el sistema.

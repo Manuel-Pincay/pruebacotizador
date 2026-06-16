@@ -10,6 +10,7 @@ from fastapi import File
 from fastapi.responses import HTMLResponse
 from fastapi.responses import FileResponse
 from fastapi.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
 
 from fastapi.templating import Jinja2Templates
 
@@ -24,6 +25,9 @@ from app.auth.auth_handler import role_required
 from app.services.excel_importer import (
     create_clients_template,
     create_products_template,
+    export_clients_excel,
+    export_filename,
+    export_products_excel,
     import_clients,
     import_products
 )
@@ -99,6 +103,25 @@ async def clients_template(request: Request):
     )
 
 
+@router.get("/clients/export")
+async def export_clients(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    buffer = export_clients_excel(db)
+    filename = export_filename("clientes")
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 # ==========================================
 # PRODUCT TEMPLATE
 # ==========================================
@@ -117,6 +140,25 @@ async def products_template(request: Request):
     return FileResponse(
         path=path,
         filename=path
+    )
+
+
+@router.get("/products/export")
+async def export_products(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    buffer = export_products_excel(db)
+    filename = export_filename("productos")
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

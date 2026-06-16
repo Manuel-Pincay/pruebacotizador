@@ -7,6 +7,11 @@ from openpyxl.styles import Alignment
 
 from openpyxl.utils import get_column_letter
 
+from io import BytesIO
+from datetime import datetime
+
+from sqlalchemy.orm import Session
+
 from app.models.client import Client
 from app.models.product import Product
 
@@ -87,6 +92,130 @@ def format_sheet(ws):
     ws.freeze_panes = "A2"
 
 
+CLIENT_HEADERS = [
+    "name",
+    "company",
+    "ruc_ci",
+    "phone",
+    "email",
+    "address",
+    "client_type",
+    "observations",
+]
+
+CLIENT_DESCRIPTIONS = [
+    "Nombre cliente",
+    "Empresa",
+    "RUC o CI",
+    "Teléfono",
+    "Correo",
+    "Dirección",
+    "Mayorista / Minorista",
+    "Notas adicionales",
+]
+
+PRODUCT_HEADERS = [
+    "code",
+    "name",
+    "description",
+    "category",
+    "material",
+    "color",
+    "size",
+    "thickness",
+    "price",
+    "cost",
+    "theme",
+    "stock",
+    "custom",
+]
+
+PRODUCT_DESCRIPTIONS = [
+    "Código producto",
+    "Nombre producto",
+    "Descripción",
+    "Categoría",
+    "Material",
+    "Color",
+    "Tamaño",
+    "Espesor",
+    "Precio venta",
+    "Costo",
+    "Temática",
+    "Stock",
+    "TRUE/FALSE",
+]
+
+
+def _workbook_to_buffer(wb: Workbook) -> BytesIO:
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def export_clients_excel(db: Session) -> BytesIO:
+    """Exporta clientes en formato compatible con la plantilla de importación."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Clientes"
+
+    ws.append(CLIENT_HEADERS)
+    ws.append(CLIENT_DESCRIPTIONS)
+
+    clients = db.query(Client).order_by(Client.name.asc()).all()
+    for client in clients:
+        ws.append([
+            client.name or "",
+            client.company or "",
+            client.ruc_ci or "",
+            client.phone or "",
+            client.email or "",
+            client.address or "",
+            client.client_type or "",
+            client.observations or "",
+        ])
+
+    format_sheet(ws)
+    return _workbook_to_buffer(wb)
+
+
+def export_products_excel(db: Session) -> BytesIO:
+    """Exporta productos en formato compatible con la plantilla de importación."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Productos"
+
+    ws.append(PRODUCT_HEADERS)
+    ws.append(PRODUCT_DESCRIPTIONS)
+
+    products = db.query(Product).order_by(Product.name.asc()).all()
+    for product in products:
+        ws.append([
+            product.code or "",
+            product.name or "",
+            product.description or "",
+            product.category or "",
+            product.material or "",
+            product.color or "",
+            product.size or "",
+            product.thickness or "",
+            product.price if product.price is not None else 0,
+            product.cost if product.cost is not None else 0,
+            product.theme or "",
+            product.stock if product.stock is not None else 0,
+            "TRUE" if product.custom else "FALSE",
+        ])
+
+    format_sheet(ws)
+    return _workbook_to_buffer(wb)
+
+
+def export_filename(prefix: str) -> str:
+    stamp = datetime.now().strftime("%Y-%m-%d")
+    return f"{prefix}_{stamp}.xlsx"
+
+
 # ==========================================
 # CLIENT TEMPLATE
 # ==========================================
@@ -101,35 +230,13 @@ def create_clients_template(path):
 
     # HEADERS
 
-    headers = [
-
-        "name",
-        "company",
-        "ruc_ci",
-        "phone",
-        "email",
-        "address",
-        "client_type",
-        "observations"
-
-    ]
+    headers = CLIENT_HEADERS
 
     ws.append(headers)
 
     # DESCRIPTIONS
 
-    ws.append([
-
-        "Nombre cliente",
-        "Empresa",
-        "RUC o CI",
-        "Teléfono",
-        "Correo",
-        "Dirección",
-        "Mayorista / Minorista",
-        "Notas adicionales"
-
-    ])
+    ws.append(CLIENT_DESCRIPTIONS)
 
     # EXAMPLE
 
@@ -165,45 +272,13 @@ def create_products_template(path):
 
     # HEADERS
 
-    headers = [
-
-        "code",
-        "name",
-        "description",
-        "category",
-        "material",
-        "color",
-        "size",
-        "thickness",
-        "price",
-        "cost",
-        "theme",
-        "stock",
-        "custom"
-
-    ]
+    headers = PRODUCT_HEADERS
 
     ws.append(headers)
 
     # DESCRIPTIONS
 
-    ws.append([
-
-        "Código producto",
-        "Nombre producto",
-        "Descripción",
-        "Categoría",
-        "Material",
-        "Color",
-        "Tamaño",
-        "Espesor",
-        "Precio venta",
-        "Costo",
-        "Temática",
-        "Stock",
-        "TRUE/FALSE"
-
-    ])
+    ws.append(PRODUCT_DESCRIPTIONS)
 
     # EXAMPLE
 
