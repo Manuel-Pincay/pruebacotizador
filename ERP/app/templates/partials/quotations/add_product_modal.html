@@ -1,4 +1,5 @@
 <form action="/quotations/{{ quotation_id }}/add-product" method="POST" id="addProductForm" enctype="multipart/form-data">
+{% from "components/logo_type_select.html" import logo_type_select %}
     <div class="space-y-5">
         <!-- TIPO -->
 
@@ -97,11 +98,8 @@
         <!-- LOGO -->
 
         <div>
-            <label class="flex items-center gap-3">
-                <input type="checkbox" name="logo" value="true" />
-
-                <span> Incluye logo del cliente </span>
-            </label>
+            <label class="block mb-2 font-medium">Tipo de logo</label>
+            {{ logo_type_select("logo_type", "sin_logo", "logo_type_modal") }}
         </div>
 
         <!-- BOTONES -->

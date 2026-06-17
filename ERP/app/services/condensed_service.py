@@ -7,10 +7,6 @@ from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, A4
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import String, cast, extract, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -21,8 +17,6 @@ from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.services.production_order_service import (
     PRODUCTION_ORDER_STATUSES as PO_STATUS_TUPLES,
-    PRODUCTION_STATUS_LABELS,
-    PRODUCTION_STATUS_SEQUENCE,
     normalize_status,
     transition_status,
 )
@@ -67,6 +61,16 @@ def _order_tracking_meta(quotation: Quotation) -> dict[str, str]:
             "notes": order.notes or order.observations or "",
         }
     return {"assigned_to": "", "notes": ""}
+
+
+def _order_display_ref(quotation: Quotation | None) -> tuple[int | None, str]:
+    """Etiqueta OP real según la orden de producción vinculada."""
+    if not quotation:
+        return None, "—"
+    order = quotation.production_order
+    if order and order.id:
+        return order.id, f"OP-{order.id:04d}"
+    return quotation.id, f"Cotización #{quotation.id}"
 
 
 def _product_name(item: QuotationItem) -> str:
@@ -203,8 +207,10 @@ def sort_order_groups(
             groups,
             key=lambda group: (
                 (group.get("client_name") or "").lower(),
-                group.get("delivery_date") or date.max,
-                group.get("quotation_id") or 0,
+                -(group.get("delivery_date") or date.min).toordinal()
+                if group.get("delivery_date")
+                else 0,
+                -(group.get("quotation_id") or 0),
             ),
         )
     if group_by == "product":
@@ -212,16 +218,17 @@ def sort_order_groups(
             groups,
             key=lambda group: (
                 (group["products"][0]["product_name"] if group.get("products") else "").lower(),
-                group.get("quotation_id") or 0,
+                -(group.get("quotation_id") or 0),
             ),
         )
     if group_by == "delivery":
         return sorted(
             groups,
             key=lambda group: (
-                group.get("delivery_date") or date.max,
+                group.get("delivery_date") or date.min,
                 group.get("quotation_id") or 0,
             ),
+            reverse=True,
         )
     return sorted(
         groups,
@@ -229,6 +236,7 @@ def sort_order_groups(
             group.get("quotation_date") or datetime.min,
             group.get("quotation_id") or 0,
         ),
+        reverse=True,
     )
 
 
@@ -273,19 +281,20 @@ def _apply_group_order(query, group_by: str):
     if group_by == "client":
         return query.order_by(
             Client.name.asc(),
-            Quotation.id.asc(),
-            QuotationItem.id.asc(),
+            Quotation.delivery_date.desc(),
+            Quotation.id.desc(),
+            QuotationItem.id.desc(),
         )
     if group_by == "product":
         return query.order_by(
             QuotationItem.detail.asc(),
-            Quotation.id.asc(),
-            QuotationItem.id.asc(),
+            Quotation.id.desc(),
+            QuotationItem.id.desc(),
         )
     return query.order_by(
-        Quotation.delivery_date.asc(),
-        Quotation.id.asc(),
-        QuotationItem.id.asc(),
+        Quotation.delivery_date.desc(),
+        Quotation.id.desc(),
+        QuotationItem.id.desc(),
     )
 
 
@@ -331,7 +340,8 @@ def build_condensed_query(
 def build_condensed_row(
     item: QuotationItem,
     *,
-    order_number: int,
+    order_number: int | None,
+    order_label: str,
     item_number: int = 1,
 ) -> dict[str, Any]:
     quotation = item.quotation
@@ -340,7 +350,7 @@ def build_condensed_row(
     return {
         "item_id": item.id,
         "item_number": item_number,
-        "order_label": f"OP-{order_number:04d}",
+        "order_label": order_label,
         "order_number": order_number,
         "quotation_id": quotation.id if quotation else None,
         "quantity": item.quantity or 0,
@@ -354,17 +364,19 @@ def build_condensed_row(
     }
 
 
-def _build_single_order_group(items: list[QuotationItem], order_number: int) -> dict[str, Any]:
+def _build_single_order_group(items: list[QuotationItem]) -> dict[str, Any]:
     first = items[0]
     quotation = first.quotation
     client = quotation.client if quotation else None
     status = _order_tracking_status(quotation) if quotation else "pendiente"
     tracking_meta = _order_tracking_meta(quotation) if quotation else {"assigned_to": "", "notes": ""}
     design_urls = get_design_urls(quotation) if quotation else []
+    order_number, order_label = _order_display_ref(quotation)
 
     return {
         "order_number": order_number,
-        "order_label": f"OP-{order_number:04d}",
+        "order_label": order_label,
+        "production_order_id": order_number,
         "quotation_id": quotation.id if quotation else None,
         "client_name": client.name if client else "—",
         "quotation_date": quotation.created_at if quotation else None,
@@ -376,7 +388,12 @@ def _build_single_order_group(items: list[QuotationItem], order_number: int) -> 
         "notes": tracking_meta["notes"],
         "products_count": len(items),
         "products": [
-            build_condensed_row(item, order_number=order_number, item_number=index + 1)
+            build_condensed_row(
+                item,
+                order_number=order_number,
+                order_label=order_label,
+                item_number=index + 1,
+            )
             for index, item in enumerate(items)
         ],
     }
@@ -398,9 +415,9 @@ def build_order_groups(items: list[QuotationItem]) -> list[dict[str, Any]]:
         buckets[qid].append(item)
 
     groups: list[dict[str, Any]] = []
-    for index, qid in enumerate(quotation_order):
+    for qid in quotation_order:
         bucket = sorted(buckets[qid], key=lambda row: row.id or 0)
-        groups.append(_build_single_order_group(bucket, index + 1))
+        groups.append(_build_single_order_group(bucket))
 
     return groups
 
@@ -422,26 +439,8 @@ def paginate_order_groups(
     start = (page - 1) * per_page
     sliced = order_groups[start:start + per_page]
 
-    renumbered: list[dict[str, Any]] = []
-    for index, group in enumerate(sliced):
-        order_number = start + index + 1
-        order_label = f"OP-{order_number:04d}"
-        updated_items = []
-        for item_row in group["products"]:
-            updated = dict(item_row)
-            updated["order_number"] = order_number
-            updated["order_label"] = order_label
-            updated_items.append(updated)
-
-        renumbered.append({
-            **group,
-            "order_number": order_number,
-            "order_label": order_label,
-            "products": updated_items,
-        })
-
     return {
-        "items": renumbered,
+        "items": sliced,
         "page": page,
         "per_page": per_page,
         "total": total,
@@ -511,37 +510,6 @@ def compute_kpis(db: Session, **filters) -> dict[str, int]:
     }
 
 
-def get_group_key(row: dict[str, Any], group_by: str) -> str:
-    if group_by == "client":
-        return row["client_name"]
-    if group_by == "product":
-        return row["product_name"]
-    if group_by == "order":
-        return row.get("order_label") or f"Cotización #{row.get('quotation_id')}"
-    delivery = row["delivery_date"]
-    if delivery:
-        return delivery.strftime("%d/%m/%Y")
-    return "Sin fecha de entrega"
-
-
-def get_or_create_quotation_tracking(db: Session, quotation_id: int) -> ProductionTracking:
-    tracking = (
-        db.query(ProductionTracking)
-        .filter(ProductionTracking.quotation_id == quotation_id)
-        .first()
-    )
-    if tracking:
-        return tracking
-
-    tracking = ProductionTracking(
-        quotation_id=quotation_id,
-        status="pendiente",
-    )
-    db.add(tracking)
-    db.flush()
-    return tracking
-
-
 def update_quotation_tracking_status(
     db: Session,
     quotation_id: int,
@@ -575,67 +543,6 @@ def update_quotation_tracking_status(
         notes=notes or "",
         force=bool(user and getattr(user, "role", "") == "admin"),
     )
-
-
-def get_or_create_tracking(db: Session, item_id: int) -> ProductionTracking:
-    tracking = (
-        db.query(ProductionTracking)
-        .filter(ProductionTracking.quotation_item_id == item_id)
-        .first()
-    )
-    if tracking:
-        return tracking
-
-    tracking = ProductionTracking(
-        quotation_item_id=item_id,
-        status="pendiente",
-    )
-    db.add(tracking)
-    db.flush()
-    return tracking
-
-
-def update_tracking_status(
-    db: Session,
-    item_id: int,
-    *,
-    status: str,
-    notes: str = "",
-    assigned_to: str = "",
-) -> ProductionTracking:
-    valid = {code for code, _ in TRACKING_STATUSES}
-    normalized = (status or "pendiente").lower()
-    if normalized not in valid:
-        raise ValueError("Estado de producción no válido.")
-
-    item = (
-        db.query(QuotationItem)
-        .options(joinedload(QuotationItem.production_tracking))
-        .filter(QuotationItem.id == item_id)
-        .first()
-    )
-    if not item:
-        raise ValueError("Ítem de cotización no encontrado.")
-
-    tracking = item.production_tracking or get_or_create_tracking(db, item_id)
-    now = datetime.utcnow()
-
-    if normalized != "pendiente" and not tracking.started_at:
-        tracking.started_at = now
-
-    if normalized in {"listo", "entregado"}:
-        tracking.completed_at = now
-    elif normalized not in {"listo", "entregado"}:
-        tracking.completed_at = None
-
-    tracking.status = normalized
-    tracking.notes = notes or ""
-    tracking.assigned_to = assigned_to or ""
-    tracking.updated_at = now
-
-    db.commit()
-    db.refresh(tracking)
-    return tracking
 
 
 def get_order_detail(db: Session, quotation_id: int) -> dict[str, Any] | None:
@@ -689,17 +596,6 @@ def get_order_detail(db: Session, quotation_id: int) -> dict[str, Any] | None:
             for item in sorted(quotation.items or [], key=lambda row: row.id or 0)
         ],
     }
-
-
-def get_item_detail(db: Session, item_id: int) -> dict[str, Any] | None:
-    item = (
-        db.query(QuotationItem)
-        .filter(QuotationItem.id == item_id)
-        .first()
-    )
-    if not item:
-        return None
-    return get_order_detail(db, item.quotation_id)
 
 
 def export_condensed_excel(rows: list[dict[str, Any]]) -> BytesIO:

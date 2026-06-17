@@ -93,7 +93,8 @@ def upgrade() -> None:
     if conn.dialect.name == "sqlite":
         conn.execute(sa.text("DROP TABLE IF EXISTS design_orders"))
     else:
-        op.drop_index("ix_design_orders_quotation_item_id", table_name="design_orders")
+        op.drop_constraint("fk_design_orders_assigned_to", "design_orders", type_="foreignkey")
+        op.drop_constraint("fk_design_orders_created_by", "design_orders", type_="foreignkey")
         op.drop_table("design_orders")
 
 

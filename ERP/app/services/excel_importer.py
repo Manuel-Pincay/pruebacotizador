@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.client import Client
 from app.models.product import Product
+from app.utils.text_format import format_title_words
 
 
 # ==========================================
@@ -327,12 +328,12 @@ def import_clients(db, file_path):
 
         client = Client(
 
-            name=row[0],
-            company=row[1],
+            name=format_title_words(str(row[0] or "")),
+            company=format_title_words(str(row[1] or "")) or None,
             ruc_ci=row[2],
             phone=row[3],
             email=row[4],
-            address=row[5],
+            address=format_title_words(str(row[5] or "")) or None,
             client_type=row[6],
             observations=row[7]
 
@@ -370,16 +371,16 @@ def import_products(db, file_path):
         product = Product(
 
             code=row[0],
-            name=row[1],
+            name=format_title_words(str(row[1] or "")),
             description=row[2],
-            category=row[3],
-            material=row[4],
-            color=row[5],
+            category=format_title_words(str(row[3] or "")),
+            material=format_title_words(str(row[4] or "")),
+            color=format_title_words(str(row[5] or "")),
             size=row[6],
             thickness=row[7],
             price=float(row[8] or 0),
             cost=float(row[9] or 0),
-            theme=row[10],
+            theme=format_title_words(str(row[10] or "")),
             stock=int(row[11] or 0),
             custom=str(row[12]).lower() == "true"
 

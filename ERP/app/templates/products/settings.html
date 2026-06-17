@@ -42,7 +42,7 @@
                 </span>
 
                 <a href="/product-settings/{{ delete_prefix }}/{{ item.id }}/delete"
-                    onclick="return confirm('¿Eliminar este registro?')"
+                    onclick="return erpConfirmLink(event, '¿Eliminar este registro?')"
                     class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
                     title="Eliminar">
                     🗑️
@@ -77,7 +77,7 @@
         </div>
 
         <a href="/product-settings/init"
-            onclick="return confirm('¿Cargar catálogos iniciales? Solo se añaden valores que no existan.')"
+            onclick="return erpConfirmLink(event, '¿Cargar catálogos iniciales? Solo se añaden valores que no existan.')"
             class="erp-full-mobile sm:w-auto text-center shrink-0 bg-purple-100 text-purple-800 px-5 py-3 rounded-xl font-medium hover:bg-purple-200 transition text-sm">
             Cargar catálogos base
         </a>

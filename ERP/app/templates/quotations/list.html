@@ -335,21 +335,29 @@
 
 <script>
     async function approveQuotation(id) {
-        if (!confirm("¿Aprobar cotización?")) return;
+        if (!(await ErpDialog.confirm("¿Aprobar cotización?"))) return;
 
         window.location.href = `/quotations/${id}/approve`;
     }
 
     async function cancelQuotation(id) {
-        if (!confirm("¿Cancelar cotización?")) return;
+        if (!(await ErpDialog.confirm("¿Cancelar cotización?"))) return;
 
         window.location.href = `/quotations/${id}/cancel`;
     }
 
     async function deleteQuotation(id) {
-        if (!confirm("¿Eliminar cotización permanentemente? Se borrarán ítems, pagos y órdenes relacionadas.")) return;
+        if (!(await ErpDialog.confirm(
+            "¿Eliminar cotización permanentemente? Se borrarán ítems, pagos y órdenes relacionadas.",
+            { title: "Eliminar cotización", confirmText: "Sí, eliminar" }
+        ))) return;
 
-        const adminPassword = prompt("Ingresa clave de administrador:", "");
+        const adminPassword = await ErpDialog.prompt("Ingresa clave de administrador", {
+            title: "Confirmación requerida",
+            input: "password",
+            inputAttributes: { autocomplete: "current-password" },
+            confirmText: "Eliminar",
+        });
         if (!adminPassword) return;
 
         const formData = new FormData();
@@ -365,11 +373,11 @@
             return;
         }
 
-        alert("No se pudo eliminar la cotización. Verifica la clave e intenta de nuevo.");
+        ErpDialog.error("No se pudo eliminar la cotización. Verifica la clave e intenta de nuevo.");
     }
 
     async function reactivateQuotation(id) {
-        if (!confirm("¿Reactivar cotización? Volverá a estado pendiente.")) return;
+        if (!(await ErpDialog.confirm("¿Reactivar cotización? Volverá a estado pendiente."))) return;
 
         window.location.href = `/quotations/${id}/reactivate`;
     }

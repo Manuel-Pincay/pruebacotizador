@@ -3,6 +3,7 @@
     method="POST"
     enctype="multipart/form-data"
 >
+{% from "components/logo_type_select.html" import logo_type_select %}
 
     <div class="space-y-5">
 
@@ -98,22 +99,12 @@
         <div>
 
             <label
-                class="flex items-center gap-3"
+                class="block mb-2 font-medium"
             >
-
-                <input
-                    type="checkbox"
-                    name="logo"
-                    value="true"
-
-                    {% if item.logo %}
-                    checked
-                    {% endif %}
-                >
-
-                Lleva logo personalizado
-
+                Tipo de logo
             </label>
+
+            {{ logo_type_select("logo_type", resolve_item_logo_type(item)) }}
 
         </div>
 

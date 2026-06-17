@@ -26,6 +26,7 @@ class QuotationItem(Base):
     theme = Column(String)
     color = Column(String)
     logo = Column(Boolean, default=False)
+    logo_type = Column(String(20), default="sin_logo", nullable=False)
     # PRECIOS
     unit_price = Column(Float)
     total = Column(Float)

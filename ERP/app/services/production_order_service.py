@@ -340,6 +340,88 @@ def assign_designer(db: Session, order: ProductionOrder, designer_user_id: int |
     return order
 
 
+def list_assignable_designers(db: Session) -> list[User]:
+    return (
+        db.query(User)
+        .filter(User.role == "disenador", User.active.is_(True))
+        .order_by(User.full_name.asc(), User.username.asc())
+        .all()
+    )
+
+
+def list_assignable_fabricators(db: Session) -> list[User]:
+    return (
+        db.query(User)
+        .filter(User.role == "produccion", User.active.is_(True))
+        .order_by(User.full_name.asc(), User.username.asc())
+        .all()
+    )
+
+
+def _match_user_id_by_label(db: Session, label: str | None, role: str) -> int | None:
+    text = (label or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    for user in db.query(User).filter(User.role == role, User.active.is_(True)).all():
+        candidates = {
+            (user.full_name or "").strip().lower(),
+            (user.username or "").strip().lower(),
+            _user_label(user).lower(),
+        }
+        if lowered in candidates:
+            return user.id
+    return None
+
+
+def resolve_selected_designer_id(order: ProductionOrder, db: Session) -> int | None:
+    if order.assigned_to_user_id:
+        return order.assigned_to_user_id
+    return _match_user_id_by_label(db, order.designer, "disenador")
+
+
+def resolve_selected_fabricator_id(order: ProductionOrder, db: Session) -> int | None:
+    return _match_user_id_by_label(db, order.fabricator, "produccion")
+
+
+def apply_designer_assignment(
+    order: ProductionOrder,
+    db: Session,
+    designer_user_id: int | None,
+) -> None:
+    if not designer_user_id:
+        order.assigned_to_user_id = None
+        order.designer = None
+        return
+    designer = (
+        db.query(User)
+        .filter(User.id == designer_user_id, User.role == "disenador", User.active.is_(True))
+        .first()
+    )
+    if not designer:
+        return
+    order.assigned_to_user_id = designer.id
+    order.designer = _user_label(designer)
+
+
+def apply_fabricator_assignment(
+    order: ProductionOrder,
+    db: Session,
+    fabricator_user_id: int | None,
+) -> None:
+    if not fabricator_user_id:
+        order.fabricator = None
+        return
+    fabricator = (
+        db.query(User)
+        .filter(User.id == fabricator_user_id, User.role == "produccion", User.active.is_(True))
+        .first()
+    )
+    if not fabricator:
+        return
+    order.fabricator = _user_label(fabricator)
+
+
 def list_design_orders(
     db: Session,
     *,

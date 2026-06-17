@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 
-from fastapi.responses import HTMLResponse, RedirectResponse
+from app.utils.dialog_response import dialog_message_response
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -93,9 +93,10 @@ def validate_production_status_change(order, status: str):
         try:
             validate_fabrication_data(order)
         except ValueError as exc:
-            return HTMLResponse(
-                content=f"<script>alert('{exc}'); window.history.back();</script>",
-                status_code=400,
+            return dialog_message_response(
+                str(exc),
+                dialog_type="warning",
+                title="Datos incompletos",
             )
     return None
 
@@ -112,12 +113,11 @@ def validate_shipment_for_sent(order, status: str, db: Session):
     )
     if shipment:
         return None
-    return HTMLResponse(
-        content=(
-            f"<script>alert('Crea la guía de envío antes de marcar como Enviado.'); "
-            f"window.location.href = '/shipments/new/{order.quotation_id}';</script>"
-        ),
-        status_code=400,
+    return dialog_message_response(
+        "Crea la guía de envío antes de marcar como Enviado.",
+        dialog_type="warning",
+        title="Guía requerida",
+        action=f"window.location.href = '/shipments/new/{order.quotation_id}';",
     )
 
 

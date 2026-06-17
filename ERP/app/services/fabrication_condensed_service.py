@@ -130,7 +130,7 @@ def _build_items_query(db: Session, quotation_ids: set[int]):
             joinedload(QuotationItem.quotation).joinedload(Quotation.production_order),
             joinedload(QuotationItem.product),
         )
-        .order_by(Quotation.delivery_date.asc(), Quotation.id.asc(), QuotationItem.id.asc())
+        .order_by(Quotation.delivery_date.desc(), Quotation.id.desc(), QuotationItem.id.desc())
     )
 
 
@@ -444,7 +444,12 @@ def get_fabrication_order_detail(db: Session, quotation_id: int) -> dict[str, An
         "production_status_label": TRACKING_STATUS_LABELS.get(status, status),
         "fabrication": _fabrication_meta(order),
         "products": [
-            build_condensed_row(item, order_number=order.id, item_number=index + 1)
+            build_condensed_row(
+                item,
+                order_number=order.id,
+                order_label=f"OP-{order.id:04d}",
+                item_number=index + 1,
+            )
             for index, item in enumerate(sorted(quotation.items or [], key=lambda row: row.id or 0))
         ],
     }

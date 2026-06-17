@@ -8,25 +8,13 @@ from app.config.settings import settings
 
 def create_db_engine(database_url: str):
 
-    kwargs = {
-        "pool_pre_ping": True
-    }
-
-    if database_url.startswith("sqlite"):
-
-        kwargs["connect_args"] = {
-            "check_same_thread": False
-        }
-
-    else:
-
-        kwargs.update(
-            pool_size=settings.database_pool_size,
-            max_overflow=settings.database_max_overflow,
-            pool_recycle=settings.database_pool_recycle,
-        )
-
-    return create_engine(database_url, **kwargs)
+    return create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_size=settings.database_pool_size,
+        max_overflow=settings.database_max_overflow,
+        pool_recycle=settings.database_pool_recycle,
+    )
 
 
 DATABASE_URL = settings.database_url

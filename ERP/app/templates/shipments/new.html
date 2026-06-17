@@ -124,7 +124,7 @@
             Elimina permanentemente la guía {{ existing.guide_number }}. Requiere clave de administrador.
         </p>
         <form method="POST" action="/shipments/{{ existing.id }}/delete"
-            onsubmit="return confirm('¿Eliminar la guía {{ existing.guide_number }}? Esta acción no se puede deshacer.');"
+            onsubmit="return erpConfirmForm(event, '¿Eliminar la guía {{ existing.guide_number }}? Esta acción no se puede deshacer.');"
             class="flex flex-wrap items-end gap-3">
             <div class="flex-1 min-w-[200px]">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Clave de administrador</label>

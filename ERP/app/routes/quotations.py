@@ -22,6 +22,12 @@ from app.models.shipment import Shipment
 from app.models.quotation_design import QuotationDesign
 from app.models.production_tracking import ProductionTracking
 from app.models.design_tracking import DesignTracking
+from app.services.logo_types import (
+    LOGO_TYPE_SIN,
+    normalize_logo_type,
+    register_logo_template_globals,
+    resolve_item_logo_type,
+)
 from app.services.production_helpers import ensure_production_order, cancel_stale_pending_quotations
 from app.services.product_service import (
     create_custom_product_from_quotation,
@@ -67,6 +73,7 @@ templates.env.globals["payment_receipt_url"] = payment_receipt_url
 templates.env.globals["is_payment_receipt_pdf"] = is_payment_receipt_pdf
 templates.env.globals["is_payment_receipt_image"] = is_payment_receipt_image
 templates.env.globals["product_image_url"] = product_image_url
+register_logo_template_globals(templates.env)
 
 QUOTATION_ROLES = ["admin", "ventas"]
 
@@ -169,6 +176,7 @@ def _add_items_to_quotation(
         if image_name and product_id:
             sync_product_image(db, product_id, image_name)
 
+        resolved_logo = normalize_logo_type(item.get("logo_type") or item.get("logo"))
         db.add(
             QuotationItem(
                 quotation_id=quotation.id,
@@ -178,7 +186,8 @@ def _add_items_to_quotation(
                 measure=item.get("measure", ""),
                 theme=item.get("theme", ""),
                 color=item.get("color", ""),
-                logo=item.get("logo", False),
+                logo=resolved_logo != LOGO_TYPE_SIN,
+                logo_type=resolved_logo,
                 unit_price=item.get("price", 0),
                 total=item.get("total", 0),
                 product_image=image_name,
@@ -535,7 +544,7 @@ async def update_item(
     theme: str = Form(""),
     measure: str = Form(""),
     color: str = Form(""),
-    logo: bool = Form(False),
+    logo_type: str = Form("sin_logo"),
     product_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -550,13 +559,15 @@ async def update_item(
     if quantity < 1:
         return RedirectResponse(url=f"/quotations/{item.quotation_id}", status_code=302)
 
+    resolved_logo = normalize_logo_type(logo_type)
     item.quantity = quantity
     item.unit_price = unit_price
     item.total = quantity * unit_price
     item.theme = theme
     item.measure = measure
     item.color = color
-    item.logo = logo
+    item.logo_type = resolved_logo
+    item.logo = resolved_logo != LOGO_TYPE_SIN
 
     if product_image and product_image.filename:
         try:
@@ -831,7 +842,7 @@ async def edit_quotation_page(
                 "measure": item.measure or "",
                 "theme": item.theme or "",
                 "color": item.color or "",
-                "logo": bool(item.logo),
+                "logo_type": resolve_item_logo_type(item),
                 "price": item.unit_price,
                 "total": item.total,
                 "existing_image": item.product_image or "",
@@ -1057,7 +1068,7 @@ async def add_product_to_quotation(
     theme: str = Form(""),
     measure: str = Form(""),
     color: str = Form(""),
-    logo: bool = Form(False),
+    logo_type: str = Form("sin_logo"),
     product_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -1071,6 +1082,8 @@ async def add_product_to_quotation(
 
     if quantity < 1:
         return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+    resolved_logo = normalize_logo_type(logo_type)
 
     image_name = None
     if product_image and product_image.filename:
@@ -1094,7 +1107,8 @@ async def add_product_to_quotation(
             theme=theme,
             measure=measure,
             color=color,
-            logo=logo,
+            logo=resolved_logo != LOGO_TYPE_SIN,
+            logo_type=resolved_logo,
             unit_price=product.price,
             total=quantity * product.price,
         )
@@ -1118,7 +1132,8 @@ async def add_product_to_quotation(
             theme=theme,
             measure=measure,
             color=color,
-            logo=logo,
+            logo=resolved_logo != LOGO_TYPE_SIN,
+            logo_type=resolved_logo,
             unit_price=custom_price,
             total=quantity * custom_price,
             product_image=image_name,

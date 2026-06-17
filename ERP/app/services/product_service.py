@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.models.product import Product
+from app.utils.text_format import format_title_words
 
 
 def create_custom_product_from_quotation(
@@ -22,7 +23,7 @@ def create_custom_product_from_quotation(
     Registra un producto personalizado en el catálogo.
     Cada ítem manual de cotización genera su propio registro.
     """
-    product_name = (name or "").strip()
+    product_name = format_title_words(name)
     if not product_name:
         return None
 
@@ -31,11 +32,11 @@ def create_custom_product_from_quotation(
         name=product_name,
         description=(description or product_name or ""),
         category="Personalizado",
-        material=material or "",
-        color=color or "",
+        material=format_title_words(material) if material else "",
+        color=format_title_words(color) if color else "",
         size=size or "",
         thickness=thickness or "",
-        theme=theme or "",
+        theme=format_title_words(theme) if theme else "",
         price=float(price or 0),
         cost=0,
         stock=0,

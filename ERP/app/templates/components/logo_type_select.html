@@ -1,0 +1,11 @@
+{% macro logo_type_select(name, selected='sin_logo', id='', extra_class='') %}
+<select
+    name="{{ name }}"
+    {% if id %}id="{{ id }}"{% endif %}
+    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm {{ extra_class }}"
+>
+    {% for value, label in LOGO_TYPE_CHOICES %}
+    <option value="{{ value }}" {% if selected == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+</select>
+{% endmacro %}

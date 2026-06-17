@@ -49,7 +49,7 @@ def generate_quotation_pdf(quotation, items, client, db=None):
             accent_color="#4C1D95",
             quotation_footer_text="Gracias por confiar en SISTEMA ERP.",
             quotation_validity_days=15,
-            iva_default=19,
+            iva_default=0,
         )
 
     # ====================================

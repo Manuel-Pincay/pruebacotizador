@@ -30,6 +30,7 @@ SCHEMA_ADDITIONS = {
     },
     "quotation_items": {
         "product_image": "VARCHAR(255)",
+        "logo_type": "VARCHAR(20) DEFAULT 'sin_logo'",
     },
     "company_config": {
         "guide_sender_name": "VARCHAR(255)",
@@ -37,6 +38,7 @@ SCHEMA_ADDITIONS = {
         "guide_sender_region": "VARCHAR(255) DEFAULT 'Ecuador'",
         "guide_sender_phone": "VARCHAR(255)",
         "guide_sender_address": "VARCHAR(255)",
+        "company_icon": "VARCHAR(255)",
     },
 }
 
@@ -61,7 +63,7 @@ def _existing_columns(inspector, table_name: str) -> set[str]:
 
 
 def run_schema_migrations():
-    """Añade columnas faltantes sin alterar datos existentes (SQLite y MySQL)."""
+    """Añade columnas faltantes sin alterar datos existentes."""
     inspector = inspect(engine)
 
     with engine.begin() as conn:
@@ -86,7 +88,21 @@ def run_schema_migrations():
                     {"old": old, "new": new},
                 )
 
+        if inspector.has_table("quotation_items"):
+            item_cols = _existing_columns(inspector, "quotation_items")
+            if "logo_type" in item_cols and "logo" in item_cols:
+                conn.execute(
+                    text(
+                        "UPDATE quotation_items SET logo_type = 'grabado' "
+                        "WHERE (logo = 1 OR logo = TRUE) "
+                        "AND (logo_type IS NULL OR logo_type = '' OR logo_type = 'sin_logo')"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "UPDATE quotation_items SET logo_type = 'sin_logo' "
+                        "WHERE logo_type IS NULL OR logo_type = ''"
+                    )
+                )
 
-def run_sqlite_migrations():
-    """Compatibilidad con código existente."""
-    run_schema_migrations()
+

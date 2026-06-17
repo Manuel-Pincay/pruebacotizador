@@ -313,9 +313,11 @@ function closeFabDetail() {
 }
 
 async function fabOrderAction(orderId, action, button) {
-    if (!confirm(action === "taken"
-        ? "¿Marcar esta orden como TOMADA (pasa a producción)?"
-        : "¿Marcar como YA REALIZADA (pasa a envío)?")) {
+    if (!(await ErpDialog.confirm(
+        action === "taken"
+            ? "¿Marcar esta orden como TOMADA (pasa a producción)?"
+            : "¿Marcar como YA REALIZADA (pasa a envío)?"
+    ))) {
         return;
     }
     const original = button.textContent;
@@ -333,9 +335,9 @@ async function fabOrderAction(orderId, action, button) {
             location.reload();
             return;
         }
-        alert(result.message || "No se pudo actualizar la orden.");
+        ErpDialog.error(result.message || "No se pudo actualizar la orden.");
     } catch (e) {
-        alert("Error de conexión.");
+        ErpDialog.error("Error de conexión.");
     } finally {
         button.disabled = false;
         button.textContent = original;

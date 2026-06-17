@@ -30,6 +30,40 @@
 </div>
 
 <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div class="p-4 md:p-5 border-b border-gray-100 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex flex-wrap gap-2">
+                {% set status_qs = '&status=' ~ filters.status if filters.status else '' %}
+                <a href="/production/?view=active{{ status_qs }}"
+                    class="px-4 py-2 rounded-xl text-sm font-medium {% if filters.view == 'active' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200 text-gray-700{% endif %}">
+                    Activas ({{ active_tab_count|default(0) }})
+                </a>
+                <a href="/production/?view=completed{{ status_qs }}"
+                    class="px-4 py-2 rounded-xl text-sm font-medium {% if filters.view == 'completed' %}bg-purple-700 text-white{% else %}bg-gray-100 hover:bg-gray-200 text-gray-700{% endif %}">
+                    Realizadas ({{ completed_tab_count|default(0) }})
+                </a>
+            </div>
+
+            <form method="GET" class="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="view" value="{{ filters.view }}" />
+                <label for="status_filter" class="text-sm text-gray-500 sr-only">Estado</label>
+                <select id="status_filter" name="status" onchange="this.form.submit()"
+                    class="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white min-w-[180px]">
+                    <option value="">Todos los estados</option>
+                    {% for code, label in status_options %}
+                    <option value="{{ code }}" {% if filters.status == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                {% if filters.status %}
+                <a href="/production/?view={{ filters.view }}"
+                    class="px-3 py-2 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 text-gray-600">
+                    Limpiar
+                </a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
     <div class="erp-table-wrap">
         <table class="erp-table text-sm">
             <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
@@ -103,7 +137,13 @@
                 {% else %}
                 <tr>
                     <td colspan="9" class="p-12 text-center text-gray-500">
+                        {% if filters.view == 'completed' %}
+                        No hay órdenes realizadas{% if filters.status %} con este estado{% endif %}.
+                        {% elif filters.status %}
+                        No hay órdenes con estado «{{ filters.status_label or filters.status }}».
+                        {% else %}
                         No hay órdenes de producción activas.
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

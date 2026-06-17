@@ -43,6 +43,8 @@ def _referenced_files(db: Session) -> dict[str, set[str]]:
     config = db.query(CompanyConfig).first()
     if config and config.logo:
         logos.add(config.logo)
+    if config and config.company_icon:
+        logos.add(config.company_icon)
     return {
         "products": products,
         "designs": designs,

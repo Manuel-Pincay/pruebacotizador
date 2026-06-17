@@ -1,5 +1,3 @@
-import os
-
 from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
@@ -39,22 +37,23 @@ templates = Jinja2Templates(
 )
 
 from app.utils.context import get_global_config
+from urllib.parse import quote
+
 from app.utils.image_storage import (
     UploadValidationError,
     delete_logo_file,
     logo_image_url,
     read_upload_bytes,
-    save_logo_image,
+    save_company_icon,
+    save_company_logo_image,
+    validate_company_icon_filename,
     validate_upload_filename,
+    MAX_LOGO_BYTES,
+    MAX_COMPANY_LOGO_BYTES,
 )
 
 templates.env.globals["inject_global_config"] = get_global_config
 templates.env.globals["logo_image_url"] = logo_image_url
-
-UPLOAD_DIR = "uploads/logos"
-
-# Create upload directory if it doesn't exist
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # =====================================
@@ -171,12 +170,13 @@ async def save_config(
     font_color: str = Form(...),
     quotation_validity_days: int = Form(default=15),
     quotation_footer_text: str = Form(...),
-    iva_default: int = Form(default=19),
+    iva_default: int = Form(default=0),
     guide_sender_name: str = Form(""),
     guide_sender_city: str = Form("Manta"),
     guide_sender_region: str = Form("Ecuador"),
     guide_sender_phone: str = Form(""),
     guide_sender_address: str = Form(""),
+    company_icon: UploadFile = File(None),
     logo: UploadFile = File(None),
     request: Request = Request,
     db: Session = Depends(get_db)
@@ -204,16 +204,29 @@ async def save_config(
     config.guide_sender_phone = guide_sender_phone.strip() or None
     config.guide_sender_address = guide_sender_address.strip() or None
 
-    # Handle logo upload
+    # Icono (sidebar / favicon)
+    if company_icon and company_icon.filename:
+        try:
+            validate_company_icon_filename(company_icon.filename)
+            data = await read_upload_bytes(company_icon, MAX_LOGO_BYTES)
+            delete_logo_file(config.company_icon)
+            config.company_icon = save_company_icon(data)
+        except UploadValidationError as exc:
+            return RedirectResponse(
+                url=f"/secretadmin/config?error=icon&msg={quote(str(exc))}",
+                status_code=302,
+            )
+
+    # Logo (PDF cotizaciones y guías)
     if logo and logo.filename:
         try:
             validate_upload_filename(logo.filename)
-            data = await read_upload_bytes(logo, 3 * 1024 * 1024)
+            data = await read_upload_bytes(logo, MAX_COMPANY_LOGO_BYTES)
             delete_logo_file(config.logo)
-            config.logo = save_logo_image(data)
-        except UploadValidationError:
+            config.logo = save_company_logo_image(data)
+        except UploadValidationError as exc:
             return RedirectResponse(
-                url="/secretadmin/config?error=logo_invalido",
+                url=f"/secretadmin/config?error=logo&msg={quote(str(exc))}",
                 status_code=302,
             )
 

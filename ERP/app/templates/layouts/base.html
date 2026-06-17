@@ -10,8 +10,14 @@
       {{ global_config.config.company_name if global_config.config else "SISTEMA
       ERP" }} ERP
     </title>
+    {% if global_config.logo_url %}
+    <link rel="icon" type="image/png" href="{{ global_config.logo_url }}" sizes="100x100 128x128">
+    {% endif %}
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/static/js/erp-dialogs.js"></script>
 
 <script src="https://unpkg.com/lucide@latest"></script>
 <script>
@@ -227,6 +233,13 @@ lucide.createIcons();
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
+      <div class="shrink-0 w-9 h-9 rounded-xl bg-purple-100 overflow-hidden flex items-center justify-center">
+        {% if global_config.logo_url %}
+        <img src="{{ global_config.logo_url }}" alt="" class="w-full h-full object-contain p-0.5" />
+        {% else %}
+        <span class="text-purple-700 text-sm font-bold">ERP</span>
+        {% endif %}
+      </div>
       <div class="min-w-0 flex-1">
         <p class="text-sm font-semibold text-slate-800 truncate">
           {{ global_config.config.company_name if global_config.config else "SISTEMA ERP" }}
@@ -258,8 +271,16 @@ lucide.createIcons();
             bg-white/15
             backdrop-blur
             flex items-center justify-center
+            overflow-hidden
+            shrink-0
         ">
-
+            {% if global_config.logo_url %}
+            <img
+                src="{{ global_config.logo_url }}"
+                alt="Logo {{ global_config.config.company_name if global_config.config else 'ERP' }}"
+                class="w-full h-full object-contain p-1"
+            />
+            {% else %}
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="w-7 h-7 text-white"
@@ -274,7 +295,7 @@ lucide.createIcons();
                     d="M3 7l9-4 9 4v10l-9 4-9-4V7z"
                 />
             </svg>
-
+            {% endif %}
         </div>
 
         <div>
@@ -350,6 +371,10 @@ lucide.createIcons();
             <span>📄</span>
             <span>Cotizaciones</span>
           </a>
+          <a href="/production/condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/condensed') }}">
+            <span>📋</span>
+            <span>Condensado</span>
+          </a>
           <a href="/quotations/tracking" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations/tracking') }}">
             <span>📈</span>
             <span>Seguimiento Comercial</span>
@@ -357,10 +382,6 @@ lucide.createIcons();
           <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
             <span>🚚</span>
             <span>Guías de Envío</span>
-          </a>
-          <a href="/production/condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/condensed') }}">
-            <span>🏭</span>
-            <span>Condensado Producción</span>
           </a>
           <a href="/production/fabrication-condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/fabrication-condensed') }}">
             <span>🖨️</span>
@@ -407,7 +428,7 @@ lucide.createIcons();
             <div id="designProductionMenu" class="sidebar-submenu {% if not design_prod_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
               <a href="/design/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/pending') }}">⏳ Diseños Pendientes</a>
               <a href="/design/orders" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/orders') }}">🖨️ Datos de fabricación</a>
-              <a href="/production/condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/condensed') }}">📋 Condensado Producción</a>
+              <a href="/production/condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/condensed') }}">📋 Condensado</a>
               <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado Fabricación</a>
             </div>
           </div>
@@ -431,7 +452,7 @@ lucide.createIcons();
           </a>
 
           {% elif current_role == 'admin' %}
-          {% set production_menu_open = nav_path.startswith('/production') %}
+          {% set production_menu_open = nav_path.startswith('/production') and not nav_path.startswith('/production/condensed') %}
           {% set design_menu_open = nav_path.startswith('/design') %}
           {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') or nav_path.startswith('/product-settings') or nav_path.startswith('/imports') %}
           {% set system_menu_open = nav_path.startswith('/users') or nav_path.startswith('/inventory') or nav_path.startswith('/secretadmin') %}
@@ -443,6 +464,10 @@ lucide.createIcons();
           <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
             <span>📄</span>
             <span>Cotizaciones</span>
+          </a>
+          <a href="/production/condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/condensed') }}">
+            <span>📋</span>
+            <span>Condensado</span>
           </a>
           <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
             <span>🚚</span>
@@ -465,7 +490,6 @@ lucide.createIcons();
               <a href="/production/kanban" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/kanban') }}">📋 Kanban</a>
               <a href="/production/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{% if admin_prod_order_active %} is-active{% endif %}">📝 Órdenes</a>
               <a href="/production/calendar" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/calendar') }}">🗓️ Calendario</a>
-              <a href="/production/condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/condensed') }}">📄 Condensado Producción</a>
               <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado Fabricación</a>
             </div>
           </div>

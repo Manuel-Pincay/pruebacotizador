@@ -138,7 +138,11 @@
                 </div>
                 <div>
                     <label class="text-xs text-gray-500">Logo</label>
-                    <div id="logo_indicator" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-1 bg-gray-50 text-center">No</div>
+                    <select id="logo_type" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-1">
+                        <option value="sin_logo">Sin Logo</option>
+                        <option value="grabado">Con logo Grabado</option>
+                        <option value="impreso">Con logo impreso</option>
+                    </select>
                 </div>
             </div>
 
@@ -285,11 +289,14 @@
 
             <input id="custom_theme" placeholder="Forma" class="border rounded-xl p-3" />
 
-            <label class="flex items-center gap-3 col-span-2">
-                <input type="checkbox" id="custom_logo" />
-
-                Incluye logo del cliente
-            </label>
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-600 mb-1">Tipo de logo</label>
+                <select id="custom_logo_type" class="w-full border rounded-xl p-3">
+                    <option value="sin_logo">Sin Logo</option>
+                    <option value="grabado">Con logo Grabado</option>
+                    <option value="impreso">Con logo impreso</option>
+                </select>
+            </div>
             <input type="number" id="custom_price" placeholder="Precio" class="border rounded-xl p-3" />
             <div class="col-span-2">
                 <label class="block text-sm font-medium text-gray-600 mb-1">Imagen del producto</label>
@@ -542,7 +549,7 @@
         const clientName = formData.get("name")?.toString().trim()
 
         if (!clientName) {
-            alert("Ingresa el nombre del cliente")
+            ErpDialog.warning("Ingresa el nombre del cliente")
             return
         }
 
@@ -552,7 +559,7 @@
         })
 
         if (!response.ok) {
-            alert("No se pudo crear el cliente")
+            ErpDialog.error("No se pudo crear el cliente")
             return
         }
 
@@ -569,7 +576,7 @@
 
         if (createdClient) {
             selectClient(createdClient)
-            alert("Cliente creado y seleccionado")
+            ErpDialog.toast("Cliente creado y seleccionado")
         }
     }
 
@@ -634,6 +641,38 @@
 
     let quotationItems = []
 
+    const LOGO_TYPES = {
+        sin_logo: "Sin Logo",
+        grabado: "Con logo Grabado",
+        impreso: "Con logo impreso",
+    }
+
+    function normalizeLogoType(value) {
+        if (value === true || value === "true" || value === 1 || value === "1") {
+            return "grabado"
+        }
+        if (!value || value === false || value === "false") {
+            return "sin_logo"
+        }
+        const text = String(value).trim().toLowerCase()
+        return LOGO_TYPES[text] ? text : "sin_logo"
+    }
+
+    function logoTypeLabel(value) {
+        return LOGO_TYPES[normalizeLogoType(value)] || LOGO_TYPES.sin_logo
+    }
+
+    function logoTypeBadgeHtml(logoType) {
+        const normalized = normalizeLogoType(logoType)
+        if (normalized === "grabado") {
+            return `<span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">${LOGO_TYPES.grabado}</span>`
+        }
+        if (normalized === "impreso") {
+            return `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs">${LOGO_TYPES.impreso}</span>`
+        }
+        return `<span class="bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs">${LOGO_TYPES.sin_logo}</span>`
+    }
+
     let designPreviewUrls = []
 
     function previewDesignFiles(input) {
@@ -650,7 +689,7 @@
         }
 
         if (input.files.length > 4) {
-            alert("Máximo 4 imágenes de diseño")
+            ErpDialog.warning("Máximo 4 imágenes de diseño")
         }
 
         Array.from(input.files)
@@ -683,7 +722,10 @@
 
     {% if edit_mode is defined and edit_mode %}
 
-    quotationItems = {{ items_json | safe }}
+    quotationItems = {{ items_json | safe }}.map(item => ({
+        ...item,
+        logo_type: normalizeLogoType(item.logo_type ?? item.logo),
+    }))
 
     {% endif %}
 
@@ -865,11 +907,8 @@
         ).value = product.color || "-"
 
         document.getElementById(
-            "logo_indicator"
-        ).innerHTML =
-            product.logo
-                ? "Sí"
-                : "No"
+            "logo_type"
+        ).value = "sin_logo"
 
         // CLOSE RESULTS
         resultsBox.classList.add(
@@ -904,7 +943,7 @@
 
         if (!productName) {
 
-            alert("Selecciona un producto")
+            ErpDialog.warning("Selecciona un producto")
 
             return
         }
@@ -916,7 +955,7 @@
 
         if (exists) {
 
-            alert("Este producto ya fue agregado")
+            ErpDialog.warning("Este producto ya fue agregado")
 
             return
         }
@@ -943,10 +982,9 @@
                 "color"
             ).value,
 
-            logo:
-                document.getElementById(
-                    "logo_indicator"
-                ).innerText === "Sí",
+            logo_type: document.getElementById(
+                "logo_type"
+            ).value,
 
             price: price,
 
@@ -993,7 +1031,7 @@
 
         if (!detail || !price) {
 
-            alert("Completa los campos")
+            ErpDialog.warning("Completa los campos")
 
             return
         }
@@ -1030,9 +1068,9 @@
                 "custom_color"
             ).value,
 
-            logo: document.getElementById(
-                "custom_logo"
-            ).checked,
+            logo_type: document.getElementById(
+                "custom_logo_type"
+            ).value,
             price: price,
 
             total: price,
@@ -1131,36 +1169,7 @@
 
               <td class="p-4">
 
-                    ${item.logo
-                    ? `
-                        <span
-                            class="
-                            bg-green-100
-                            text-green-700
-                            px-2
-                            py-1
-                            rounded-full
-                            text-xs
-                            "
-                        >
-                            Sí
-                        </span>
-                        `
-                    : `
-                        <span
-                            class="
-                            bg-gray-100
-                            text-gray-500
-                            px-2
-                            py-1
-                            rounded-full
-                            text-xs
-                            "
-                        >
-                            No
-                        </span>
-                        `
-                }
+                    ${logoTypeBadgeHtml(item.logo_type ?? item.logo)}
 
                 </td>
 
@@ -1396,8 +1405,8 @@
         ).value = ""
 
         document.getElementById(
-            "logo_indicator"
-        ).innerHTML = "No"
+            "logo_type"
+        ).value = "sin_logo"
     }
     function clearCustomFields() {
 
@@ -1418,8 +1427,8 @@
         ).value = ""
 
         document.getElementById(
-            "custom_logo"
-        ).checked = false
+            "custom_logo_type"
+        ).value = "sin_logo"
 
         document.getElementById(
             "custom_price"
@@ -1457,23 +1466,23 @@
         clearSaveError()
 
         if (!document.getElementById("selected_client_id").value) {
-            alert("Selecciona un cliente")
+            ErpDialog.warning("Selecciona un cliente")
             return
         }
 
         if (quotationItems.length === 0) {
-            alert("Agrega productos")
+            ErpDialog.warning("Agrega productos")
             return
         }
 
         for (const item of quotationItems) {
             if (!item.quantity || item.quantity <= 0) {
-                alert("Existe un producto con cantidad inválida")
+                ErpDialog.warning("Existe un producto con cantidad inválida")
                 return
             }
 
             if (!item.price || item.price <= 0) {
-                alert("Existe un producto con precio inválido")
+                ErpDialog.warning("Existe un producto con precio inválido")
                 return
             }
         }
@@ -1502,7 +1511,7 @@
         )
         let designInput = document.getElementById("design_files")
         if (designInput && designInput.files.length > 4) {
-            alert("Máximo 4 imágenes de diseño")
+            ErpDialog.warning("Máximo 4 imágenes de diseño")
             return
         }
 
@@ -1512,7 +1521,7 @@
 
         if (!deliveryDate) {
 
-            alert("Selecciona fecha de entrega")
+            ErpDialog.warning("Selecciona fecha de entrega")
 
             return
         }
@@ -1564,7 +1573,7 @@
             measure: item.measure || "",
             theme: item.theme || "",
             color: item.color || "",
-            logo: !!item.logo,
+            logo_type: normalizeLogoType(item.logo_type ?? item.logo),
             price: item.price,
             total: item.total,
             existing_image: item.existing_image || ""

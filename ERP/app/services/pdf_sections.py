@@ -1,5 +1,6 @@
 from reportlab.platypus import Table, TableStyle, Paragraph, Image, Spacer
 
+from app.services.logo_types import logo_type_pdf_label, resolve_item_logo_type
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
@@ -203,7 +204,7 @@ def build_products_table(items, config):
     ]
 
     for item in items:
-        logo_display = "Sí" if item.logo else "-"
+        logo_display = logo_type_pdf_label(resolve_item_logo_type(item))
 
         data.append(
             [
@@ -220,7 +221,7 @@ def build_products_table(items, config):
 
     table = Table(
         data,
-        colWidths=[32, 165, 48, 88, 52, 32, 58, 55],
+        colWidths=[32, 168, 48, 90, 50, 42, 42, 52],
         repeatRows=1,
     )
 

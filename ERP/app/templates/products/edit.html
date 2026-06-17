@@ -58,33 +58,37 @@
         <div>
           <label class="block mb-2"> Categoría </label>
 
-          <div class="flex gap-2">
-            <select name="category" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for category in categories %}
-
-              <option value="{{ category.name }}" {% if category.name == product.category %}selected{% endif %}>{{ category.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank" class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">+</a>
-          </div>
+          <input
+            type="text"
+            name="category"
+            list="category-options"
+            value="{{ product.category or '' }}"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="category-options">
+            {% for category in categories %}
+            <option value="{{ category.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
 
         <div>
           <label class="block mb-2"> Temática </label>
 
-          <div class="flex gap-2">
-            <select name="theme" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for theme in themes %}
-
-              <option value="{{ theme.name }}" {% if theme.name == product.theme %}selected{% endif %}>{{ theme.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank" class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">+</a>
-          </div>
+          <input
+            type="text"
+            name="theme"
+            list="theme-options"
+            value="{{ product.theme or '' }}"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="theme-options">
+            {% for theme in themes %}
+            <option value="{{ theme.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
       </div>
     </div>
@@ -98,33 +102,37 @@
         <div>
           <label class="block mb-2"> Material </label>
 
-          <div class="flex gap-2">
-            <select name="material" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for material in materials %}
-
-              <option value="{{ material.name }}" {% if material.name == product.material %}selected{% endif %}>{{ material.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank" class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">+</a>
-          </div>
+          <input
+            type="text"
+            name="material"
+            list="material-options"
+            value="{{ product.material or '' }}"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="material-options">
+            {% for material in materials %}
+            <option value="{{ material.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
 
         <div>
           <label class="block mb-2"> Color </label>
 
-          <div class="flex gap-2">
-            <select name="color" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for color in colors %}
-
-              <option value="{{ color.name }}" {% if color.name == product.color %}selected{% endif %}>{{ color.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank" class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">+</a>
-          </div>
+          <input
+            type="text"
+            name="color"
+            list="color-options"
+            value="{{ product.color or '' }}"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="color-options">
+            {% for color in colors %}
+            <option value="{{ color.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
       </div>
 

@@ -22,7 +22,11 @@ BLOCKED_EXTENSIONS = {
 
 MAX_PRODUCT_BYTES = 5 * 1024 * 1024
 MAX_DESIGN_BYTES = 10 * 1024 * 1024
-MAX_LOGO_BYTES = 3 * 1024 * 1024
+MAX_LOGO_BYTES = 512 * 1024
+MAX_COMPANY_LOGO_BYTES = 3 * 1024 * 1024
+COMPANY_ICON_SIZES = frozenset({100, 128})
+COMPANY_ICON_FORMAT = "PNG"
+COMPANY_LOGO_MAX_PX = 800
 MAX_PAYMENT_RECEIPT_BYTES = 10 * 1024 * 1024
 
 PRODUCT_MAX_PX = 1920
@@ -148,17 +152,65 @@ def save_design_image(data: bytes) -> str:
     return name
 
 
-def save_logo_image(data: bytes) -> str:
+def validate_company_icon_filename(filename: str | None) -> str:
+    ext = _extension(filename)
+    if ext != "png":
+        raise UploadValidationError(
+            "El icono debe ser PNG cuadrado de 100×100 o 128×128 px."
+        )
+    return ext
+
+
+def validate_company_icon_data(data: bytes) -> Image.Image:
+    if len(data) > MAX_LOGO_BYTES:
+        raise UploadValidationError(
+            f"El icono no debe superar {MAX_LOGO_BYTES // 1024} KB."
+        )
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise UploadValidationError(
+            "El icono debe ser un archivo PNG válido de 100×100 o 128×128 px."
+        )
+    image = _open_image(data)
+    if (image.format or "").upper() != COMPANY_ICON_FORMAT:
+        raise UploadValidationError(
+            "El icono debe estar en formato PNG."
+        )
+    width, height = image.size
+    if width != height or width not in COMPANY_ICON_SIZES:
+        allowed = " o ".join(f"{size}×{size}" for size in sorted(COMPANY_ICON_SIZES))
+        raise UploadValidationError(
+            f"El icono debe medir exactamente {allowed} px "
+            f"(recibido: {width}×{height} px)."
+        )
+    return image
+
+
+def save_company_icon(data: bytes) -> str:
+    """Icono PNG 100×100 o 128×128 para sidebar y favicon."""
+    image = validate_company_icon_data(data)
+    if image.mode not in ("RGBA", "RGB", "P", "LA"):
+        image = image.convert("RGBA")
+    elif image.mode == "P":
+        image = image.convert("RGBA")
+    name = f"{uuid.uuid4()}.png"
+    path = LOGOS_DIR / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path, format="PNG", optimize=True)
+    return name
+
+
+def save_company_logo_image(data: bytes) -> str:
+    """Logo de empresa para PDFs y documentos (hasta 800 px)."""
     name = _new_webp_name()
     image = _open_image(data)
     if image.mode in ("RGBA", "LA", "P"):
         image = image.convert("RGBA")
-        image.thumbnail((800, 800), Image.Resampling.LANCZOS)
+        image.thumbnail((COMPANY_LOGO_MAX_PX, COMPANY_LOGO_MAX_PX), Image.Resampling.LANCZOS)
         path = LOGOS_DIR / name
         path.parent.mkdir(parents=True, exist_ok=True)
         image.save(path, format="WEBP", quality=WEBP_QUALITY, method=6)
     else:
-        image = _resize_max(_to_rgb(image), 800)
+        image = _resize_max(_to_rgb(image), COMPANY_LOGO_MAX_PX)
         _save_webp(image, LOGOS_DIR / name)
     return name
 
@@ -236,7 +288,12 @@ def design_image_url(filename: str | None) -> str | None:
 def logo_image_url(filename: str | None) -> str | None:
     if not filename:
         return None
-    path = _file_exists(LOGOS_DIR / filename, LOGOS_DIR / f"{Path(filename).stem}.webp")
+    stem = Path(filename).stem
+    path = _file_exists(
+        LOGOS_DIR / filename,
+        LOGOS_DIR / f"{stem}.webp",
+        LOGOS_DIR / f"{stem}.png",
+    )
     if path:
         return f"/uploads/logos/{path.name}"
     return None

@@ -17,6 +17,8 @@ class CompanyConfig(Base):
 
     logo = Column(String, nullable=True)
 
+    company_icon = Column(String, nullable=True)
+
     primary_color = Column(String, default="#7C3AED")
 
     secondary_color = Column(String, default="#E9D5FF")
@@ -29,7 +31,7 @@ class CompanyConfig(Base):
 
     quotation_footer_text = Column(String, default="Gracias por confiar en SISTEMA ERP.")
 
-    iva_default = Column(Integer, default=19)
+    iva_default = Column(Integer, default=0)
 
     guide_sender_name = Column(String, nullable=True)
     guide_sender_city = Column(String, default="Manta")

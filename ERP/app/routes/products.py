@@ -1,5 +1,3 @@
-import json
-
 from fastapi import APIRouter
 from fastapi import Request
 from fastapi import Depends
@@ -28,6 +26,9 @@ from app.models.measurementunit import MeasurementUnit
 from app.models.product import Product
 
 from app.auth.auth_handler import role_required
+from app.services.product_catalog_service import ensure_product_catalog_values
+from app.utils.text_format import format_title_words
+from app.utils.dialog_response import dialog_message_response
 from app.utils.image_storage import (
     UploadValidationError,
     delete_product_files,
@@ -163,7 +164,6 @@ def search_products(request: Request, q: str, db: Session = Depends(get_db)):
             "measure": product.size or "",
             "theme": product.theme or "",
             "color": product.color or "",
-            "logo": "Sí" if getattr(product, "custom", False) else "No",
         }
         for product in products
     ]
@@ -208,19 +208,10 @@ async def create_product(
 
     if existing_product:
 
-        return HTMLResponse(
-            content=f"""
-        <script>
-
-            alert(
-                'Ya existe un producto con el código {code}'
-            )
-
-            window.history.back()
-
-        </script>
-        """,
-            status_code=400,
+        return dialog_message_response(
+            f"Ya existe un producto con el código {code}",
+            dialog_type="warning",
+            title="Código duplicado",
         )
     image_name = None
 
@@ -230,24 +221,28 @@ async def create_product(
             data = read_upload_bytes_sync(image, 5 * 1024 * 1024)
             image_name = save_product_image(data)
         except UploadValidationError as exc:
-            return HTMLResponse(
-                content=f"""
-                <script>
-                    alert({json.dumps(str(exc))});
-                    window.history.back();
-                </script>
-                """,
-                status_code=400,
+            return dialog_message_response(
+                str(exc),
+                dialog_type="warning",
+                title="Imagen no válida",
             )
 
-    product = Product(
-        code=code,
-        name=name,
-        description=description,
-        theme=theme,
+    catalog = ensure_product_catalog_values(
+        db,
         category=category,
+        theme=theme,
         material=material,
         color=color,
+    )
+
+    product = Product(
+        code=(code or "").strip(),
+        name=format_title_words(name),
+        description=(description or "").strip(),
+        theme=catalog["theme"],
+        category=catalog["category"],
+        material=catalog["material"],
+        color=catalog["color"],
         size=formatted_size,
         thickness=thickness,
         price=price,
@@ -427,17 +422,25 @@ async def update_product(
 
         product.code = code
 
-        product.name = name
+        product.name = format_title_words(name)
 
         product.description = (description or "").strip()
 
-        product.category = category
+        catalog = ensure_product_catalog_values(
+            db,
+            category=category,
+            theme=theme,
+            material=material,
+            color=color,
+        )
 
-        product.theme = theme
+        product.category = catalog["category"]
 
-        product.material = material
+        product.theme = catalog["theme"]
 
-        product.color = color
+        product.material = catalog["material"]
+
+        product.color = catalog["color"]
 
         product.size = formatted_size
 
@@ -599,5 +602,4 @@ async def product_json(
         "measure": product.size or "",
         "theme": product.theme or "",
         "color": product.color or "",
-        "logo": getattr(product, "logo", False)
     }

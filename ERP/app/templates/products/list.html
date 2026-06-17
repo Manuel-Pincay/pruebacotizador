@@ -171,7 +171,7 @@
                         Editar
                     </a>
                     <a href="/products/{{ product.id }}/delete"
-                        onclick="return confirm('¿Eliminar este producto?')"
+                        onclick="return erpConfirmLink(event, '¿Eliminar este producto?')"
                         class="flex-1 bg-red-500 hover:bg-red-600 text-white text-center px-3 py-2.5 rounded-xl text-sm font-medium transition">
                         Eliminar
                     </a>
@@ -201,7 +201,7 @@
         {% if is_admin %}
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
             <a href="/product-settings/init"
-                onclick="return confirm('¿Cargar catálogos iniciales (categorías, materiales, etc.)?')"
+                onclick="return erpConfirmLink(event, '¿Cargar catálogos iniciales (categorías, materiales, etc.)?')"
                 class="border border-purple-300 text-purple-700 px-6 py-3 rounded-xl font-medium hover:bg-purple-50 transition">
                 Cargar catálogos base
             </a>

@@ -25,6 +25,7 @@ router = APIRouter(prefix="/product-settings", tags=["product_settings"])
 templates = Jinja2Templates(directory="app/templates")
 
 from app.utils.context import get_global_config
+from app.utils.text_format import format_title_words
 
 templates.env.globals["inject_global_config"] = get_global_config
 
@@ -85,6 +86,8 @@ async def create_category(request: Request, name: str = Form(...), db: Session =
     user = _require_admin(request)
     if isinstance(user, RedirectResponse):
         return user
+
+    name = format_title_words(name)
 
     exists = db.query(ProductCategory).filter(ProductCategory.name == name).first()
 
@@ -230,6 +233,8 @@ async def create_material(
     if isinstance(user, RedirectResponse):
         return user
 
+    name = format_title_words(name)
+
     exists = db.query(
         ProductMaterial
     ).filter(
@@ -296,6 +301,8 @@ async def create_color(
     user = _require_admin(request)
     if isinstance(user, RedirectResponse):
         return user
+
+    name = format_title_words(name)
 
     exists = db.query(
         ProductColor
@@ -368,6 +375,8 @@ async def create_theme(
     user = _require_admin(request)
     if isinstance(user, RedirectResponse):
         return user
+
+    name = format_title_words(name)
 
     exists = db.query(
         ProductTheme

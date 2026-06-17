@@ -32,7 +32,6 @@ from app.services.production_helpers import (
     apply_production_status_change,
     next_production_status,
     production_order_delivery_meta,
-    PRODUCTION_ORDER_STATUSES,
     PRODUCTION_STATUS_LABELS,
     production_status_index,
     status_requirements_hint,
@@ -43,10 +42,12 @@ from app.services.production_helpers import (
     week_start,
     status_column_config,
 )
+from app.services.logo_types import register_logo_template_globals
 from app.services.production_order_service import (
     DESIGN_MATERIALS,
     DESIGN_SIZES,
     USB_REFERENCES,
+    PRODUCTION_ORDER_STATUSES,
     PRODUCTION_STATUS_SEQUENCE,
     approve_design,
     build_history_list,
@@ -56,6 +57,12 @@ from app.services.production_order_service import (
     get_production_order,
     normalize_status,
     update_design_fields,
+    list_assignable_designers,
+    list_assignable_fabricators,
+    resolve_selected_designer_id,
+    resolve_selected_fabricator_id,
+    apply_designer_assignment,
+    apply_fabricator_assignment,
 )
 from app.services.kanban_service import (
     KPI_KEYS,
@@ -87,6 +94,7 @@ templates = Jinja2Templates(
 
 from app.utils.context import get_global_config
 templates.env.globals['inject_global_config'] = get_global_config
+register_logo_template_globals(templates.env)
 
 _PRODUCTION_ORDER_LOAD = (
     joinedload(ProductionOrder.quotation).options(
@@ -94,6 +102,36 @@ _PRODUCTION_ORDER_LOAD = (
         joinedload(Quotation.items),
     ),
 )
+
+LIST_COMPLETED_STATUSES = frozenset({"entregado", "cancelado", "envio"})
+
+
+def _order_is_list_completed(status: str | None) -> bool:
+    return normalize_status(status) in LIST_COMPLETED_STATUSES
+
+
+def _filter_production_list(
+    orders: list[ProductionOrder],
+    *,
+    view: str,
+    status: str,
+) -> list[ProductionOrder]:
+    view = (view or "active").lower().strip()
+    status_filter = normalize_status(status) if status else ""
+
+    filtered: list[ProductionOrder] = []
+    for order in orders:
+        normalized = normalize_status(order.status)
+        is_completed = normalized in LIST_COMPLETED_STATUSES
+
+        if view == "completed" and not is_completed:
+            continue
+        if view == "active" and is_completed:
+            continue
+        if status_filter and normalized != status_filter:
+            continue
+        filtered.append(order)
+    return filtered
 
 
 def _calendar_entry(order: ProductionOrder) -> dict:
@@ -150,7 +188,9 @@ def _production_query(db: Session):
 )
 async def production_page(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    view: str = "active",
+    status: str = "",
 ):
 
     user = role_required(
@@ -163,11 +203,19 @@ async def production_page(
 
     prepare_production_module(db)
 
-    orders = (
+    all_orders = (
         _production_query(db)
-        .order_by(ProductionOrder.delivery_date.asc())
+        .order_by(ProductionOrder.created_at.desc(), ProductionOrder.id.desc())
         .all()
     )
+
+    view = (view or "active").lower().strip()
+    if view not in {"active", "completed"}:
+        view = "active"
+
+    orders = _filter_production_list(all_orders, view=view, status=status)
+    active_tab_count = sum(1 for order in all_orders if not _order_is_list_completed(order.status))
+    completed_tab_count = sum(1 for order in all_orders if _order_is_list_completed(order.status))
 
     base = production_orders_base_query(db)
     active_orders_count = base.filter(
@@ -184,6 +232,9 @@ async def production_page(
         ProductionOrder.status != "entregado"
     ).count()
 
+    status_filter = normalize_status(status) if status else ""
+    status_filter_label = PRODUCTION_STATUS_LABELS.get(status_filter, "") if status_filter else ""
+
     return templates.TemplateResponse(
         request=request,
         name="production/list.html",
@@ -192,6 +243,14 @@ async def production_page(
             "active_orders_count": active_orders_count,
             "urgent_orders_count": urgent_orders_count,
             "overdue_orders_count": overdue_orders_count,
+            "active_tab_count": active_tab_count,
+            "completed_tab_count": completed_tab_count,
+            "filters": {
+                "view": view,
+                "status": status_filter,
+                "status_label": status_filter_label,
+            },
+            "status_options": PRODUCTION_ORDER_STATUSES,
             "today": date.today(),
             "user": user,
         }
@@ -720,8 +779,8 @@ async def advance_production_order(
 async def update_production(
     request: Request,
     order_id: int,
-    designer: str = Form(""),
-    fabricator: str = Form(""),
+    designer_user_id: str = Form(""),
+    fabricator_user_id: str = Form(""),
     priority: str = Form("media"),
     observations: str = Form(""),
     status: str = Form("pendiente"),
@@ -742,8 +801,10 @@ async def update_production(
     if not order:
         return RedirectResponse(url="/production/", status_code=302)
 
-    order.designer = designer.strip()
-    order.fabricator = fabricator.strip()
+    parsed_designer_id = int(designer_user_id) if designer_user_id.strip().isdigit() else None
+    parsed_fabricator_id = int(fabricator_user_id) if fabricator_user_id.strip().isdigit() else None
+    apply_designer_assignment(order, db, parsed_designer_id)
+    apply_fabricator_assignment(order, db, parsed_fabricator_id)
 
     error = validate_production_status_change(order, status)
     if error:
@@ -862,10 +923,16 @@ def _production_detail_context(order, request, shipment, user, db) -> dict:
         and (user.role == "admin" or can_edit_design_order(user, order))
     )
     can_manage_order = user.role in {"admin", "produccion"}
+    designers = list_assignable_designers(db)
+    fabricators = list_assignable_fabricators(db)
     return {
         "order": order,
         "shipment": shipment,
         "user": user,
+        "designers": designers,
+        "fabricators": fabricators,
+        "selected_designer_id": resolve_selected_designer_id(order, db) if order else None,
+        "selected_fabricator_id": resolve_selected_fabricator_id(order, db) if order else None,
         "current_status": current_status,
         "production_stages": PRODUCTION_STATUS_SEQUENCE,
         "status_labels": PRODUCTION_STATUS_LABELS,

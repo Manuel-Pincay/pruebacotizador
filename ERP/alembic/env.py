@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, inspect, pool, text
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -21,6 +21,34 @@ if config.config_file_name is not None:
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 target_metadata = Base.metadata
+
+
+def _ensure_alembic_version_table(connection) -> None:
+    """MySQL: revision ids largos requieren version_num > VARCHAR(32)."""
+    insp = inspect(connection)
+    if not insp.has_table("alembic_version"):
+        connection.execute(
+            text(
+                "CREATE TABLE alembic_version ("
+                "version_num VARCHAR(128) NOT NULL, "
+                "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)"
+                ")"
+            )
+        )
+        return
+
+    for col in insp.get_columns("alembic_version"):
+        if col["name"] != "version_num":
+            continue
+        length = getattr(col["type"], "length", None)
+        if length is not None and length < 128:
+            connection.execute(
+                text(
+                    "ALTER TABLE alembic_version "
+                    "MODIFY version_num VARCHAR(128) NOT NULL"
+                )
+            )
+        break
 
 
 def run_migrations_offline() -> None:
@@ -45,6 +73,9 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        _ensure_alembic_version_table(connection)
+        connection.commit()
+
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

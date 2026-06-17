@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.utils.activity import log_activity
 from app.auth.auth_handler import role_required
+from app.utils.text_format import format_title_words
+from app.utils.dialog_response import dialog_message_response
 
 from app.models.client import Client
 from app.models.quotation import Quotation
@@ -277,6 +279,9 @@ async def update_client(
         if not client:
 
             return RedirectResponse(url="/clients", status_code=302)
+
+        ruc_ci = (ruc_ci or "").strip()
+
         # VALIDAR CÉDULA/RUC DUPLICADO
 
         existing_client = (
@@ -287,29 +292,20 @@ async def update_client(
 
         if existing_client:
 
-            return HTMLResponse(
-                content=f"""
-                <script>
-
-                    alert(
-                        "Ya existe otro cliente con la cédula/RUC: {ruc_ci}"
-                    )
-
-                    window.history.back()
-
-                </script>
-                """,
-                status_code=400,
+            return dialog_message_response(
+                f"Ya existe otro cliente con la cédula/RUC: {ruc_ci}",
+                dialog_type="warning",
+                title="Documento duplicado",
             )
 
-        client.name = name
-        client.phone = phone
-        client.email = email
-        client.address = address
-        client.ruc_ci = ruc_ci
-        client.company = company
-        client.client_type = client_type
-        client.observations = observations
+        client.name = format_title_words(name)
+        client.phone = (phone or "").strip()
+        client.email = (email or "").strip().lower()
+        client.address = format_title_words(address)
+        client.ruc_ci = ruc_ci or None
+        client.company = format_title_words(company) or None
+        client.client_type = (client_type or "").strip()
+        client.observations = (observations or "").strip()
 
         db.commit()
 
@@ -392,12 +388,12 @@ async def create_client(
     if isinstance(user, RedirectResponse):
         return user
 
-    name = (name or "").strip()
-    company = (company or "").strip()
+    name = format_title_words(name)
+    company = format_title_words(company)
     ruc_ci = (ruc_ci or "").strip()
     phone = (phone or "").strip()
-    email = (email or "").strip()
-    address = (address or "").strip()
+    email = (email or "").strip().lower()
+    address = format_title_words(address)
     client_type = (client_type or "minorista").strip()
     observations = (observations or "").strip()
 

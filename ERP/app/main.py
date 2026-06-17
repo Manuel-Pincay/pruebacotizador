@@ -12,7 +12,6 @@ from app.models.design_tracking import DesignTracking
 from app.models.production_order import ProductionOrder
 from app.models.production_order_history import ProductionOrderHistory
 from app.models.design_observation import DesignObservation
-from app.models.production_order import ProductionOrder
 from app.models.production_tracking import ProductionTracking
 from app.models.inventory_movement import InventoryMovement
 from app.models.shipment import Shipment
@@ -23,7 +22,7 @@ from app.models.product import Product
 
 from app.auth.security import hash_password
 
-from app.db_migrations import run_schema_migrations
+from app.db_bootstrap import prepare_database
 
 from app.routes import auth
 from app.routes import dashboard
@@ -43,34 +42,18 @@ from app.routes import imports
 from app.routes import product_settings
 
 from app.config.settings import settings
-print("\n========== MODELOS ==========")
-
-for table in Base.metadata.tables:
-    print(f"✓ {table}")
-
-print("=============================\n")
 
 try:
-
-    print("Creando tablas MySQL...")
-
-    Base.metadata.create_all(bind=engine)
-
-    print("✓ Tablas creadas correctamente")
-
+    prepare_database()
+    table_count = len(Base.metadata.tables)
+    print(f"\n✓ Base de datos MySQL lista ({table_count} tablas)\n")
 except Exception as e:
-
-    print("\n" + "=" * 80)
-    print("ERROR CREANDO TABLAS")
-    print("=" * 80)
-
+    print("\n" + "=" * 60)
+    print("ERROR PREPARANDO BASE DE DATOS")
+    print("=" * 60)
     print(type(e).__name__)
     print(str(e))
-
     raise
-
-run_schema_migrations()
-
 app = FastAPI(title="SISTEMA ERP")
 
 app.mount(
@@ -106,10 +89,6 @@ app.include_router(
     product_settings.router
 )
 
-
-print("Creando tablas...")
-Base.metadata.create_all(bind=engine)
-print("Tablas verificadas")
 
 def create_admin():
 

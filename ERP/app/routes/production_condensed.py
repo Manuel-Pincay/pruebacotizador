@@ -249,29 +249,6 @@ async def condensed_order_detail(
     return detail
 
 
-@router.get("/condensed/items/{item_id}/detail")
-async def condensed_item_detail(
-    item_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = _require_condensed_access(request)
-    if isinstance(user, RedirectResponse):
-        return user
-
-    from app.models.quotation_item import QuotationItem
-
-    item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
-    if not item:
-        return JSONResponse(status_code=404, content={"message": "Ítem no encontrado."})
-
-    detail = get_order_detail(db, item.quotation_id)
-    if not detail:
-        return JSONResponse(status_code=404, content={"message": "Orden no encontrada."})
-
-    return detail
-
-
 @router.post("/condensed/orders/{quotation_id}/status")
 async def condensed_update_order_status(
     quotation_id: int,
@@ -289,42 +266,6 @@ async def condensed_update_order_status(
         tracking = update_quotation_tracking_status(
             db,
             quotation_id,
-            status=status,
-            notes=notes,
-            assigned_to=assigned_to,
-        )
-        return {
-            "success": True,
-            "status": tracking.status,
-            "status_label": TRACKING_STATUS_LABELS.get(tracking.status, tracking.status),
-        }
-    except ValueError as exc:
-        return JSONResponse(status_code=400, content={"success": False, "message": str(exc)})
-
-
-@router.post("/condensed/items/{item_id}/status")
-async def condensed_update_status(
-    item_id: int,
-    request: Request,
-    status: str = Form(...),
-    notes: str = Form(""),
-    assigned_to: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    user = _require_condensed_write(request)
-    if isinstance(user, RedirectResponse):
-        return user
-
-    from app.models.quotation_item import QuotationItem
-
-    item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
-    if not item:
-        return JSONResponse(status_code=404, content={"success": False, "message": "Ítem no encontrado."})
-
-    try:
-        tracking = update_quotation_tracking_status(
-            db,
-            item.quotation_id,
             status=status,
             notes=notes,
             assigned_to=assigned_to,

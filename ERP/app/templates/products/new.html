@@ -35,39 +35,35 @@
         <div>
           <label class="block mb-2"> Categoría </label>
 
-          <div class="flex gap-2">
-            <select name="category" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for category in categories %}
-
-              <option value="{{ category.name }}">{{ category.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank"
-              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
-              +
-            </a>
-          </div>
+          <input
+            type="text"
+            name="category"
+            list="category-options"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="category-options">
+            {% for category in categories %}
+            <option value="{{ category.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
 
         <div>
           <label class="block mb-2"> Temática </label>
 
-          <div class="flex gap-2">
-            <select name="theme" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for theme in themes %}
-
-              <option value="{{ theme.name }}">{{ theme.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank"
-              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
-              +
-            </a>
-          </div>
+          <input
+            type="text"
+            name="theme"
+            list="theme-options"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="theme-options">
+            {% for theme in themes %}
+            <option value="{{ theme.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
       </div>
     </div>
@@ -81,39 +77,35 @@
         <div>
           <label class="block mb-2"> Material </label>
 
-          <div class="flex gap-2">
-            <select name="material" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for material in materials %}
-
-              <option value="{{ material.name }}">{{ material.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank"
-              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
-              +
-            </a>
-          </div>
+          <input
+            type="text"
+            name="material"
+            list="material-options"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="material-options">
+            {% for material in materials %}
+            <option value="{{ material.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
 
         <div>
           <label class="block mb-2"> Color </label>
 
-          <div class="flex gap-2">
-            <select name="color" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-              {% for color in colors %}
-
-              <option value="{{ color.name }}">{{ color.name }}</option>
-
-              {% endfor %}
-            </select>
-
-            <a href="/product-settings" target="_blank"
-              class="bg-purple-600 text-white w-12 rounded-xl flex items-center justify-center">
-              +
-            </a>
-          </div>
+          <input
+            type="text"
+            name="color"
+            list="color-options"
+            placeholder="Escribir o elegir..."
+            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
+          />
+          <datalist id="color-options">
+            {% for color in colors %}
+            <option value="{{ color.name }}"></option>
+            {% endfor %}
+          </datalist>
         </div>
       </div>
 
