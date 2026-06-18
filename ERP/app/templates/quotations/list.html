@@ -55,7 +55,7 @@
 </div>
 {% if error == 'clave_admin_incorrecta' %}
 <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-    Clave de administrador incorrecta. Intenta de nuevo.
+    Clave secreta del sistema incorrecta. No es la contraseña de tu usuario; usa la clave configurada en el ERP.
 </div>
 {% elif deleted %}
 <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
@@ -352,28 +352,27 @@
             { title: "Eliminar cotización", confirmText: "Sí, eliminar" }
         ))) return;
 
-        const adminPassword = await ErpDialog.prompt("Ingresa clave de administrador", {
-            title: "Confirmación requerida",
-            input: "password",
-            inputAttributes: { autocomplete: "current-password" },
-            confirmText: "Eliminar",
-        });
+        const adminPassword = await ErpDialog.prompt(
+            "Ingresa la clave secreta del sistema (no es la contraseña de tu usuario).",
+            {
+                title: "Clave secreta requerida",
+                input: "password",
+                inputAttributes: { autocomplete: "off" },
+                confirmText: "Eliminar",
+            }
+        );
         if (!adminPassword) return;
 
-        const formData = new FormData();
-        formData.append("admin_password", adminPassword);
-
-        const response = await fetch(`/quotations/${id}/delete`, {
-            method: "POST",
-            body: formData,
-        });
-
-        if (response.redirected) {
-            window.location.href = response.url;
-            return;
-        }
-
-        ErpDialog.error("No se pudo eliminar la cotización. Verifica la clave e intenta de nuevo.");
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = `/quotations/${id}/delete`;
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "admin_password";
+        input.value = adminPassword;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
     }
 
     async function reactivateQuotation(id) {

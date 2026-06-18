@@ -31,7 +31,7 @@ ROLE_PERMISSIONS = {
         "design_dashboard", "design_pending", "design_orders",
     },
     ROLE_VENTAS: {
-        "dashboard", "clients", "products_read", "quotations", "sales_tracking",
+        "dashboard", "clients", "products_read", "products", "quotations", "sales_tracking",
         "production_condensed", "fabrication_condensed",
         "shipments",
     },

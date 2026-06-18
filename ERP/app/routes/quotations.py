@@ -21,7 +21,9 @@ from app.models.quotation_payment import QuotationPayment
 from app.models.shipment import Shipment
 from app.models.quotation_design import QuotationDesign
 from app.models.production_tracking import ProductionTracking
+from app.models.design_observation import DesignObservation
 from app.models.design_tracking import DesignTracking
+from app.models.production_order_history import ProductionOrderHistory
 from app.services.logo_types import (
     LOGO_TYPE_SIN,
     normalize_logo_type,
@@ -53,6 +55,7 @@ from app.utils.image_storage import (
     UploadValidationError,
     delete_payment_receipt,
     delete_design_file,
+    delete_product_files,
     design_image_url,
     read_upload_bytes,
     save_product_image,
@@ -80,6 +83,8 @@ QUOTATION_ROLES = ["admin", "ventas"]
 
 def _purge_quotation(db: Session, quotation: Quotation) -> None:
     """Elimina registros ligados y archivos antes de borrar la cotización."""
+    design_filenames: set[str] = set()
+
     payments = (
         db.query(QuotationPayment)
         .filter(QuotationPayment.quotation_id == quotation.id)
@@ -97,18 +102,67 @@ def _purge_quotation(db: Session, quotation: Quotation) -> None:
         .all()
     )
     for design in designs:
-        delete_design_file(design.filename)
+        if design.filename:
+            design_filenames.add(design.filename)
+            delete_design_file(design.filename)
     db.query(QuotationDesign).filter(
         QuotationDesign.quotation_id == quotation.id
     ).delete(synchronize_session=False)
 
-    item_ids = [
-        row[0]
-        for row in db.query(QuotationItem.id)
+    if quotation.design_file and quotation.design_file not in design_filenames:
+        delete_design_file(quotation.design_file)
+
+    items = (
+        db.query(QuotationItem)
         .filter(QuotationItem.quotation_id == quotation.id)
         .all()
-    ]
+    )
+    item_ids = [item.id for item in items]
+
+    production_orders = (
+        db.query(ProductionOrder)
+        .filter(ProductionOrder.quotation_id == quotation.id)
+        .all()
+    )
+    for order in production_orders:
+        design_name = (order.design_file_name or "").strip()
+        if design_name and design_name not in design_filenames:
+            delete_design_file(design_name)
+
+    for item in items:
+        image_name = (item.product_image or "").strip()
+        if not image_name:
+            continue
+        used_by_product = (
+            db.query(Product.id)
+            .filter(Product.image == image_name)
+            .first()
+        )
+        if used_by_product:
+            continue
+        used_by_other_item = (
+            db.query(QuotationItem.id)
+            .filter(
+                QuotationItem.product_image == image_name,
+                QuotationItem.quotation_id != quotation.id,
+            )
+            .first()
+        )
+        if used_by_other_item:
+            continue
+        delete_product_files(image_name)
+
     if item_ids:
+        tracking_ids = [
+            row[0]
+            for row in db.query(DesignTracking.id)
+            .filter(DesignTracking.quotation_item_id.in_(item_ids))
+            .all()
+        ]
+        if tracking_ids:
+            db.query(DesignObservation).filter(
+                DesignObservation.design_tracking_id.in_(tracking_ids)
+            ).delete(synchronize_session=False)
         db.query(DesignTracking).filter(
             DesignTracking.quotation_item_id.in_(item_ids)
         ).delete(synchronize_session=False)
@@ -122,12 +176,19 @@ def _purge_quotation(db: Session, quotation: Quotation) -> None:
     db.query(Shipment).filter(
         Shipment.quotation_id == quotation.id
     ).delete(synchronize_session=False)
-    db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete(
-        synchronize_session=False
-    )
+
+    order_ids = [order.id for order in production_orders]
+    if order_ids:
+        db.query(ProductionOrderHistory).filter(
+            ProductionOrderHistory.production_order_id.in_(order_ids)
+        ).delete(synchronize_session=False)
     db.query(ProductionOrder).filter(
         ProductionOrder.quotation_id == quotation.id
     ).delete(synchronize_session=False)
+
+    db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete(
+        synchronize_session=False
+    )
     db.delete(quotation)
 
 

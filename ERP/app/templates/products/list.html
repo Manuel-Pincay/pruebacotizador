@@ -164,7 +164,7 @@
                     </div>
                 </div>
 
-                {% if is_admin %}
+                {% if can_manage_products %}
                 <div class="mt-4 flex flex-col xs:flex-row gap-2 sm:flex-row">
                     <a href="/products/{{ product.id }}/edit"
                         class="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-center px-3 py-2.5 rounded-xl text-sm font-medium transition">

@@ -45,6 +45,9 @@ from app.utils.image_storage import (
 
 router = APIRouter(prefix="/products", tags=["products"])
 
+PRODUCT_VIEW_ROLES = ["admin", "ventas"]
+PRODUCT_MANAGE_ROLES = ["admin", "ventas"]
+
 templates = Jinja2Templates(directory="app/templates")
 
 from app.utils.context import get_global_config
@@ -61,7 +64,7 @@ templates.env.globals["product_image_url"] = product_image_url
 @router.get("/", response_class=HTMLResponse)
 async def products_page(request: Request, db: Session = Depends(get_db)):
 
-    user = role_required(request, ["admin", "ventas"])
+    user = role_required(request, PRODUCT_VIEW_ROLES)
 
     if isinstance(user, RedirectResponse):
         return user
@@ -84,6 +87,7 @@ async def products_page(request: Request, db: Session = Depends(get_db)):
             "low_stock": low_stock,
             "custom_count": custom_count,
             "is_admin": user.role == "admin",
+            "can_manage_products": user.role in PRODUCT_MANAGE_ROLES,
         },
     )
 
@@ -135,7 +139,7 @@ async def new_product_page(request: Request, db: Session = Depends(get_db)):
 @router.get("/search")
 def search_products(request: Request, q: str, db: Session = Depends(get_db)):
 
-    user = role_required(request, ["admin", "ventas"])
+    user = role_required(request, PRODUCT_VIEW_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
@@ -280,7 +284,7 @@ async def edit_product_page(
     product_id: int, request: Request, db: Session = Depends(get_db)
 ):
 
-    user = role_required(request, ["admin"])
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
 
     if isinstance(user, RedirectResponse):
         return user
@@ -348,7 +352,7 @@ async def update_product(
     db: Session = Depends(get_db),
 ):
 
-    user = role_required(request, ["admin"])
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
@@ -488,7 +492,7 @@ async def delete_product(
     request: Request, product_id: int, db: Session = Depends(get_db)
 ):
 
-    user = role_required(request, ["admin"])
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
@@ -527,7 +531,7 @@ async def delete_product(
 @router.get("/api/list")
 async def products_api(request: Request, db: Session = Depends(get_db)):
 
-    user = role_required(request, ["admin", "ventas"])
+    user = role_required(request, PRODUCT_VIEW_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
@@ -554,7 +558,7 @@ async def catalog_modal(
     db: Session = Depends(get_db)
 ):
 
-    user = role_required(request, ["admin", "ventas"])
+    user = role_required(request, PRODUCT_VIEW_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
@@ -580,7 +584,7 @@ async def product_json(
     db: Session = Depends(get_db)
 ):
 
-    user = role_required(request, ["admin", "ventas"])
+    user = role_required(request, PRODUCT_VIEW_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
