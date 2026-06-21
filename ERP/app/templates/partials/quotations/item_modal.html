@@ -1,136 +1,172 @@
+{% from "components/logo_type_select.html" import logo_type_select %}
+
 <form
+    id="editItemForm"
     action="/quotations/quotation-items/{{ item.id }}/edit"
     method="POST"
     enctype="multipart/form-data"
+    class="space-y-5"
 >
-{% from "components/logo_type_select.html" import logo_type_select %}
-
-    <div class="space-y-5">
-
-        <div>
-
-            <label
-                class="block mb-2 font-medium"
-            >
-                Cantidad
-            </label>
-
-            <input
-                type="number"
-                name="quantity"
-                value="{{ item.quantity }}"
-                class="w-full border rounded-xl p-3"
-                min="1"
-            >
-
-        </div>
-
-        <div>
-
-            <label
-                class="block mb-2 font-medium"
-            >
-                Precio unitario
-            </label>
-
-            <input
-                type="number"
-                step="0.01"
-                name="unit_price"
-                value="{{ item.unit_price }}"
-                class="w-full border rounded-xl p-3"
-                min="0"
-                required
-            >
-
-        </div>
-
-        <div>
-
-            <label
-                class="block mb-2 font-medium"
-            >
-                Temática
-            </label>
-
-            <input
-                type="text"
-                name="theme"
-                value="{{ item.theme }}"
-                class="w-full border rounded-xl p-3"
-            >
-
-        </div>
-
-        <div>
-
-            <label
-                class="block mb-2 font-medium"
-            >
-                Medida
-            </label>
-
-            <input
-                type="text"
-                name="measure"
-                value="{{ item.measure }}"
-                class="w-full border rounded-xl p-3"
-            >
-
-        </div>
-
-        <div>
-
-            <label
-                class="block mb-2 font-medium"
-            >
-                Color
-            </label>
-
-            <input
-                type="text"
-                name="color"
-                value="{{ item.color }}"
-                class="w-full border rounded-xl p-3"
-            >
-
-        </div>
-
-        <div>
-
-            <label
-                class="block mb-2 font-medium"
-            >
-                Tipo de logo
-            </label>
-
-            {{ logo_type_select("logo_type", resolve_item_logo_type(item)) }}
-
-        </div>
-
-        <div>
-            <label class="block mb-2 font-medium">Imagen del producto</label>
-            {% set item_img = product_image_url(item.product_image, thumb=true) if item.product_image else none %}
-            {% if item_img %}
-            <img src="{{ item_img }}" alt="Imagen producto" class="h-16 w-16 object-cover rounded-lg border mb-2" />
-            {% endif %}
-            <input type="file" name="product_image" accept=".png,.jpg,.jpeg,.webp"
-                class="w-full border rounded-xl p-3 text-sm" />
-        </div>
-
-        <button
-            class="
-            bg-purple-600
-            hover:bg-purple-700
-            text-white
-            px-6
-            py-3
-            rounded-xl
-            "
-        >
-            Guardar Cambios
-        </button>
-
+    {# ── Encabezado del ítem ── #}
+    <div class="rounded-xl border border-purple-100 bg-purple-50/60 px-4 py-3">
+        <p class="text-xs font-semibold uppercase tracking-wide text-purple-600">Producto</p>
+        <p class="text-base font-bold text-slate-800 mt-0.5">
+            {{ item.detail or (item.product.name if item.product else "Ítem #" ~ item.id) }}
+        </p>
+        <p class="text-sm text-gray-600 mt-1">
+            Subtotal línea:
+            <span id="edit_item_line_total" class="font-semibold text-purple-700">${{ "%.2f"|format(item.total) }}</span>
+        </p>
     </div>
 
+    {# ── Precios ── #}
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Precios</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
+                <input
+                    type="number"
+                    name="quantity"
+                    id="edit_item_quantity"
+                    value="{{ item.quantity }}"
+                    min="1"
+                    required
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Precio unitario</label>
+                <input
+                    type="number"
+                    step="0.01"
+                    name="unit_price"
+                    id="edit_item_unit_price"
+                    value="{{ item.unit_price }}"
+                    min="0"
+                    required
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Descuento %</label>
+                <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    name="item_discount"
+                    id="edit_item_discount"
+                    value="{{ item.item_discount or 0 }}"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+            </div>
+        </div>
+    </div>
+
+    {# ── Detalle ── #}
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Detalle</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Medida</label>
+                <input
+                    type="text"
+                    name="measure"
+                    value="{{ item.measure or '' }}"
+                    placeholder="-"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Temática / Forma</label>
+                <input
+                    type="text"
+                    name="theme"
+                    value="{{ item.theme or '' }}"
+                    placeholder="-"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Color</label>
+                <input
+                    type="text"
+                    name="color"
+                    value="{{ item.color or '' }}"
+                    placeholder="-"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+            </div>
+        </div>
+        <div class="mt-3">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de logo</label>
+            {{ logo_type_select("logo_type", resolve_item_logo_type(item), extra_class="focus:outline-none focus:ring-2 focus:ring-purple-500/30") }}
+        </div>
+    </div>
+
+    {# ── Imagen ── #}
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Imagen</p>
+        <div class="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 border-dashed p-3">
+            {% set item_img = product_image_url(item.product_image, thumb=true) if item.product_image else none %}
+            {% if item_img %}
+            <img
+                src="{{ item_img }}"
+                alt="Imagen producto"
+                class="h-16 w-16 object-cover rounded-lg border border-gray-200 shrink-0"
+            />
+            {% else %}
+            <div class="h-16 w-16 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400 text-xs shrink-0">
+                Sin img
+            </div>
+            {% endif %}
+            <input
+                type="file"
+                name="product_image"
+                accept=".png,.jpg,.jpeg,.webp"
+                class="flex-1 min-w-[180px] text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-purple-50 file:text-purple-700 file:text-sm file:font-medium"
+            />
+        </div>
+    </div>
+
+    {# ── Acciones ── #}
+    <div class="flex flex-wrap justify-end gap-3 pt-2 border-t border-gray-100">
+        <button
+            type="button"
+            onclick="closeItemModal()"
+            class="px-5 py-2.5 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+            Cancelar
+        </button>
+        <button
+            type="submit"
+            class="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold shadow-sm"
+        >
+            Guardar cambios
+        </button>
+    </div>
 </form>
+
+<script>
+(function () {
+    function updateEditItemLineTotal() {
+        const qty = parseFloat(document.getElementById("edit_item_quantity")?.value) || 0;
+        const price = parseFloat(document.getElementById("edit_item_unit_price")?.value) || 0;
+        const discount = parseFloat(document.getElementById("edit_item_discount")?.value) || 0;
+        const gross = qty * price;
+        const total = gross * (1 - Math.min(100, Math.max(0, discount)) / 100);
+        const el = document.getElementById("edit_item_line_total");
+        if (el) {
+            el.textContent = "$" + total.toFixed(2);
+        }
+    }
+
+    ["edit_item_quantity", "edit_item_unit_price", "edit_item_discount"].forEach(function (id) {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener("input", updateEditItemLineTotal);
+        }
+    });
+})();
+</script>

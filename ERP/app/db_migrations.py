@@ -31,6 +31,7 @@ SCHEMA_ADDITIONS = {
     "quotation_items": {
         "product_image": "VARCHAR(255)",
         "logo_type": "VARCHAR(20) DEFAULT 'sin_logo'",
+        "item_discount": "FLOAT DEFAULT 0",
     },
     "company_config": {
         "guide_sender_name": "VARCHAR(255)",

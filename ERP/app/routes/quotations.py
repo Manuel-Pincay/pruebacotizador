@@ -36,7 +36,7 @@ from app.services.product_service import (
     resolve_custom_product_id,
     sync_product_image,
 )
-from app.services.quotation_service import recalculate_quotation
+from app.services.quotation_service import compute_item_total, recalculate_quotation
 from app.services.quotation_design_service import (
     MAX_QUOTATION_DESIGNS,
     DesignLimitError,
@@ -238,19 +238,26 @@ def _add_items_to_quotation(
             sync_product_image(db, product_id, image_name)
 
         resolved_logo = normalize_logo_type(item.get("logo_type") or item.get("logo"))
+        item_discount = float(item.get("item_discount") or item.get("discount") or 0)
+        quantity = item.get("quantity", 1)
+        unit_price = item.get("price", 0)
+        line_total = item.get("total")
+        if line_total is None:
+            line_total = compute_item_total(quantity, unit_price, item_discount)
         db.add(
             QuotationItem(
                 quotation_id=quotation.id,
                 product_id=product_id,
-                quantity=item.get("quantity", 1),
+                quantity=quantity,
                 detail=item.get("detail", ""),
                 measure=item.get("measure", ""),
                 theme=item.get("theme", ""),
                 color=item.get("color", ""),
                 logo=resolved_logo != LOGO_TYPE_SIN,
                 logo_type=resolved_logo,
-                unit_price=item.get("price", 0),
-                total=item.get("total", 0),
+                item_discount=item_discount,
+                unit_price=unit_price,
+                total=line_total,
                 product_image=image_name,
             )
         )
@@ -606,6 +613,7 @@ async def update_item(
     measure: str = Form(""),
     color: str = Form(""),
     logo_type: str = Form("sin_logo"),
+    item_discount: float = Form(0),
     product_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -621,9 +629,10 @@ async def update_item(
         return RedirectResponse(url=f"/quotations/{item.quotation_id}", status_code=302)
 
     resolved_logo = normalize_logo_type(logo_type)
+    item.item_discount = max(0.0, min(float(item_discount or 0), 100.0))
     item.quantity = quantity
     item.unit_price = unit_price
-    item.total = quantity * unit_price
+    item.total = compute_item_total(quantity, unit_price, item.item_discount)
     item.theme = theme
     item.measure = measure
     item.color = color
@@ -700,7 +709,11 @@ async def update_quantity(
         return {"success": False}
 
     item.quantity = quantity
-    item.total = item.quantity * item.unit_price
+    item.total = compute_item_total(
+        item.quantity,
+        item.unit_price,
+        getattr(item, "item_discount", 0),
+    )
     db.commit()
     recalculate_quotation(item.quotation, db)
     return {"success": True}
@@ -904,6 +917,7 @@ async def edit_quotation_page(
                 "theme": item.theme or "",
                 "color": item.color or "",
                 "logo_type": resolve_item_logo_type(item),
+                "item_discount": float(getattr(item, "item_discount", 0) or 0),
                 "price": item.unit_price,
                 "total": item.total,
                 "existing_image": item.product_image or "",
@@ -1130,6 +1144,7 @@ async def add_product_to_quotation(
     measure: str = Form(""),
     color: str = Form(""),
     logo_type: str = Form("sin_logo"),
+    item_discount: float = Form(0),
     product_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -1145,6 +1160,7 @@ async def add_product_to_quotation(
         return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
     resolved_logo = normalize_logo_type(logo_type)
+    line_discount = max(0.0, min(float(item_discount or 0), 100.0))
 
     image_name = None
     if product_image and product_image.filename:
@@ -1170,8 +1186,9 @@ async def add_product_to_quotation(
             color=color,
             logo=resolved_logo != LOGO_TYPE_SIN,
             logo_type=resolved_logo,
+            item_discount=line_discount,
             unit_price=product.price,
-            total=quantity * product.price,
+            total=compute_item_total(quantity, product.price, line_discount),
         )
     else:
         custom_product = create_custom_product_from_quotation(
@@ -1195,8 +1212,9 @@ async def add_product_to_quotation(
             color=color,
             logo=resolved_logo != LOGO_TYPE_SIN,
             logo_type=resolved_logo,
+            item_discount=line_discount,
             unit_price=custom_price,
-            total=quantity * custom_price,
+            total=compute_item_total(quantity, custom_price, line_discount),
             product_image=image_name,
         )
 

@@ -246,6 +246,14 @@ lucide.createIcons();
         </p>
         <p class="text-xs text-gray-500 truncate">ERP Empresarial</p>
       </div>
+      {% if user is defined and user and user.role in ['admin', 'ventas'] %}
+      <a
+        href="/quotations/new"
+        class="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg"
+        title="Nueva cotización"
+        aria-label="Nueva cotización"
+      >+</a>
+      {% endif %}
     </header>
 
     <div
@@ -341,6 +349,16 @@ lucide.createIcons();
              is-active
             {%- endif -%}
           {%- endmacro %}
+
+          {% if current_role in ['admin', 'ventas'] %}
+          <a
+            href="/quotations/new"
+            class="sidebar-nav-link flex items-center justify-center gap-2 mx-1 mb-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold transition shadow-md shadow-emerald-900/20{% if nav_path == '/quotations/new' %} ring-2 ring-white/40{% endif %}"
+          >
+            <span>➕</span>
+            <span>Nueva cotización</span>
+          </a>
+          {% endif %}
 
           {% if current_role == 'produccion' %}
           {% set prod_order_active = nav_path in ['/production', '/production/'] or (nav_path.startswith('/production/') and nav_path.split('/')[2].isdigit() if nav_path.split('/')|length > 2 else false) %}

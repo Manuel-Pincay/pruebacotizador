@@ -1,26 +1,30 @@
+<div class="max-h-[50vh] overflow-y-auto border border-gray-100 rounded-xl">
+
+{% if products %}
+
 <table class="w-full">
 
-    <thead>
+    <thead class="sticky top-0 bg-gray-50 z-10">
 
-        <tr class="bg-gray-50">
+        <tr>
 
             <th class="p-3 text-left">
                 Producto
             </th>
 
-            <th class="p-3">
+            <th class="p-3 text-left">
                 Categoría
             </th>
 
-            <th class="p-3">
+            <th class="p-3 text-left">
                 Medida
             </th>
 
-            <th class="p-3">
+            <th class="p-3 text-left">
                 Precio
             </th>
 
-            <th class="p-3">
+            <th class="p-3 text-left">
                 Stock
             </th>
 
@@ -35,7 +39,7 @@
 
         {% for product in products %}
 
-        <tr class="border-b">
+        <tr class="border-b hover:bg-gray-50">
 
             <td class="p-3">
 
@@ -47,29 +51,36 @@
                     {{ product.code }}
                 </div>
 
+                {% if product.material or product.color or product.theme %}
+                <div class="text-xs text-gray-400 mt-0.5">
+                    {{ product.material or "" }}{% if product.color %} · {{ product.color }}{% endif %}{% if product.theme %} · {{ product.theme }}{% endif %}
+                </div>
+                {% endif %}
+
             </td>
 
             <td class="p-3">
-                {{ product.category }}
+                {{ product.category or "-" }}
             </td>
 
             <td class="p-3">
-                {{ product.size }}
+                {{ product.size or "-" }}
             </td>
 
             <td class="p-3">
-                ${{ product.price }}
+                ${{ "%.2f"|format(product.price or 0) }}
             </td>
 
             <td class="p-3">
-                {{ product.stock }}
+                {{ product.stock or 0 }}
             </td>
 
             <td class="p-3">
 
                 <button
+                    type="button"
                     onclick="selectCatalogProduct({{ product.id }})"
-                    class="bg-purple-600 text-white px-3 py-2 rounded-lg"
+                    class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap"
                 >
                     Seleccionar
                 </button>
@@ -83,3 +94,37 @@
     </tbody>
 
 </table>
+
+{% else %}
+
+<div class="p-10 text-center text-gray-500">
+
+    <div class="text-4xl mb-2">🔍</div>
+
+    <p class="font-medium text-slate-700">
+        {% if filters_active %}
+        No hay productos con esos filtros
+        {% else %}
+        No hay productos en el catálogo
+        {% endif %}
+    </p>
+
+    <p class="text-sm mt-1">
+        Prueba con otro término o limpia los filtros.
+    </p>
+
+</div>
+
+{% endif %}
+
+</div>
+
+{% if products|length >= 50 %}
+<p class="text-xs text-gray-400 mt-2">
+    Mostrando los primeros 50 resultados. Refina la búsqueda para ver más.
+</p>
+{% elif products %}
+<p class="text-xs text-gray-400 mt-2">
+    {{ products|length }} producto{{ "s" if products|length != 1 else "" }} encontrado{{ "s" if products|length != 1 else "" }}
+</p>
+{% endif %}

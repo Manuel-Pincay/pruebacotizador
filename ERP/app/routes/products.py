@@ -552,29 +552,118 @@ async def products_api(request: Request, db: Session = Depends(get_db)):
     ]
 
 # CATALOGO
-@router.get("/catalog/modal")
-async def catalog_modal(
-    request: Request,
-    db: Session = Depends(get_db)
-):
 
+<<<<<<< Updated upstream
     user = role_required(request, PRODUCT_VIEW_ROLES)
+=======
+def _distinct_product_field(db: Session, column) -> list[str]:
+    rows = (
+        db.query(column)
+        .filter(column.isnot(None), column != "")
+        .distinct()
+        .order_by(column.asc())
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _catalog_filter_options(db: Session) -> dict[str, list[str]]:
+    catalog_categories = [
+        c.name for c in db.query(ProductCategory).order_by(ProductCategory.name.asc()).all()
+    ]
+    catalog_materials = [
+        m.name for m in db.query(ProductMaterial).order_by(ProductMaterial.name.asc()).all()
+    ]
+    catalog_colors = [
+        c.name for c in db.query(ProductColor).order_by(ProductColor.name.asc()).all()
+    ]
+    catalog_themes = [
+        t.name for t in db.query(ProductTheme).order_by(ProductTheme.name.asc()).all()
+    ]
+
+    def merge(*lists: list[str]) -> list[str]:
+        seen: set[str] = set()
+        merged: list[str] = []
+        for items in lists:
+            for item in items:
+                text = (item or "").strip()
+                if text and text not in seen:
+                    seen.add(text)
+                    merged.append(text)
+        return sorted(merged, key=str.casefold)
+
+    return {
+        "categories": merge(catalog_categories, _distinct_product_field(db, Product.category)),
+        "materials": merge(catalog_materials, _distinct_product_field(db, Product.material)),
+        "colors": merge(catalog_colors, _distinct_product_field(db, Product.color)),
+        "shapes": merge(catalog_themes, _distinct_product_field(db, Product.theme)),
+    }
+
+
+@router.get("/catalog/filters")
+async def catalog_filters(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = role_required(request, ["admin", "ventas"])
+>>>>>>> Stashed changes
     if isinstance(user, RedirectResponse):
         return user
 
-    products = (
-        db.query(Product)
-        .order_by(Product.name.asc())
-        .limit(20)
-        .all()
-    )
+    return _catalog_filter_options(db)
+
+
+@router.get("/catalog/modal")
+async def catalog_modal(
+    request: Request,
+    q: str = "",
+    category: str = "",
+    material: str = "",
+    color: str = "",
+    shape: str = "",
+    db: Session = Depends(get_db),
+):
+    user = role_required(request, ["admin", "ventas"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(Product)
+
+    search = q.strip()
+    if search:
+        term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Product.name.ilike(term),
+                Product.code.ilike(term),
+                Product.category.ilike(term),
+                Product.material.ilike(term),
+                Product.color.ilike(term),
+                Product.theme.ilike(term),
+            )
+        )
+
+    if category.strip():
+        query = query.filter(Product.category == category.strip())
+
+    if material.strip():
+        query = query.filter(Product.material == material.strip())
+
+    if color.strip():
+        query = query.filter(Product.color == color.strip())
+
+    if shape.strip():
+        query = query.filter(Product.theme == shape.strip())
+
+    products = query.order_by(Product.name.asc()).limit(50).all()
 
     return templates.TemplateResponse(
         request=request,
         name="partials/products/catalog_table.html",
         context={
-            "products": products
-        }
+            "products": products,
+            "filters_active": bool(search or category or material or color or shape),
+        },
     )
 
 @router.get("/{product_id}/json")

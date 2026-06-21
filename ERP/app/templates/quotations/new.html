@@ -140,6 +140,7 @@
                     <label class="text-xs text-gray-500">Logo</label>
                     <select id="logo_type" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-1">
                         <option value="sin_logo">Sin Logo</option>
+                        <option value="con_logo">Con logo</option>
                         <option value="grabado">Con logo Grabado</option>
                         <option value="impreso">Con logo impreso</option>
                     </select>
@@ -168,6 +169,7 @@
                             <th class="text-left p-3 font-semibold">Forma</th>
                             <th class="text-left p-3 font-semibold">Color</th>
                             <th class="text-left p-3 font-semibold">Logo</th>
+                            <th class="text-left p-3 font-semibold">Desc %</th>
                             <th class="text-left p-3 font-semibold">V. Unit.</th>
                             <th class="text-left p-3 font-semibold">Total</th>
                             <th class="text-left p-3 font-semibold"></th>
@@ -272,7 +274,7 @@
 
 <!-- CUSTOM MODAL -->
 
-<div id="custom_modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+<div id="custom_modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-6 md:p-8 w-full max-w-[700px] mx-4">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold">Producto Personalizado</h2>
@@ -293,6 +295,7 @@
                 <label class="block text-sm font-medium text-gray-600 mb-1">Tipo de logo</label>
                 <select id="custom_logo_type" class="w-full border rounded-xl p-3">
                     <option value="sin_logo">Sin Logo</option>
+                    <option value="con_logo">Con logo</option>
                     <option value="grabado">Con logo Grabado</option>
                     <option value="impreso">Con logo impreso</option>
                 </select>
@@ -393,7 +396,7 @@
 
 </div>
 
-<div id="client_modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+<div id="client_modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 md:p-8 w-full max-w-3xl mx-auto overflow-hidden">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-bold">Seleccionar Cliente</h2>
@@ -419,7 +422,7 @@
     </div>
 </div>
 
-<div id="new_client_modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4 overflow-y-auto">
+<div id="new_client_modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl p-6 md:p-8 w-full max-w-2xl mx-auto">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-bold">Nuevo Cliente</h2>
@@ -593,27 +596,126 @@
             .getElementById("catalogModal")
             .classList.remove("hidden")
 
+        document.getElementById("catalog_search").value = ""
+        resetCatalogFilterSelect("filter_category", "Todas las categorías")
+        resetCatalogFilterSelect("filter_material", "Todos los materiales")
+        resetCatalogFilterSelect("filter_color", "Todos los colores")
+        resetCatalogFilterSelect("filter_shape", "Todas las formas")
+
+        loadCatalogFilters()
         loadCatalogProducts()
 
     }
 
+    function resetCatalogFilterSelect(id, placeholder) {
+        const select = document.getElementById(id)
+        select.innerHTML = `<option value="">${placeholder}</option>`
+    }
+
+    function fillCatalogFilterSelect(id, placeholder, values, selected = "") {
+        const select = document.getElementById(id)
+        select.innerHTML = `<option value="">${placeholder}</option>`
+        values.forEach(value => {
+            const option = document.createElement("option")
+            option.value = value
+            option.textContent = value
+            if (value === selected) {
+                option.selected = true
+            }
+            select.appendChild(option)
+        })
+    }
+
+    async function loadCatalogFilters() {
+        try {
+            const response = await fetch("/products/catalog/filters")
+            if (!response.ok) return
+
+            const data = await response.json()
+
+            fillCatalogFilterSelect(
+                "filter_category",
+                "Todas las categorías",
+                data.categories || []
+            )
+            fillCatalogFilterSelect(
+                "filter_material",
+                "Todos los materiales",
+                data.materials || []
+            )
+            fillCatalogFilterSelect(
+                "filter_color",
+                "Todos los colores",
+                data.colors || []
+            )
+            fillCatalogFilterSelect(
+                "filter_shape",
+                "Todas las formas",
+                data.shapes || []
+            )
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
+    function getCatalogFilterParams() {
+        const params = new URLSearchParams()
+
+        const q = document.getElementById("catalog_search").value.trim()
+        const category = document.getElementById("filter_category").value
+        const material = document.getElementById("filter_material").value
+        const color = document.getElementById("filter_color").value
+        const shape = document.getElementById("filter_shape").value
+
+        if (q) params.set("q", q)
+        if (category) params.set("category", category)
+        if (material) params.set("material", material)
+        if (color) params.set("color", color)
+        if (shape) params.set("shape", shape)
+
+        return params
+    }
+
     async function loadCatalogProducts() {
 
-        const response =
-            await fetch(
-                "/products/catalog/modal"
-            )
+        const params = getCatalogFilterParams()
+        const query = params.toString()
+        const url = query
+            ? `/products/catalog/modal?${query}`
+            : "/products/catalog/modal"
 
-        const html =
-            await response.text()
+        const container = document.getElementById("catalog_table_container")
+        container.innerHTML = `
+            <div class="p-8 text-center text-gray-400">
+                Cargando productos...
+            </div>
+        `
 
-        document
-            .getElementById(
-                "catalog_table_container"
-            )
-            .innerHTML = html
+        try {
+            const response = await fetch(url)
+            const html = await response.text()
+            container.innerHTML = html
+        } catch (error) {
+            console.error(error)
+            container.innerHTML = `
+                <div class="p-8 text-center text-red-500">
+                    Error al cargar el catálogo
+                </div>
+            `
+        }
 
     }
+
+    let catalogSearchTimer = null
+
+    document.getElementById("catalog_search").addEventListener("input", function () {
+        clearTimeout(catalogSearchTimer)
+        catalogSearchTimer = setTimeout(loadCatalogProducts, 300)
+    })
+
+    ;["filter_category", "filter_material", "filter_color", "filter_shape"].forEach(id => {
+        document.getElementById(id).addEventListener("change", loadCatalogProducts)
+    })
 
     function closeProductCatalog() {
 
@@ -643,8 +745,16 @@
 
     const LOGO_TYPES = {
         sin_logo: "Sin Logo",
+        con_logo: "Con logo",
         grabado: "Con logo Grabado",
         impreso: "Con logo impreso",
+    }
+
+    function computeItemTotal(item) {
+        const gross = (parseFloat(item.quantity) || 0) * (parseFloat(item.price) || 0)
+        const discount = parseFloat(item.item_discount) || 0
+        item.total = gross * (1 - discount / 100)
+        return item.total
     }
 
     function normalizeLogoType(value) {
@@ -666,6 +776,9 @@
         const normalized = normalizeLogoType(logoType)
         if (normalized === "grabado") {
             return `<span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">${LOGO_TYPES.grabado}</span>`
+        }
+        if (normalized === "con_logo") {
+            return `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs">${LOGO_TYPES.con_logo}</span>`
         }
         if (normalized === "impreso") {
             return `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs">${LOGO_TYPES.impreso}</span>`
@@ -724,6 +837,7 @@
 
     quotationItems = {{ items_json | safe }}.map(item => ({
         ...item,
+        item_discount: parseFloat(item.item_discount) || 0,
         logo_type: normalizeLogoType(item.logo_type ?? item.logo),
     }))
 
@@ -986,11 +1100,15 @@
                 "logo_type"
             ).value,
 
+            item_discount: 0,
+
             price: price,
 
             total: quantity * price
 
         }
+
+        computeItemTotal(item)
 
         quotationItems.push(item)
 
@@ -1071,6 +1189,7 @@
             logo_type: document.getElementById(
                 "custom_logo_type"
             ).value,
+            item_discount: 0,
             price: price,
 
             total: price,
@@ -1177,6 +1296,20 @@
 
                   <input
                       type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value="${item.item_discount || 0}"
+                      onchange="updateItemDiscount(${index}, this.value)"
+                      class="w-16 border rounded-lg p-2"
+                  >
+
+              </td>
+
+              <td class="p-4">
+
+                  <input
+                      type="number"
                       value="${item.price}"
                       onchange="updatePrice(${index}, this.value)"
                       class="w-32 border rounded-lg p-2"
@@ -1237,9 +1370,7 @@
         quotationItems[index].quantity =
             parseFloat(value)
 
-        quotationItems[index].total =
-            quotationItems[index].quantity *
-            quotationItems[index].price
+        computeItemTotal(quotationItems[index])
 
         renderItems()
 
@@ -1256,9 +1387,20 @@
         quotationItems[index].price =
             parseFloat(value)
 
-        quotationItems[index].total =
-            quotationItems[index].quantity *
-            quotationItems[index].price
+        computeItemTotal(quotationItems[index])
+
+        renderItems()
+
+        calculateTotals()
+    }
+
+
+    function updateItemDiscount(index, value) {
+
+        quotationItems[index].item_discount =
+            Math.min(100, Math.max(0, parseFloat(value) || 0))
+
+        computeItemTotal(quotationItems[index])
 
         renderItems()
 
@@ -1574,6 +1716,7 @@
             theme: item.theme || "",
             color: item.color || "",
             logo_type: normalizeLogoType(item.logo_type ?? item.logo),
+            item_discount: parseFloat(item.item_discount) || 0,
             price: item.price,
             total: item.total,
             existing_image: item.existing_image || ""

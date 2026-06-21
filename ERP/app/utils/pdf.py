@@ -79,7 +79,7 @@ def generate_quotation_pdf(quotation, items, client, db=None):
 
     elements.append(build_header(quotation, config, styles))
 
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 12))
 
     elements.append(
         HRFlowable(
@@ -87,7 +87,7 @@ def generate_quotation_pdf(quotation, items, client, db=None):
         )
     )
 
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 10))
 
     # ====================================
     # CLIENT CARD
@@ -95,7 +95,7 @@ def generate_quotation_pdf(quotation, items, client, db=None):
 
     elements.append(build_client_section(quotation, config, styles))
 
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 10))
 
     # ====================================
     # TABLE
@@ -118,18 +118,14 @@ def generate_quotation_pdf(quotation, items, client, db=None):
 
     elements.append(build_payment_status_section(quotation, config))
 
-    elements.append(Spacer(1, 20))
-
-    # ====================================
-    # BENEFITS SECTION
-    # ====================================
+    elements.append(Spacer(1, 8))
 
     # ====================================
     # NOTES
     # ====================================
     elements.append(build_notes_section(config))
 
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 6))
 
     # ====================================
     # BUILD PDF

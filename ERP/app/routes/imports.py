@@ -28,6 +28,7 @@ from app.services.excel_importer import (
     export_clients_excel,
     export_filename,
     export_products_excel,
+    export_quotations_excel,
     import_clients,
     import_products
 )
@@ -154,6 +155,25 @@ async def export_products(
 
     buffer = export_products_excel(db)
     filename = export_filename("productos")
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/quotations/export")
+async def export_quotations(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = role_required(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    buffer = export_quotations_excel(db)
+    filename = export_filename("cotizaciones")
 
     return StreamingResponse(
         buffer,

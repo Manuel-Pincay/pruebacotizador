@@ -3,6 +3,7 @@ from reportlab.platypus import Table, TableStyle, Paragraph, Image, Spacer
 from app.services.logo_types import logo_type_pdf_label, resolve_item_logo_type
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 
 from reportlab.platypus.flowables import HRFlowable
@@ -134,29 +135,60 @@ def build_header(quotation, config, styles):
 def build_client_section(quotation, config, styles):
 
     client = quotation.client
+    phone = (client.phone or "-").replace("&", "&amp;")
+    address = (client.address or "-").replace("&", "&amp;")
+    name = (client.name or "-").replace("&", "&amp;")
+    ruc_ci = (getattr(client, "ruc_ci", None) or "-").replace("&", "&amp;")
+
+    label_style = ParagraphStyle(
+        "ClientFieldLabel",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        leading=9,
+        textColor=colors.HexColor("#6B7280"),
+        alignment=TA_LEFT,
+    )
+    value_style = ParagraphStyle(
+        "ClientFieldValue",
+        parent=styles["Normal"],
+        fontSize=7,
+        leading=9,
+        textColor=colors.HexColor("#374151"),
+        alignment=TA_LEFT,
+    )
+
+    label_w = 42
+    value_w = (530 - label_w * 2) // 2
+
+    def _row(field_label: str, value: str, field_label2: str, value2: str):
+        return [
+            Paragraph(f"{field_label}:", label_style),
+            Paragraph(value, value_style),
+            Paragraph(f"{field_label2}:", label_style),
+            Paragraph(value2, value_style),
+        ]
 
     client_box = Table(
         [
-            [Paragraph("<b>CLIENTE</b>", styles["Normal"])],
-            [
-                Paragraph(
-                    f"<font size='16'><b>{client.name}</b></font>", styles["Normal"]
-                )
-            ],
-            [Paragraph(f"Teléfono: {client.phone or '-'}", styles["Normal"])],
-            [Paragraph(f"Dirección: {client.address or '-'}", styles["Normal"])],
+            _row("Cliente", name, "CI", ruc_ci),
+            _row("Telf", phone, "Dir", address),
         ],
-        colWidths=[550],
+        colWidths=[label_w, value_w, label_w, value_w],
     )
 
     client_box.setStyle(
         TableStyle(
             [
                 ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E5E7EB")),
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F9FAFB")),
-                ("LEFTPADDING", (0, 0), (-1, -1), 12),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E5E7EB")),
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F9FAFB")),
+                ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#F9FAFB")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ]
         )
     )
@@ -165,9 +197,69 @@ def build_client_section(quotation, config, styles):
 
 
 # seccion tabla de productos
-def _pdf_cell_text(text, style) -> Paragraph:
+def _pdf_cell_text(text, style, *, align: str = "left") -> Paragraph:
     safe = (str(text) if text not in (None, "") else "-").replace("&", "&amp;")
-    return Paragraph(safe, style)
+    if align == "right":
+        content = f'<para align="right">{safe}</para>'
+    elif align == "center":
+        content = f'<para align="center">{safe}</para>'
+    else:
+        content = safe
+    return Paragraph(content, style)
+
+
+def _product_table_styles(base: ParagraphStyle, primary_color: str) -> dict:
+    return {
+        "left": ParagraphStyle(
+            "TblLeft",
+            parent=base,
+            alignment=TA_LEFT,
+        ),
+        "center": ParagraphStyle(
+            "TblCenter",
+            parent=base,
+            alignment=TA_CENTER,
+        ),
+        "right": ParagraphStyle(
+            "TblRight",
+            parent=base,
+            alignment=TA_RIGHT,
+        ),
+        "right_bold": ParagraphStyle(
+            "TblRightBold",
+            parent=base,
+            fontName="Helvetica-Bold",
+            alignment=TA_RIGHT,
+            textColor=colors.HexColor(primary_color),
+        ),
+        "header": ParagraphStyle(
+            "TblHeader",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            textColor=colors.white,
+            alignment=TA_LEFT,
+        ),
+        "header_center": ParagraphStyle(
+            "TblHeaderCenter",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            textColor=colors.white,
+            alignment=TA_CENTER,
+        ),
+        "header_right": ParagraphStyle(
+            "TblHeaderRight",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            textColor=colors.white,
+            alignment=TA_RIGHT,
+        ),
+    }
 
 
 def _pdf_product_cell(item, style):
@@ -179,49 +271,75 @@ def _pdf_product_cell(item, style):
     if image_path and os.path.exists(image_path):
         try:
             thumb = Image(image_path)
-            thumb._restrictSize(42, 42)
+            thumb._restrictSize(36, 36)
             parts.append(thumb)
         except Exception:
             pass
-    parts.append(_pdf_cell_text(product_name, style))
+    parts.append(_pdf_cell_text(product_name, style, align="left"))
     return parts if len(parts) > 1 else parts[0]
 
 
 def build_products_table(items, config):
 
     styles = getSampleStyleSheet()
-    table_cell_style = ParagraphStyle(
+    base_cell = ParagraphStyle(
         name="TableCell",
         parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=8,
-        leading=11,
+        fontSize=7,
+        leading=10,
         wordWrap="CJK",
     )
+    cell = _product_table_styles(base_cell, config.primary_color)
 
     data = [
-        ["CANT.", "PRODUCTO", "MEDIDA", "TEMÁTICA", "COLOR", "LOGO", "V. UNIT", "TOTAL"]
+        [
+            Paragraph("CANT.", cell["header_right"]),
+            Paragraph("PRODUCTO", cell["header"]),
+            Paragraph("MEDIDA", cell["header"]),
+            Paragraph("TEMÁTICA", cell["header"]),
+            Paragraph("COLOR", cell["header"]),
+            Paragraph("LOGO", cell["header_center"]),
+            Paragraph("DESC%", cell["header_right"]),
+            Paragraph("V. UNIT", cell["header_right"]),
+            Paragraph("TOTAL", cell["header_right"]),
+        ]
     ]
 
     for item in items:
         logo_display = logo_type_pdf_label(resolve_item_logo_type(item))
+        item_discount = float(getattr(item, "item_discount", 0) or 0)
 
         data.append(
             [
-                _pdf_cell_text(item.quantity, table_cell_style),
-                _pdf_product_cell(item, table_cell_style),
-                _pdf_cell_text(item.measure, table_cell_style),
-                _pdf_cell_text(item.theme, table_cell_style),
-                _pdf_cell_text(item.color, table_cell_style),
-                _pdf_cell_text(logo_display, table_cell_style),
-                _pdf_cell_text(f"${item.unit_price:.2f}", table_cell_style),
-                _pdf_cell_text(f"${item.total:.2f}", table_cell_style),
+                _pdf_cell_text(item.quantity, cell["right"], align="right"),
+                _pdf_product_cell(item, cell["left"]),
+                _pdf_cell_text(item.measure or "-", cell["left"], align="left"),
+                _pdf_cell_text(item.theme or "-", cell["left"], align="left"),
+                _pdf_cell_text(item.color or "-", cell["left"], align="left"),
+                _pdf_cell_text(logo_display, cell["center"], align="center"),
+                _pdf_cell_text(
+                    f"{item_discount:.0f}%" if item_discount else "-",
+                    cell["right"],
+                    align="right",
+                ),
+                _pdf_cell_text(
+                    f"${item.unit_price:.2f}",
+                    cell["right"],
+                    align="right",
+                ),
+                _pdf_cell_text(
+                    f"${item.total:.2f}",
+                    cell["right_bold"],
+                    align="right",
+                ),
             ]
         )
 
+    col_widths = [30, 148, 42, 78, 44, 36, 32, 62, 58]
     table = Table(
         data,
-        colWidths=[32, 168, 48, 90, 50, 42, 42, 52],
+        colWidths=col_widths,
         repeatRows=1,
     )
 
@@ -230,20 +348,15 @@ def build_products_table(items, config):
             [
                 # HEADER
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(config.primary_color)),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 9),
-                ("TOPPADDING", (0, 0), (-1, 0), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+                ("FONTSIZE", (0, 0), (-1, 0), 8),
+                ("TOPPADDING", (0, 0), (-1, 0), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
                 # BODY
                 ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ("FONTSIZE", (0, 1), (-1, -1), 7),
                 ("TEXTCOLOR", (0, 1), (-1, -1), colors.black),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("ALIGN", (0, 0), (0, -1), "CENTER"),
-                ("ALIGN", (6, 1), (7, -1), "RIGHT"),
-                ("FONTNAME", (7, 1), (7, -1), "Helvetica-Bold"),
-                ("TEXTCOLOR", (7, 1), (7, -1), colors.HexColor(config.primary_color)),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 (
                     "ROWBACKGROUNDS",
                     (0, 1),
@@ -251,10 +364,10 @@ def build_products_table(items, config):
                     [colors.white, colors.HexColor("#FAFAFA")],
                 ),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E5E7EB")),
-                ("TOPPADDING", (0, 1), (-1, -1), 10),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 10),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 1), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ]
         )
     )
@@ -321,18 +434,21 @@ def build_design_totals_section(quotation, config, design_paths=None):
     # RESUMEN
     # ===================================
 
-    subtotal = quotation.subtotal or 0
+    subtotal = float(quotation.subtotal or 0)
 
-    discount = getattr(quotation, "discount", 0)
+    discount_percent = float(getattr(quotation, "discount", 0) or 0)
+    discount_amount = subtotal * (discount_percent / 100)
+    subtotal_after_discount = subtotal - discount_amount
 
-    iva_amount = subtotal * quotation.iva / 100
+    iva_percent = float(quotation.iva or 0)
+    iva_amount = subtotal_after_discount * (iva_percent / 100)
 
     shipping = float(getattr(quotation, "shipping_cost", None) or 0)
 
     summary_rows = [
         ["SUBTOTAL", f"${subtotal:.2f}"],
-        ["DESCUENTO", f"{discount:.2f}%"],
-        [f"IVA ({quotation.iva:.2f}%)", f"${iva_amount:.2f}"],
+        ["DESCUENTO", f"${discount_amount:.2f}"],
+        [f"IVA ({iva_percent:.2f}%)", f"${iva_amount:.2f}"],
     ]
     if shipping > 0:
         summary_rows.append(["ENVÍO", f"${shipping:.2f}"])
@@ -346,12 +462,16 @@ def build_design_totals_section(quotation, config, design_paths=None):
         TableStyle(
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.HexColor("#E5E7EB")),
                 ("LINEBELOW", (0, 1), (-1, 1), 0.5, colors.HexColor("#E5E7EB")),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
         )
     )
@@ -368,10 +488,14 @@ def build_design_totals_section(quotation, config, design_paths=None):
                 ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(config.primary_color)),
                 ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 11),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("ALIGN", (0, 0), (0, 0), "LEFT"),
                 ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
         )
     )
@@ -396,12 +520,13 @@ def build_design_totals_section(quotation, config, design_paths=None):
     if image_card:
         layout = Table([[image_card, totals_card]], colWidths=[380, 150])
     else:
-        layout = Table([[totals_card]], colWidths=[530])
+        layout = Table([["", totals_card]], colWidths=[380, 150])
 
     layout.setStyle(
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ]
@@ -539,9 +664,9 @@ def build_payment_status_section(quotation, config):
 
     content = Paragraph(
         f"""
-        <font size="9">
+        <font size="8">
         <b>ESTADO DE PAGO</b>
-        <br/><br/>
+        <br/>
         Total: <b>${total:.2f}</b>
         &nbsp;&nbsp;|&nbsp;&nbsp;
         Abonado: <b>${total_paid:.2f}</b>
@@ -575,94 +700,42 @@ def build_payment_status_section(quotation, config):
 def build_notes_section(config):
 
     styles = getSampleStyleSheet()
+    notes_style = ParagraphStyle(
+        "NotesCompact",
+        parent=styles["BodyText"],
+        fontSize=7,
+        leading=8,
+        spaceBefore=0,
+        spaceAfter=0,
+    )
 
     notes = Paragraph(
         f"""
-        <font size="9">
-
-        <b>CONDICIONES COMERCIALES</b>
-
-        <br/><br/>
-
-        • La presente cotización tiene una vigencia de
-        <b>{config.quotation_validity_days} días</b>
-        a partir de la fecha de emisión.
-
-        <br/>
-
-        • Los tiempos de producción comienzan una vez aprobado el diseño y confirmado el pago.
-
-        <br/>
-
-        • Los valores indicados están expresados en dólares americanos.
-
-        <br/>
-
-        • Los precios pueden variar si se modifican cantidades, materiales o especificaciones.
-
-        <br/><br/>
-
-        <font color="{config.primary_color}">
-        <i>{config.quotation_footer_text}</i>
-        </font>
-
-        </font>
+        <b>CONDICIONES COMERCIALES</b><br/>
+        • Vigencia: <b>{config.quotation_validity_days} días</b> desde la emisión.<br/>
+        • Producción inicia tras aprobar diseño y confirmar el pago.<br/>
+        • Valores en dólares americanos; sujetos a cambio por cantidad, material o especificaciones.<br/>
+        <font color="{config.primary_color}"><i>{config.quotation_footer_text}</i></font>
         """,
-        styles["BodyText"]
+        notes_style,
     )
 
     table = Table(
         [[notes]],
-        colWidths=[530]
+        colWidths=[530],
     )
 
     table.setStyle(
-        TableStyle([
-
-            (
-                "BOX",
-                (0,0),
-                (-1,-1),
-                1,
-                colors.HexColor("#E5E7EB")
-            ),
-
-            (
-                "BACKGROUND",
-                (0,0),
-                (-1,-1),
-                colors.HexColor("#FAFAFA")
-            ),
-
-            (
-                "LEFTPADDING",
-                (0,0),
-                (-1,-1),
-                12
-            ),
-
-            (
-                "RIGHTPADDING",
-                (0,0),
-                (-1,-1),
-                12
-            ),
-
-            (
-                "TOPPADDING",
-                (0,0),
-                (-1,-1),
-                10
-            ),
-
-            (
-                "BOTTOMPADDING",
-                (0,0),
-                (-1,-1),
-                10
-            )
-
-        ])
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E5E7EB")),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFAFA")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
     )
 
     return table

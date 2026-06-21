@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 LOGO_TYPE_SIN = "sin_logo"
+LOGO_TYPE_CON = "con_logo"
 LOGO_TYPE_GRABADO = "grabado"
 LOGO_TYPE_IMPRESO = "impreso"
 
 LOGO_TYPE_CHOICES: list[tuple[str, str]] = [
     (LOGO_TYPE_SIN, "Sin Logo"),
+    (LOGO_TYPE_CON, "Con logo"),
     (LOGO_TYPE_GRABADO, "Con logo Grabado"),
     (LOGO_TYPE_IMPRESO, "Con logo impreso"),
 ]
@@ -15,6 +17,7 @@ LOGO_TYPE_CHOICES: list[tuple[str, str]] = [
 LOGO_TYPE_LABELS = dict(LOGO_TYPE_CHOICES)
 LOGO_TYPE_PDF_LABELS = {
     LOGO_TYPE_SIN: "S/L",
+    LOGO_TYPE_CON: "C/Logo",
     LOGO_TYPE_GRABADO: "Grabado",
     LOGO_TYPE_IMPRESO: "Impreso",
 }
@@ -30,7 +33,7 @@ def normalize_logo_type(value) -> str:
     if text in VALID_LOGO_TYPES:
         return text
     if text in {"si", "sí", "s", "yes", "con logo", "con_logo"}:
-        return LOGO_TYPE_GRABADO
+        return LOGO_TYPE_CON
     return LOGO_TYPE_SIN
 
 

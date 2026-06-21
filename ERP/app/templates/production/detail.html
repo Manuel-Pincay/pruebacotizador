@@ -308,6 +308,8 @@
                                 {% set item_logo = resolve_item_logo_type(item) %}
                                 {% if item_logo == 'grabado' %}
                                 <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{{ logo_type_label(item_logo) }}</span>
+                                {% elif item_logo == 'con_logo' %}
+                                <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs">{{ logo_type_label(item_logo) }}</span>
                                 {% elif item_logo == 'impreso' %}
                                 <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">{{ logo_type_label(item_logo) }}</span>
                                 {% else %}

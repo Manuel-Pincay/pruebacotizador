@@ -147,6 +147,7 @@
 
             <th class="text-left p-4">Cantidad</th>
             <th class="text-left p-4">Precio</th>
+            <th class="text-left p-4">Desc %</th>
             <th class="text-left p-4">Subtotal</th>
             <th class="text-center">Acciones</th>
           </tr>
@@ -206,6 +207,8 @@
             </td>
 
             <td class="p-4">${{ "%.2f"|format(item.unit_price) }}</td>
+
+            <td class="p-4">{{ "%.2f"|format(item.item_discount or 0) }}%</td>
 
             <td class="p-4 font-bold text-purple-700">
               ${{ "%.2f"|format(item.total) }}
@@ -460,22 +463,21 @@
 </div>
 
 <div id="itemModal" onclick="closeIfBackdrop(event)"
-  class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-3xl w-full max-w-5xl shadow-xl max-h-[90vh] overflow-y-auto">
-    <div class="flex justify-between items-center p-6 border-b">
-      <h2 id="modalTitle" class="text-2xl font-bold">Editar Producto</h2>
-
-      <button onclick="closeItemModal()" class="text-2xl">✕</button>
+  class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4">
+  <div id="itemModalPanel" class="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+      <h2 id="modalTitle" class="text-lg font-bold text-slate-800">Editar producto</h2>
+      <button type="button" onclick="closeItemModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Cerrar">✕</button>
     </div>
 
-    <div id="modalContent" class="p-6">
+    <div id="modalContent" class="px-5 py-4">
       <div class="text-center py-10">Cargando...</div>
     </div>
   </div>
 </div>
 
 <div id="paymentModal" onclick="closePaymentIfBackdrop(event)"
-  class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+  class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4">
   <div class="bg-white rounded-3xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
     <div class="flex justify-between items-center p-6 border-b">
       <h2 class="text-2xl font-bold">Agregar Abono</h2>
@@ -488,7 +490,7 @@
 </div>
 
 <div id="receiptPreviewModal" onclick="closeReceiptIfBackdrop(event)"
-  class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[60] p-4">
+  class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-[60] p-4">
   <div class="bg-white rounded-3xl w-full max-w-4xl shadow-xl max-h-[90vh] overflow-hidden">
     <div class="flex justify-between items-center p-4 border-b">
       <h2 class="text-xl font-bold">Comprobante de pago</h2>
@@ -518,10 +520,19 @@
 
   }
 
+  function setItemModalSize(sizeClass) {
+    const panel = document.getElementById("itemModalPanel")
+    if (!panel) return
+    panel.classList.remove("max-w-2xl", "max-w-3xl", "max-w-5xl")
+    panel.classList.add(sizeClass)
+  }
+
   async function openAddProductModal() {
 
     const quotationId =
       {{ quotation.id }}
+
+  setItemModalSize("max-w-3xl")
 
   const response =
     await fetch(
@@ -662,13 +673,17 @@
 
   async function openEditItemModal(id) {
 
+    setItemModalSize("max-w-2xl")
+
+    document.getElementById("modalTitle").innerText = "Editar producto"
+
     document
       .getElementById(
         "modalContent"
       )
       .innerHTML =
       `
-        <div class="text-center py-10">
+        <div class="text-center py-8 text-sm text-gray-500">
             Cargando...
         </div>
         `
@@ -886,7 +901,7 @@
 
 </script>
 
-<div id="designPreviewModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[70] p-4"
+<div id="designPreviewModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-[70] p-4"
     onclick="closeDesignPreview()">
     <div class="max-w-5xl max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
         <img id="designPreviewImage" src="" alt="Diseño ampliado" class="max-w-full rounded-2xl shadow-2xl" />
