@@ -2,21 +2,15 @@
 
 {% block content %}
 
-<div class="flex justify-between items-center mb-8">
-
-    <div>
-
-        <h1 class="text-2xl md:text-3xl font-bold">
-            Inventario
-        </h1>
-
-        <p class="text-gray-500 mt-1">
-            Historial de movimientos de stock
-        </p>
-
+<div class="erp-container space-y-5">
+    <div class="erp-page-header">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Inventario</h1>
+            <p class="text-gray-500 mt-1">Historial de movimientos de stock</p>
+        </div>
     </div>
 
-</div>
+    {% include 'inventory/_nav.html' %}
 
 <div class="bg-white rounded-2xl shadow overflow-hidden">
 
@@ -168,6 +162,8 @@
 
      </table>
     </div>
+
+</div>
 
 </div>
 

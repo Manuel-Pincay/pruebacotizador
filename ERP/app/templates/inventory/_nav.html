@@ -1,0 +1,15 @@
+{% set inv_path = request.url.path %}
+<nav class="flex flex-wrap gap-2 mb-6 sm:mb-8" aria-label="Inventario">
+    <a href="/inventory"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if inv_path == '/inventory' or inv_path == '/inventory/' %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 text-gray-700 hover:bg-gray-50{% endif %}">
+        Movimientos
+    </a>
+    <a href="/inventory/stock"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if inv_path.startswith('/inventory/stock') %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 text-gray-700 hover:bg-gray-50{% endif %}">
+        Stock
+    </a>
+    <a href="/inventory/labels"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if inv_path.startswith('/inventory/labels') %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 text-gray-700 hover:bg-gray-50{% endif %}">
+        Etiquetas
+    </a>
+</nav>

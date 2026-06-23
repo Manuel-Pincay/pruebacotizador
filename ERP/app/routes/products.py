@@ -553,9 +553,6 @@ async def products_api(request: Request, db: Session = Depends(get_db)):
 
 # CATALOGO
 
-<<<<<<< Updated upstream
-    user = role_required(request, PRODUCT_VIEW_ROLES)
-=======
 def _distinct_product_field(db: Session, column) -> list[str]:
     rows = (
         db.query(column)
@@ -605,8 +602,7 @@ async def catalog_filters(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    user = role_required(request, ["admin", "ventas"])
->>>>>>> Stashed changes
+    user = role_required(request, PRODUCT_VIEW_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
@@ -623,7 +619,7 @@ async def catalog_modal(
     shape: str = "",
     db: Session = Depends(get_db),
 ):
-    user = role_required(request, ["admin", "ventas"])
+    user = role_required(request, PRODUCT_VIEW_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 

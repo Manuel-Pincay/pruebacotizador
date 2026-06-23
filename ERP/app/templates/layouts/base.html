@@ -474,6 +474,7 @@ lucide.createIcons();
           {% set design_menu_open = nav_path.startswith('/design') %}
           {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') or nav_path.startswith('/product-settings') or nav_path.startswith('/imports') %}
           {% set system_menu_open = nav_path.startswith('/users') or nav_path.startswith('/inventory') or nav_path.startswith('/secretadmin') %}
+          {% set inventory_menu_open = nav_path.startswith('/inventory') %}
           {% set admin_prod_order_active = nav_path in ['/production', '/production/'] or (nav_path.startswith('/production/') and nav_path.split('/')[2].isdigit() if nav_path.split('/')|length > 2 else false) %}
           <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
             <span>📊</span>
@@ -565,7 +566,9 @@ lucide.createIcons();
             </button>
             <div id="systemMenu" class="sidebar-submenu {% if not system_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
               <a href="/users" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/users') }}">👤 Usuarios</a>
-              <a href="/inventory" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory') }}">📦 Inventario</a>
+              <a href="/inventory" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{% if nav_path == '/inventory' or nav_path == '/inventory/' %} is-active{% endif %}">📦 Movimientos</a>
+              <a href="/inventory/stock" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/stock') }}">📊 Stock</a>
+              <a href="/inventory/labels" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/labels') }}">🏷️ Etiquetas</a>
               <a href="/secretadmin/config" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/secretadmin') }}">⚙️ Configuración</a>
             </div>
           </div>

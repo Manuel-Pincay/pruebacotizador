@@ -1,0 +1,234 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+
+<div class="erp-container space-y-5">
+    <div class="erp-page-header lg:items-center">
+        <div>
+            <h1 class="erp-page-title text-slate-900">Etiquetas de productos</h1>
+            <p class="text-slate-500 mt-1 text-sm">
+                Genera e imprime etiquetas con código de barras usando el código del producto.
+            </p>
+        </div>
+        <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
+            Formato 50×30 mm · blanco y negro · listo para impresora de etiquetas
+        </div>
+    </div>
+
+    {% include 'inventory/_nav.html' %}
+
+    {% if request.query_params.get('error') == 'sin_seleccion' %}
+    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 text-sm">
+        Seleccione al menos un producto con código para generar etiquetas.
+    </div>
+    {% elif request.query_params.get('error') == 'sin_codigo' %}
+    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
+        Los productos seleccionados no tienen código. El código de barras usa el campo <strong>code</strong> del producto.
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-4">
+            <div>
+                <label for="labelSearch" class="block text-sm font-medium text-slate-700 mb-1">Buscar producto</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                    <input id="labelSearch" type="search" value="{{ search or '' }}"
+                        placeholder="Código o nombre del producto..."
+                        class="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30">
+                </div>
+            </div>
+
+            <div class="border border-dashed border-purple-200 rounded-xl p-4 bg-purple-50/40">
+                <label for="scannerInput" class="block text-sm font-medium text-purple-800 mb-1">
+                    Escáner USB / lector de código de barras
+                </label>
+                <input id="scannerInput" type="text" autocomplete="off"
+                    placeholder="Escanee aquí o escriba el código y presione Enter..."
+                    class="w-full border border-purple-200 rounded-xl px-4 py-3 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/30">
+                <p class="text-xs text-purple-700 mt-2">
+                    El lector funciona como teclado: al leer, busca automáticamente por <code>product.code</code>.
+                </p>
+                <div id="scannerResult" class="hidden mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"></div>
+                <div id="scannerError" class="hidden mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <h2 class="font-semibold text-slate-800 mb-3">Resumen de impresión</h2>
+            <dl class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Productos seleccionados</dt>
+                    <dd id="summaryProducts" class="font-semibold text-slate-800">0</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Total etiquetas</dt>
+                    <dd id="summaryLabels" class="font-semibold text-purple-700">0</dd>
+                </div>
+            </dl>
+            <button type="submit" form="labelsForm" id="printBtn"
+                class="mt-5 w-full bg-purple-700 hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-3 rounded-xl font-medium transition"
+                disabled>
+                Generar PDF de etiquetas
+            </button>
+            <p class="text-xs text-gray-400 mt-3">
+                Se abrirá un PDF con todas las etiquetas repetidas según la cantidad indicada.
+            </p>
+        </div>
+    </div>
+
+    <form id="labelsForm" method="POST" action="/inventory/labels/pdf" target="_blank" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="p-4 w-12">
+                            <input type="checkbox" id="selectAll" class="rounded border-gray-300" title="Seleccionar todos">
+                        </th>
+                        <th class="text-left p-4 font-semibold">Código</th>
+                        <th class="text-left p-4 font-semibold">Producto</th>
+                        <th class="text-right p-4 font-semibold">Precio</th>
+                        <th class="text-right p-4 font-semibold">Stock</th>
+                        <th class="text-left p-4 font-semibold min-w-[140px]">Cantidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr class="label-row border-t hover:bg-gray-50 transition"
+                        id="product-row-{{ product.id }}"
+                        data-id="{{ product.id }}"
+                        data-code="{{ (product.code or '')|lower }}"
+                        data-name="{{ (product.name or '')|lower }}">
+                        <td class="p-4 align-middle">
+                            <input type="checkbox" name="product_id" value="{{ product.id }}"
+                                class="product-check rounded border-gray-300"
+                                {% if not product.code %}disabled title="Sin código: no se puede generar código de barras"{% endif %}>
+                        </td>
+                        <td class="p-4 align-middle font-mono text-gray-700">{{ product.code or '—' }}</td>
+                        <td class="p-4 align-middle font-medium text-slate-800">{{ product.name }}</td>
+                        <td class="p-4 align-middle text-right text-purple-700 font-semibold">${{ "%.2f"|format(product.price or 0) }}</td>
+                        <td class="p-4 align-middle text-right">{{ product.stock or 0 }}</td>
+                        <td class="p-4 align-middle">
+                            <select name="qty_{{ product.id }}" class="qty-select border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                                {% for qty in label_quantities %}
+                                <option value="{{ qty }}" {% if qty == 10 %}selected{% endif %}>{{ qty }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="p-10 text-center text-gray-400">
+                            No hay productos que coincidan con la búsqueda.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<script>
+    const labelSearch = document.getElementById("labelSearch");
+    const scannerInput = document.getElementById("scannerInput");
+    const scannerResult = document.getElementById("scannerResult");
+    const scannerError = document.getElementById("scannerError");
+    const selectAll = document.getElementById("selectAll");
+    const printBtn = document.getElementById("printBtn");
+    const summaryProducts = document.getElementById("summaryProducts");
+    const summaryLabels = document.getElementById("summaryLabels");
+    const labelRows = Array.from(document.querySelectorAll(".label-row"));
+    const checks = () => Array.from(document.querySelectorAll(".product-check:not(:disabled)"));
+
+    function filterRows() {
+        const q = (labelSearch?.value || "").trim().toLowerCase();
+        labelRows.forEach((row) => {
+            const haystack = `${row.dataset.code} ${row.dataset.name}`;
+            row.classList.toggle("hidden", q && !haystack.includes(q));
+        });
+    }
+
+    function updateSummary() {
+        const selected = checks().filter((el) => el.checked);
+        let totalLabels = 0;
+        selected.forEach((el) => {
+            const row = el.closest(".label-row");
+            const qty = row?.querySelector(".qty-select");
+            totalLabels += parseInt(qty?.value || "1", 10) || 0;
+        });
+        summaryProducts.textContent = String(selected.length);
+        summaryLabels.textContent = String(totalLabels);
+        printBtn.disabled = selected.length === 0;
+    }
+
+    function highlightRow(productId) {
+        labelRows.forEach((row) => row.classList.remove("ring-2", "ring-purple-400", "bg-purple-50"));
+        const row = document.getElementById(`product-row-${productId}`);
+        if (!row) return null;
+        row.classList.remove("hidden");
+        row.classList.add("ring-2", "ring-purple-400", "bg-purple-50");
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        const checkbox = row.querySelector(".product-check:not(:disabled)");
+        if (checkbox) checkbox.checked = true;
+        updateSummary();
+        return row;
+    }
+
+    async function lookupByCode(code) {
+        const normalized = (code || "").trim();
+        if (!normalized) return;
+
+        scannerResult.classList.add("hidden");
+        scannerError.classList.add("hidden");
+
+        const response = await fetch(`/inventory/labels/lookup?code=${encodeURIComponent(normalized)}`);
+        if (!response.ok) {
+            scannerError.textContent = `No se encontró producto con código "${normalized}".`;
+            scannerError.classList.remove("hidden");
+            return;
+        }
+
+        const product = await response.json();
+        const row = highlightRow(product.id);
+        if (!row) {
+            scannerError.textContent = `Producto encontrado pero no visible en el listado actual.`;
+            scannerError.classList.remove("hidden");
+            return;
+        }
+
+        scannerResult.innerHTML = `
+            <strong>${product.code}</strong> — ${product.name}
+            <span class="text-emerald-700">($${Number(product.price || 0).toFixed(2)})</span>
+        `;
+        scannerResult.classList.remove("hidden");
+    }
+
+    labelSearch?.addEventListener("input", filterRows);
+
+    scannerInput?.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            lookupByCode(this.value);
+            this.select();
+        }
+    });
+
+    selectAll?.addEventListener("change", function () {
+        const visibleChecks = checks().filter((el) => !el.closest(".label-row")?.classList.contains("hidden"));
+        visibleChecks.forEach((el) => { el.checked = selectAll.checked; });
+        updateSummary();
+    });
+
+    document.addEventListener("change", function (event) {
+        if (event.target.matches(".product-check, .qty-select")) {
+            updateSummary();
+        }
+    });
+
+    filterRows();
+    updateSummary();
+    scannerInput?.focus();
+</script>
+
+{% endblock %}
