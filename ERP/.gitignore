@@ -9,7 +9,6 @@ backups/
 logs/
 migration_report_*.json
 storage_audit_*.json
-tools/mariadb/
 tools/python312/
 tools/downloads/
 uploads/products/thumbs/

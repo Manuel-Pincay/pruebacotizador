@@ -1,5 +1,5 @@
 -- =============================================================================
--- MySQL 8+ / MariaDB 10.6+ — Creación de base de datos ERP
+-- MySQL 8+ — Creación de base de datos ERP
 -- =============================================================================
 -- Uso:
 --   1. Edite la contraseña en CREATE USER (línea ~15)

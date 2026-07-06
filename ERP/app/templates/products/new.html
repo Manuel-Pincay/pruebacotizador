@@ -1,4 +1,6 @@
-{% extends 'layouts/base.html' %} {% block content %}
+{% extends 'layouts/base.html' %}
+{% from "components/catalog_select.html" import catalog_select %}
+{% block content %}
 
 <div class="max-w-6xl mx-auto">
   <div class="erp-page-header mb-6 sm:mb-8">
@@ -35,35 +37,23 @@
         <div>
           <label class="block mb-2"> Categoría </label>
 
-          <input
-            type="text"
-            name="category"
-            list="category-options"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="category-options">
-            {% for category in categories %}
-            <option value="{{ category.name }}"></option>
-            {% endfor %}
-          </datalist>
+          {{ catalog_select(
+            "category",
+            categories,
+            "+ Agregar nueva categoría",
+            "/product-settings/api/category"
+          ) }}
         </div>
 
         <div>
           <label class="block mb-2"> Temática </label>
 
-          <input
-            type="text"
-            name="theme"
-            list="theme-options"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="theme-options">
-            {% for theme in themes %}
-            <option value="{{ theme.name }}"></option>
-            {% endfor %}
-          </datalist>
+          {{ catalog_select(
+            "theme",
+            themes,
+            "+ Agregar nueva temática",
+            "/product-settings/api/theme"
+          ) }}
         </div>
       </div>
     </div>
@@ -77,35 +67,23 @@
         <div>
           <label class="block mb-2"> Material </label>
 
-          <input
-            type="text"
-            name="material"
-            list="material-options"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="material-options">
-            {% for material in materials %}
-            <option value="{{ material.name }}"></option>
-            {% endfor %}
-          </datalist>
+          {{ catalog_select(
+            "material",
+            materials,
+            "+ Agregar nuevo material",
+            "/product-settings/api/material"
+          ) }}
         </div>
 
         <div>
           <label class="block mb-2"> Color </label>
 
-          <input
-            type="text"
-            name="color"
-            list="color-options"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="color-options">
-            {% for color in colors %}
-            <option value="{{ color.name }}"></option>
-            {% endfor %}
-          </datalist>
+          {{ catalog_select(
+            "color",
+            colors,
+            "+ Agregar nuevo color",
+            "/product-settings/api/color"
+          ) }}
         </div>
       </div>
 
@@ -113,13 +91,12 @@
         <div>
           <label class="block mb-2"> Grosor </label>
 
-          <select name="thickness" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-            {% for thickness in thicknesses %}
-
-            <option value="{{ thickness.name }}">{{ thickness.name }}</option>
-
-            {% endfor %}
-          </select>
+          {{ catalog_select(
+            "thickness",
+            thicknesses,
+            "+ Agregar nuevo grosor",
+            "/product-settings/api/thickness"
+          ) }}
         </div>
 
         <div>
@@ -131,15 +108,15 @@
         <div>
           <label class="block mb-2"> Unidad </label>
 
-          <select name="size_unit" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-            {% for unit in units %}
-
-            <option value="{{ unit.abbreviation }}">
-              {{ unit.abbreviation }}
-            </option>
-
-            {% endfor %}
-          </select>
+          {{ catalog_select(
+            "size_unit",
+            units,
+            "+ Agregar nueva unidad",
+            "/product-settings/api/unit",
+            value_attr="abbreviation",
+            label_attr="abbreviation",
+            add_mode="unit"
+          ) }}
         </div>
       </div>
     </div>
@@ -219,17 +196,128 @@
 
 <script>
   const imageInput = document.getElementById("imageInput");
-
   const preview = document.getElementById("preview");
 
   imageInput.addEventListener("change", function (e) {
     const file = e.target.files[0];
-
     if (!file) return;
-
     preview.src = URL.createObjectURL(file);
-
     preview.classList.remove("hidden");
+  });
+
+  document.querySelector("form")?.addEventListener("submit", function () {
+    document.querySelectorAll(".catalog-select").forEach(function (select) {
+      if (select.value === "__new__") {
+        select.value = "";
+      }
+    });
+  });
+
+  document.querySelectorAll(".catalog-select").forEach(function (select) {
+    let previousValue = select.value;
+
+    async function promptCatalogValue(selectEl) {
+      const addLabel = selectEl.dataset.addLabel || "Agregar nuevo";
+
+      if (selectEl.dataset.addMode === "unit") {
+        const result = await Swal.fire({
+          title: addLabel,
+          html:
+            '<input id="swal-unit-name" class="swal2-input" placeholder="Nombre (ej. Milímetros)">' +
+            '<input id="swal-unit-abbr" class="swal2-input" placeholder="Abreviatura (ej. mm)">',
+          showCancelButton: true,
+          confirmButtonText: "Guardar",
+          cancelButtonText: "Cancelar",
+          reverseButtons: true,
+          focusConfirm: false,
+          preConfirm: function () {
+            const name = document.getElementById("swal-unit-name").value.trim();
+            const abbreviation = document.getElementById("swal-unit-abbr").value.trim();
+            if (!name || !abbreviation) {
+              Swal.showValidationMessage("Completa nombre y abreviatura");
+              return false;
+            }
+            return { name: name, abbreviation: abbreviation };
+          },
+        });
+
+        if (!result.isConfirmed) {
+          return null;
+        }
+
+        return result.value;
+      }
+
+      const value = await ErpDialog.prompt(addLabel, {
+        title: addLabel,
+        placeholder: "Nombre...",
+        confirmText: "Guardar",
+        validator: function (inputValue) {
+          if (!inputValue || !inputValue.trim()) {
+            return "Ingresa un nombre";
+          }
+        },
+      });
+
+      if (!value) {
+        return null;
+      }
+
+      return { name: value.trim() };
+    }
+
+    select.addEventListener("change", async function () {
+      if (select.value !== "__new__") {
+        previousValue = select.value;
+        return;
+      }
+
+      const apiUrl = select.dataset.apiUrl;
+      const newOption = select.querySelector('option[value="__new__"]');
+      const payload = await promptCatalogValue(select);
+
+      if (!payload) {
+        select.value = previousValue;
+        return;
+      }
+
+      const formData = new FormData();
+      Object.entries(payload).forEach(function ([key, value]) {
+        formData.append(key, value);
+      });
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          body: formData,
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "No se pudo guardar");
+        }
+
+        const optionValue = data.value || data.name;
+        const optionLabel = data.label || data.name;
+        let option = Array.from(select.options).find(function (opt) {
+          return opt.value === optionValue;
+        });
+
+        if (!option) {
+          option = document.createElement("option");
+          option.value = optionValue;
+          option.textContent = optionLabel;
+          select.insertBefore(option, newOption);
+        }
+
+        select.value = optionValue;
+        previousValue = optionValue;
+        ErpDialog.toast(data.created ? "Agregado correctamente" : "Ya existía, seleccionado");
+      } catch (error) {
+        select.value = previousValue;
+        ErpDialog.error(error.message || "No se pudo guardar");
+      }
+    });
   });
 </script>
 

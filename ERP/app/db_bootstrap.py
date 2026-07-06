@@ -1,4 +1,4 @@
-"""Preparación de esquema MySQL (Alembic + columnas legacy)."""
+"""Preparación de esquema MySQL (Alembic)."""
 
 from __future__ import annotations
 
@@ -15,9 +15,5 @@ def run_alembic_upgrade() -> None:
 
 
 def prepare_database() -> None:
-    """Aplica migraciones Alembic y ajustes de esquema incrementales."""
+    """Crea o actualiza el esquema MySQL desde cero con Alembic."""
     run_alembic_upgrade()
-
-    from app.db_migrations import run_schema_migrations
-
-    run_schema_migrations()

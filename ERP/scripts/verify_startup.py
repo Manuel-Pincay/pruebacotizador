@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,7 +28,6 @@ REQUIRED_PACKAGES: tuple[tuple[str, str], ...] = (
 )
 
 MIN_PYTHON = (3, 10)
-LOCAL_MARIADB_PORT = 3307
 
 
 @dataclass
@@ -146,27 +144,16 @@ def _try_mysql_connect(params: dict) -> tuple[bool, str]:
         return False, str(exc)
 
 
-def _is_local_portable_target(params: dict) -> bool:
-    return params["host"] in {"127.0.0.1", "localhost"} and params["port"] == LOCAL_MARIADB_PORT
-
-
 def _mysql_help(params: dict, error: str) -> str:
     host = params["host"]
     port = params["port"]
     db = params["database"]
 
-    if _is_local_portable_target(params):
-        return (
-            "MariaDB portable no responde en el puerto 3307.\n"
-            "      Ejecute: python scripts/setup_local_mysql.py\n"
-            f"      Detalle: {error}"
-        )
-
     lines = [
         f"No se pudo conectar a MySQL en {host}:{port} (base: {db}).",
         "",
         "Verifique:",
-        "  1. MySQL 8+ o MariaDB instalado y el servicio en ejecución",
+        "  1. MySQL 8+ instalado y el servicio en ejecución",
         "  2. Usuario, contraseña y base en DATABASE_URL (.env)",
         f"  3. La base '{db}' existe (docs/mysql_setup.sql)",
         "",
@@ -175,17 +162,7 @@ def _mysql_help(params: dict, error: str) -> str:
     return "\n      ".join(lines)
 
 
-def ensure_local_mariadb() -> bool:
-    setup = ROOT / "scripts" / "setup_local_mysql.py"
-    print("\n  Intentando iniciar MariaDB portable (puerto 3307)...")
-    result = subprocess.run(
-        [sys.executable, str(setup)],
-        cwd=str(ROOT),
-    )
-    return result.returncode == 0
-
-
-def check_mysql(auto_setup_portable: bool = True) -> CheckResult:
+def check_mysql() -> CheckResult:
     try:
         database_url = _load_database_url()
     except Exception as exc:
@@ -205,19 +182,10 @@ def check_mysql(auto_setup_portable: bool = True) -> CheckResult:
             f"MySQL conectado ({params['host']}:{params['port']}/{params['database']})",
         )
 
-    if auto_setup_portable and _is_local_portable_target(params):
-        if ensure_local_mariadb():
-            connected, error = _try_mysql_connect(params)
-            if connected:
-                return _ok(
-                    "MariaDB portable iniciado y conectado",
-                    f"{params['host']}:{params['port']}/{params['database']}",
-                )
-
     return _fail("MySQL no disponible", _mysql_help(params, error))
 
 
-def run_all_checks(*, auto_setup_mysql: bool = True) -> int:
+def run_all_checks() -> int:
     _header("ERP - Verificacion de requisitos")
 
     checks = [
@@ -227,7 +195,7 @@ def run_all_checks(*, auto_setup_mysql: bool = True) -> int:
     ]
 
     if all(item.ok for item in checks):
-        checks.append(check_mysql(auto_setup_portable=auto_setup_mysql))
+        checks.append(check_mysql())
     else:
         print("\n  [!] Se omitio la verificacion de MySQL hasta corregir lo anterior.")
 
@@ -245,7 +213,7 @@ def run_all_checks(*, auto_setup_mysql: bool = True) -> int:
                     print(f"    {line}")
         print()
         print("Dependencias:  ejecute iniciar_servidor.bat o python scripts/bootstrap_environment.py")
-        print("MySQL local:   python scripts/setup_local_mysql.py")
+        print("MySQL:         revise DATABASE_URL en .env y docs/mysql_setup.sql")
         print("=" * 60)
         return 1
 

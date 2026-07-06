@@ -42,7 +42,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: ── 3. Servidor (MySQL portable + verificacion + uvicorn) ─────
+:: ── 3. Servidor (verificacion MySQL + uvicorn) ────────────────
 echo [3/3] Iniciando servidor...
 echo.
 "%PYTHON%" scripts\run_server.py

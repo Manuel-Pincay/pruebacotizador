@@ -36,10 +36,7 @@ class Settings:
         _APP_ENV.lower() == "production",
     )
 
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "mysql+pymysql://erp_user:erppassword@127.0.0.1:3307/erp?charset=utf8mb4",
-    )
+    database_url: str = os.getenv("DATABASE_URL", "")
     database_pool_size: int = int(os.getenv("DB_POOL_SIZE", "20"))
     database_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "40"))
     database_pool_recycle: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))

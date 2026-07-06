@@ -4,10 +4,12 @@ from fastapi import Depends
 from fastapi import Form
 
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 from fastapi.templating import Jinja2Templates
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -35,6 +37,94 @@ def _require_admin(request: Request):
     if isinstance(user, RedirectResponse):
         return user
     return user
+
+
+def _create_catalog_item_json(request: Request, db: Session, model, name: str):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"success": False, "message": "No autorizado."})
+
+    cleaned = format_title_words(name)
+    if not cleaned:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Ingresa un nombre válido."},
+        )
+
+    existing = (
+        db.query(model)
+        .filter(func.lower(model.name) == cleaned.lower())
+        .first()
+    )
+    if existing:
+        return {"success": True, "name": existing.name, "value": existing.name, "label": existing.name, "created": False}
+
+    db.add(model(name=cleaned))
+    db.commit()
+    return {"success": True, "name": cleaned, "value": cleaned, "label": cleaned, "created": True}
+
+
+def _create_thickness_json(request: Request, db: Session, name: str):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"success": False, "message": "No autorizado."})
+
+    cleaned = " ".join((name or "").split())
+    if not cleaned:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Ingresa un grosor válido."},
+        )
+
+    existing = (
+        db.query(ProductThickness)
+        .filter(func.lower(ProductThickness.name) == cleaned.lower())
+        .first()
+    )
+    if existing:
+        return {"success": True, "name": existing.name, "value": existing.name, "label": existing.name, "created": False}
+
+    db.add(ProductThickness(name=cleaned))
+    db.commit()
+    return {"success": True, "name": cleaned, "value": cleaned, "label": cleaned, "created": True}
+
+
+def _create_unit_json(request: Request, db: Session, name: str, abbreviation: str):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"success": False, "message": "No autorizado."})
+
+    cleaned_name = format_title_words(name)
+    cleaned_abbr = " ".join((abbreviation or "").split())
+    if not cleaned_name or not cleaned_abbr:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Nombre y abreviatura son obligatorios."},
+        )
+
+    existing = (
+        db.query(MeasurementUnit)
+        .filter(func.lower(MeasurementUnit.abbreviation) == cleaned_abbr.lower())
+        .first()
+    )
+    if existing:
+        return {
+            "success": True,
+            "name": existing.name,
+            "value": existing.abbreviation,
+            "label": existing.abbreviation,
+            "created": False,
+        }
+
+    db.add(MeasurementUnit(name=cleaned_name, abbreviation=cleaned_abbr))
+    db.commit()
+    return {
+        "success": True,
+        "name": cleaned_name,
+        "value": cleaned_abbr,
+        "label": cleaned_abbr,
+        "created": True,
+    }
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -98,6 +188,18 @@ async def create_category(request: Request, name: str = Form(...), db: Session =
         db.commit()
 
     return RedirectResponse("/product-settings", status_code=302)
+
+
+@router.post("/api/category")
+async def api_create_category(
+    request: Request,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    result = _create_catalog_item_json(request, db, ProductCategory, name)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
 
 
 # =====================================
@@ -257,6 +359,18 @@ async def create_material(
     )
 
 
+@router.post("/api/material")
+async def api_create_material(
+    request: Request,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    result = _create_catalog_item_json(request, db, ProductMaterial, name)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
+
+
 @router.get("/material/{material_id}/delete")
 async def delete_material(
     request: Request,
@@ -324,6 +438,18 @@ async def create_color(
         "/product-settings",
         status_code=302
     )
+
+
+@router.post("/api/color")
+async def api_create_color(
+    request: Request,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    result = _create_catalog_item_json(request, db, ProductColor, name)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
 
 
 # =====================================
@@ -400,6 +526,18 @@ async def create_theme(
     )
 
 
+@router.post("/api/theme")
+async def api_create_theme(
+    request: Request,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    result = _create_catalog_item_json(request, db, ProductTheme, name)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
+
+
 # =====================================
 # DELETE THEME
 # =====================================
@@ -470,6 +608,18 @@ async def create_thickness(
         "/product-settings",
         status_code=302
     )
+
+
+@router.post("/api/thickness")
+async def api_create_thickness(
+    request: Request,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    result = _create_thickness_json(request, db, name)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
 
 
 # =====================================
@@ -544,6 +694,19 @@ async def create_unit(
         "/product-settings",
         status_code=302
     )
+
+
+@router.post("/api/unit")
+async def api_create_unit(
+    request: Request,
+    name: str = Form(...),
+    abbreviation: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    result = _create_unit_json(request, db, name, abbreviation)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
 
 
 # =====================================

@@ -9,7 +9,7 @@ Esta guía cubre el despliegue completo del ERP: creación de la base de datos M
 | Componente | Versión mínima |
 |---|---|
 | Python | 3.10+ |
-| MySQL o MariaDB | 8.0+ / 10.6+ |
+| MySQL | 8.0+ |
 | Sistema operativo | Windows, Linux o VPS |
 
 **Dependencias Python:**
@@ -42,10 +42,9 @@ El script descarga e instala automáticamente (solo la primera vez, requiere int
 | 1 | **Python 3.12** en `tools/python312/` (si no hay Python en el PC) |
 | 2 | Entorno virtual `venv/` + `pip install -r requirements.txt` |
 | 3 | Crea `.env` desde `.env.example` si no existe |
-| 4 | **MariaDB portable** en `tools/mariadb/` (puerto 3307) |
-| 5 | Migraciones Alembic + inicia el servidor |
+| 4 | Verifica conexión a MySQL y inicia el servidor |
 
-No necesita permisos de administrador. La primera ejecución puede tardar **10–15 minutos** (descargas). Las siguientes arrancan en segundos.
+Requiere **MySQL 8+** instalado y en ejecución. Configure `DATABASE_URL` en `.env` antes de arrancar.
 
 Acceso: `http://127.0.0.1:8000` — usuario `admin` / clave `123456`
 
@@ -102,24 +101,6 @@ docker compose ps        # debe mostrar mysql "healthy"
 
 Docker crea automáticamente la base `erp` y el usuario `erp_user` según las variables del `.env`.
 
-### Opción C — Desarrollo local en Windows (sin instalar MySQL)
-
-El proyecto incluye MariaDB portable (puerto **3307**):
-
-```bash
-python scripts/setup_local_mysql.py
-```
-
-Credenciales por defecto:
-
-| Campo | Valor |
-|---|---|
-| Host | `127.0.0.1` |
-| Puerto | `3307` |
-| Base | `erp` |
-| Usuario | `erp_user` |
-| Contraseña | `erppassword` |
-
 ---
 
 ## 2. Configurar el archivo `.env`
@@ -167,7 +148,6 @@ mysql+pymysql://USUARIO:CONTRASEÑA@HOST:PUERTO/NOMBRE_BASE?charset=utf8mb4
 | Escenario | HOST | PUERTO | Ejemplo |
 |---|---|---|---|
 | MySQL en el mismo servidor | `127.0.0.1` | `3306` | `...@127.0.0.1:3306/erp?...` |
-| MariaDB portable (Windows dev) | `127.0.0.1` | `3307` | `...@127.0.0.1:3307/erp?...` |
 | Docker Compose (app en contenedor) | `mysql` | `3306` | `...@mysql:3306/erp?...` |
 | MySQL en otro servidor | IP o dominio | `3306` | `...@192.168.1.50:3306/erp?...` |
 
@@ -191,7 +171,7 @@ ERP_SECRET_KEY=erp-dev-secret-change-in-production
 ERP_SECRETADMIN_PASSWORD=203211
 ERP_COOKIE_SECURE=false
 
-DATABASE_URL=mysql+pymysql://erp_user:erppassword@127.0.0.1:3307/erp?charset=utf8mb4
+DATABASE_URL=mysql+pymysql://erp_user:erppassword@127.0.0.1:3306/erp?charset=utf8mb4
 ```
 
 ### Checklist antes de producción
@@ -305,7 +285,6 @@ ERP_SECRETADMIN_PASSWORD=password_admin
 | Carpeta | Contenido | Backup |
 |---|---|---|
 | `uploads/` | Logos, imágenes de productos, diseños | Sí |
-| `tools/mariadb/data/` | Datos MariaDB portable (solo dev) | Opcional |
 
 MySQL en servidor o Docker usa su propio volumen/datadir; haga backup con `mysqldump`.
 
@@ -341,7 +320,6 @@ mysql -u erp_user -p erp < backup_erp_20260613.sql
 | `Can't connect to MySQL server` | Servicio detenido o puerto incorrecto | Inicie MySQL; revise host/puerto en `.env` |
 | `Unknown database 'erp'` | Base no creada | Ejecute `docs/mysql_setup.sql` |
 | `Faltan paquetes` | Dependencias no instaladas | `pip install -r requirements.txt` |
-| MariaDB no responde (dev) | Puerto 3307 apagado | `python scripts/setup_local_mysql.py` |
 | `ERP_SECRET_KEY` por defecto | `.env` no configurado | Genere clave y reinicie la app |
 
 **Diagnóstico completo:**
@@ -357,9 +335,6 @@ python scripts/verify_startup.py
 ```bash
 # Verificar requisitos
 python scripts/verify_startup.py
-
-# MariaDB local (Windows, puerto 3307)
-python scripts/setup_local_mysql.py
 
 # Migraciones
 alembic upgrade head
@@ -386,5 +361,4 @@ docker compose logs -f app
 | `docs/mysql_setup.sql` | Crear base y usuario en MySQL manual |
 | `docker-compose.yml` | MySQL + app en contenedores |
 | `scripts/verify_startup.py` | Verificación pre-arranque |
-| `scripts/setup_local_mysql.py` | MariaDB portable (desarrollo Windows) |
 | `alembic/versions/` | Historial de migraciones de esquema |

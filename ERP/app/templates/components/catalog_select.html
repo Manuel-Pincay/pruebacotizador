@@ -1,0 +1,18 @@
+{% macro catalog_select(name, items, add_label, api_url, selected='', id='', extra_class='', value_attr='name', label_attr='name', add_mode='') %}
+<select
+  name="{{ name }}"
+  {% if id %}id="{{ id }}"{% else %}id="{{ name }}"{% endif %}
+  class="catalog-select w-full border border-gray-200 px-3 py-2 rounded-lg {{ extra_class }}"
+  data-api-url="{{ api_url }}"
+  data-add-label="{{ add_label }}"
+  {% if add_mode %}data-add-mode="{{ add_mode }}"{% endif %}
+>
+  <option value="">Seleccionar...</option>
+  {% for item in items %}
+  <option value="{{ item|attr(value_attr) }}" {% if selected == item|attr(value_attr) %}selected{% endif %}>
+    {{ item|attr(label_attr) }}
+  </option>
+  {% endfor %}
+  <option value="__new__">{{ add_label }}</option>
+</select>
+{% endmacro %}
