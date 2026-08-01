@@ -27,6 +27,7 @@ from app.services.product_service import (
     ensure_billing_line_product,
     product_to_billing_payload,
 )
+from app.services.billing_client_service import (
     consult_client_identificacion,
     consult_sri_identificacion,
     list_local_clients,

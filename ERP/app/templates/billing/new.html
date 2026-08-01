@@ -989,6 +989,95 @@ function initProductSearch() {
   });
 }
 
+function getSelectedCustomIva() {
+  const sel = document.getElementById('custom_product_iva');
+  if (!sel) return { tarifa_iva: DEFAULT_TARIFA_IVA, codigo_iva: DEFAULT_CODIGO_IVA };
+  const opt = sel.options[sel.selectedIndex];
+  return {
+    tarifa_iva: parseFloat(opt.value) || 0,
+    codigo_iva: opt.dataset.codigo || DEFAULT_CODIGO_IVA,
+  };
+}
+
+function openCustomProductModal() {
+  document.getElementById('custom_product_modal').classList.remove('hidden');
+  document.getElementById('custom_product_name')?.focus();
+}
+
+function closeCustomProductModal() {
+  document.getElementById('custom_product_modal').classList.add('hidden');
+}
+
+async function addCustomProductLine() {
+  clearError();
+  const name = document.getElementById('custom_product_name').value.trim();
+  const qty = parseFloat(document.getElementById('custom_product_qty').value) || 1;
+  const price = parseFloat(document.getElementById('custom_product_price').value);
+  const iva = getSelectedCustomIva();
+  if (!name) {
+    showError('Ingrese la descripción del producto');
+    return;
+  }
+  if (!price || price <= 0) {
+    showError('Ingrese un precio válido');
+    return;
+  }
+
+  const btn = document.getElementById('btn-add-custom-product');
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  try {
+    const res = await fetch('/billing/api/products/quick-create', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        name,
+        price,
+        tarifa_iva: iva.tarifa_iva,
+        codigo_iva: iva.codigo_iva,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || 'No se pudo crear el producto');
+      return;
+    }
+    PRODUCTOS.push(data);
+    lineas.push({
+      product_id: data.id,
+      codigo_principal: data.codigo_principal,
+      codigo_auxiliar: data.codigo_auxiliar || null,
+      descripcion: name,
+      cantidad: qty,
+      precio_unitario: price,
+      tarifa_iva: Number(data.tarifa_iva),
+      codigo_iva: data.codigo_iva,
+      is_manual: true,
+    });
+    document.getElementById('custom_product_name').value = '';
+    document.getElementById('custom_product_qty').value = '1';
+    document.getElementById('custom_product_price').value = '';
+    closeCustomProductModal();
+    renderLines();
+  } catch (_) {
+    showError('Error de conexión al crear el producto');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
+}
+
+function initCustomProductModal() {
+  document.getElementById('btn-open-custom-product')?.addEventListener('click', openCustomProductModal);
+  document.getElementById('btn-close-custom-product')?.addEventListener('click', closeCustomProductModal);
+  document.getElementById('btn-add-custom-product')?.addEventListener('click', addCustomProductLine);
+  document.getElementById('custom_product_modal')?.addEventListener('click', e => {
+    if (e.target.id === 'custom_product_modal') closeCustomProductModal();
+  });
+}
+
 function initEstablecimientos() {
   const estSel = document.getElementById('codigo_establecimiento');
   const ptoSel = document.getElementById('codigo_punto_emision');
@@ -1168,6 +1257,7 @@ document.getElementById('invoice-form').addEventListener('submit', e => {
 });
 
 initProductSearch();
+initCustomProductModal();
 initClientSearch();
 initEstablecimientos();
 renderLines();
