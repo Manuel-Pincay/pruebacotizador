@@ -1,8 +1,23 @@
 import math
+from dataclasses import dataclass
 from urllib.parse import urlencode
 
 
-def paginate_query(query, page: int, per_page: int):
+@dataclass
+class Pagination:
+    items: list
+    page: int
+    per_page: int
+    total: int
+    pages: int
+    has_prev: bool
+    has_next: bool
+
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+
+
+def paginate_query(query, page: int, per_page: int) -> Pagination:
     page = max(1, page)
     per_page = max(1, min(per_page, 100))
     total = query.count()
@@ -14,15 +29,15 @@ def paginate_query(query, page: int, per_page: int):
         .limit(per_page)
         .all()
     )
-    return {
-        "items": items,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "pages": pages,
-        "has_prev": page > 1,
-        "has_next": page < pages,
-    }
+    return Pagination(
+        items=items,
+        page=page,
+        per_page=per_page,
+        total=total,
+        pages=pages,
+        has_prev=page > 1,
+        has_next=page < pages,
+    )
 
 
 def build_page_url(base_path: str, page: int, params: dict | None = None) -> str:

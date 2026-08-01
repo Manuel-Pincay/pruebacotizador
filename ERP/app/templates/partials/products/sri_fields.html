@@ -1,0 +1,83 @@
+{# Campos SRI para facturación electrónica. No afectan el cotizador. #}
+<div class="bg-white rounded-xl shadow-sm border border-emerald-100 p-4">
+  <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
+    <div>
+      <h2 class="text-base font-semibold text-gray-700">Facturación electrónica (SRI)</h2>
+      <p class="text-xs text-gray-500 mt-0.5">
+        Datos para el XML de factura. El cotizador sigue usando nombre, precio y características del producto.
+      </p>
+    </div>
+    <span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-100">Solo factura</span>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-5">
+    <div>
+      <label class="block mb-2 text-sm">Código principal</label>
+      <input type="text" id="sri_codigo_principal_mirror" readonly
+        class="w-full border border-gray-200 px-3 py-2 rounded-lg bg-slate-50 text-gray-600 text-sm"
+        placeholder="Igual al código del producto"
+        value="{{ product.code if product is defined else '' }}">
+      <p class="text-xs text-gray-400 mt-1">Mismo valor que «Código» arriba. Obligatorio en factura SRI.</p>
+    </div>
+
+    <div>
+      <label class="block mb-2 text-sm">Código secundario (auxiliar)</label>
+      <input type="text" name="codigo_auxiliar" maxlength="50"
+        value="{{ product.codigo_auxiliar if product is defined and product.codigo_auxiliar else '' }}"
+        placeholder="Opcional — código interno, SKU, etc."
+        class="w-full border border-gray-200 px-3 py-2 rounded-lg">
+    </div>
+
+    <div class="md:col-span-2">
+      <label class="block mb-2 text-sm">Descripción en factura</label>
+      <p class="text-xs text-gray-500 mb-2">
+        Se usa la «Descripción» del producto en el detalle XML. Si está vacía, se usa el nombre.
+      </p>
+    </div>
+
+    <div>
+      <label class="block mb-2 text-sm">Tarifa IVA *</label>
+      <select name="tarifa_iva" id="tarifa_iva_select"
+        class="w-full border border-gray-200 px-3 py-2 rounded-lg bg-white" required>
+        {% set current_tarifa = product.tarifa_iva if product is defined and product.tarifa_iva is not none else 0 %}
+        {% for opt in tarifas_iva %}
+        <option value="{{ opt.tarifa }}"
+          data-codigo="{{ opt.codigo }}"
+          {% if opt.tarifa == current_tarifa %}selected{% endif %}>
+          {{ opt.label }}
+        </option>
+        {% endfor %}
+      </select>
+      <input type="hidden" name="codigo_iva" id="codigo_iva_hidden"
+        value="{{ product.codigo_iva if product is defined and product.codigo_iva else '0' }}">
+      <p class="text-xs text-gray-400 mt-1">Código SRI (Tabla 17): <span id="codigo_iva_label">{{ product.codigo_iva if product is defined and product.codigo_iva else '0' }}</span></p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const codeInput = document.querySelector('input[name="code"]');
+  const mirror = document.getElementById('sri_codigo_principal_mirror');
+  const tarifaSel = document.getElementById('tarifa_iva_select');
+  const codigoHidden = document.getElementById('codigo_iva_hidden');
+  const codigoLabel = document.getElementById('codigo_iva_label');
+
+  if (codeInput && mirror) {
+    const syncCode = () => { mirror.value = codeInput.value.trim(); };
+    codeInput.addEventListener('input', syncCode);
+    syncCode();
+  }
+
+  if (tarifaSel && codigoHidden) {
+    const syncIva = () => {
+      const opt = tarifaSel.options[tarifaSel.selectedIndex];
+      const codigo = opt?.dataset?.codigo || '4';
+      codigoHidden.value = codigo;
+      if (codigoLabel) codigoLabel.textContent = codigo;
+    };
+    tarifaSel.addEventListener('change', syncIva);
+    syncIva();
+  }
+})();
+</script>

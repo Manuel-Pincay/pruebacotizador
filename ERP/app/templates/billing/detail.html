@@ -1,0 +1,368 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="mb-6">
+  <a href="/billing/" class="text-purple-600 text-sm">← Facturas</a>
+  <h1 class="text-3xl font-bold text-slate-800 mt-2">{{ invoice.tipo_label }} #{{ invoice.id }}</h1>
+  <p class="text-gray-500 font-mono">{{ invoice.numero_comprobante }}</p>
+</div>
+
+{% if error %}
+<div class="mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl whitespace-pre-wrap">{{ error }}</div>
+{% endif %}
+{% if success == 'nc_creada' %}
+<div class="mb-4 p-4 bg-green-50 border border-green-200 text-green-800 rounded-xl">Nota de crédito creada. Revise y emítala al SRI.</div>
+{% elif success == 'nc_emitida' %}
+<div class="mb-4 p-4 bg-green-50 border border-green-200 text-green-800 rounded-xl">Nota de crédito enviada al SRI.</div>
+{% elif success %}
+<div class="mb-4 p-4 bg-green-50 border border-green-200 text-green-800 rounded-xl">{{ success }}</div>
+{% endif %}
+
+{% if seq_warning %}
+<div class="mb-4 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl">
+  <strong>Existe una diferencia en la secuencia del comprobante.</strong><br>
+  Secuencia local: {{ seq_warning.secuencia_local }}<br>
+  Secuencia esperada/configurada: {{ seq_warning.secuencia_esperada }}
+</div>
+{% endif %}
+
+{% if not config_ready %}
+<div class="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+  <strong>Configuración SRI incompleta.</strong>
+  <ul class="mt-2 list-disc ml-5 text-sm">
+    {% for err in config_errors %}
+    <li>{{ err.mensaje }}</li>
+    {% endfor %}
+  </ul>
+  {% if user.role == 'admin' %}
+  <a href="/billing/config/sri" class="inline-block mt-2 text-purple-700 font-semibold">Ir a configuración SRI →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 space-y-6">
+    <div class="bg-white rounded-2xl border p-6">
+      <div class="flex flex-wrap gap-3 mb-4">
+        <span class="px-3 py-1 rounded-full text-sm font-semibold
+          {% if invoice.estado == 'AUTORIZADA' %}bg-green-100 text-green-800
+          {% elif invoice.estado == 'ANULADA' %}bg-gray-200 text-gray-700
+          {% elif invoice.estado in ['RECHAZADA','ERROR'] %}bg-red-100 text-red-800
+          {% else %}bg-yellow-100 text-yellow-800{% endif %}">{{ invoice.estado }}</span>
+        {% if invoice.quotation_id %}
+        <a href="/quotations/{{ invoice.quotation_id }}" class="text-blue-600 text-sm">Cotización #{{ invoice.quotation_id }}</a>
+        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+        <div><span class="text-gray-500">Cliente</span><p class="font-semibold">{{ invoice.client.company or invoice.client.name }}</p></div>
+        <div><span class="text-gray-500">Identificación</span><p>{{ invoice.client.ruc_ci }}</p></div>
+        <div><span class="text-gray-500">Clave acceso</span><p class="font-mono text-xs break-all">{{ invoice.clave_acceso }}</p></div>
+        <div><span class="text-gray-500">Autorización</span><p class="font-mono text-xs">{{ invoice.numero_autorizacion or '-' }}</p></div>
+        {% if invoice.is_nota_credito %}
+        <div><span class="text-gray-500">Modifica factura</span>
+          <p class="font-mono text-xs">
+            {% if invoice.documento_modificado %}
+            <a href="/billing/{{ invoice.documento_modificado.id }}" class="text-purple-600">{{ invoice.num_doc_modificado }}</a>
+            {% else %}{{ invoice.num_doc_modificado or '-' }}{% endif %}
+          </p>
+        </div>
+        <div class="sm:col-span-2"><span class="text-gray-500">Motivo</span><p>{{ invoice.motivo or '-' }}</p></div>
+        {% endif %}
+      </div>
+
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr><th class="p-2 text-left">Descripción</th><th class="p-2">Cant.</th><th class="p-2">P.U.</th><th class="p-2">IVA</th><th class="p-2">Total</th></tr>
+        </thead>
+        <tbody>
+          {% for line in invoice.lines %}
+          <tr class="border-t">
+            <td class="p-2">{{ line.descripcion }}</td>
+            <td class="p-2 text-center">{{ line.cantidad }}</td>
+            <td class="p-2 text-right">${{ '%.2f'|format(line.precio_unitario) }}</td>
+            <td class="p-2 text-right">${{ '%.2f'|format(line.valor_iva) }}</td>
+            <td class="p-2 text-right">${{ '%.2f'|format(line.precio_total_sin_impuesto) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="mt-4 text-right space-y-1 text-sm">
+        <div>Subtotal: ${{ '%.2f'|format(invoice.subtotal_sin_impuestos) }}</div>
+        <div>IVA: ${{ '%.2f'|format(invoice.subtotal_iva) }}</div>
+        <div class="text-lg font-bold">Total: ${{ '%.2f'|format(invoice.importe_total) }}</div>
+      </div>
+
+      {% if invoice.error_message %}
+      <div class="mt-4 p-3 bg-red-50 text-red-800 rounded-lg text-sm whitespace-pre-wrap">{{ invoice.error_message }}</div>
+      {% endif %}
+
+      {% if pagos %}
+      <div class="mt-6">
+        <h3 class="font-bold mb-2">Formas de pago</h3>
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50"><tr><th class="p-2 text-left">Forma</th><th class="p-2 text-right">Valor</th></tr></thead>
+          <tbody>
+            {% for p in pagos %}
+            <tr class="border-t">
+              <td class="p-2">{{ p.forma_pago }} — {% for f in formas_pago %}{% if f.codigo == p.forma_pago %}{{ f.label }}{% endif %}{% endfor %}</td>
+              <td class="p-2 text-right">${{ '%.2f'|format(p.total) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if info_adicional %}
+      <div class="mt-4">
+        <h3 class="font-bold mb-2">Información adicional</h3>
+        <ul class="text-sm space-y-1">
+          {% for c in info_adicional %}
+          <li><span class="text-gray-500">{{ c.nombre }}:</span> {{ c.valor }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <details class="mt-6 pt-4 border-t border-gray-100 group">
+        <summary class="cursor-pointer text-xs text-gray-500 hover:text-purple-700 list-none flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span class="font-medium text-gray-600">SRI</span>
+          <span class="font-mono">{{ invoice.numero_comprobante }}</span>
+          <span class="{% if invoice.estado == 'AUTORIZADA' %}text-green-700{% elif invoice.estado in ['RECHAZADA','ERROR'] %}text-red-700{% else %}text-gray-600{% endif %}">
+            {% if sri_recepcion and sri_recepcion.estado %}{{ sri_recepcion.estado }}{% else %}{{ invoice.estado }}{% endif %}
+          </span>
+          <span>
+            {% if sri_ambiente_clave == 'PRODUCCION' %}Producción{% elif sri_ambiente_clave == 'PRUEBAS' %}Pruebas{% else %}{{ sri_ambiente_config }}{% endif %}
+          </span>
+          <span class="text-gray-400 group-open:hidden">▸ detalles</span>
+        </summary>
+        <div class="mt-2 pl-1 text-xs text-gray-500 space-y-2">
+          {% if sri_ambiente_clave and sri_ambiente_clave != sri_ambiente_config %}
+          <p class="text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1">
+            ⚠ Clave en {{ sri_ambiente_clave }}, config actual {{ sri_ambiente_config }}.
+          </p>
+          {% endif %}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+            <p><span class="text-gray-400">Ambiente clave:</span>
+              {% if sri_ambiente_clave == 'PRODUCCION' %}Producción{% elif sri_ambiente_clave == 'PRUEBAS' %}Pruebas{% else %}—{% endif %}
+            </p>
+            <p><span class="text-gray-400">Config ERP:</span> {{ sri_ambiente_config }}</p>
+            {% if sri_recepcion and sri_recepcion.fase %}
+            <p><span class="text-gray-400">Fase:</span> {{ sri_recepcion.fase }}</p>
+            {% endif %}
+            <p><span class="text-gray-400">Emisión:</span> {{ sri_tipo_emision }}</p>
+          </div>
+          <p class="font-mono break-all text-[11px] text-gray-400">{{ sri_recepcion_url }}</p>
+        </div>
+      </details>
+
+      {% if invoice.is_factura and invoice.estado == 'AUTORIZADA' %}
+      <details class="mt-4 pt-4 border-t border-gray-100 group">
+        <summary class="cursor-pointer text-xs text-gray-500 hover:text-orange-700 list-none flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span class="font-medium text-gray-600">Anular factura</span>
+          <span class="text-orange-600">Nota de crédito SRI</span>
+          <span class="text-gray-400 group-open:hidden">▸</span>
+        </summary>
+        <div class="mt-2 pl-1 text-xs text-gray-500 space-y-2">
+          <p>Las facturas autorizadas solo se anulan ante el SRI con una nota de crédito.</p>
+          <a href="/billing/{{ invoice.id }}/credit-note/preview"
+            class="inline-block bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            Emitir nota de crédito
+          </a>
+        </div>
+      </details>
+      {% elif invoice.is_factura and invoice.estado == 'ANULADA' %}
+      <div class="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+        <span class="font-medium text-gray-600">Anulada</span>
+        {% if authorized_nc %}
+        · <a href="/billing/{{ authorized_nc.id }}" class="text-purple-600 hover:underline">NC {{ authorized_nc.numero_comprobante }}</a>
+        {% elif pending_nc %}
+        · <a href="/billing/{{ pending_nc.id }}" class="text-orange-600 hover:underline">NC pendiente {{ pending_nc.numero_comprobante }}</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    {% if invoice.estado in ['BORRADOR', 'RECHAZADA', 'ERROR', 'PENDIENTE_ENVIO'] and config_ready %}
+    <button type="button" id="btn-validar-emision"
+      class="w-full bg-purple-100 hover:bg-purple-200 text-purple-900 py-3 rounded-xl font-semibold mb-2">
+      ✓ Validar antes de emitir
+    </button>
+    <div id="validacion-resultado" class="hidden mb-2 p-3 rounded-xl text-sm"></div>
+    <form method="post" action="/billing/{{ invoice.id }}/emit">
+      <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold"
+        onclick="return confirm('¿Enviar factura al SRI?')">🚀 Emitir al SRI</button>
+    </form>
+    {% endif %}
+
+    {% if invoice.estado in ['RECIBIDA', 'ENVIANDO'] %}
+    <form method="post" action="/billing/{{ invoice.id }}/sync">
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold">🔄 Consultar autorización SRI</button>
+    </form>
+    {% elif invoice.estado == 'BORRADOR' and invoice.error_message %}
+    <form method="post" action="/billing/{{ invoice.id }}/sync">
+      <button type="submit" class="w-full bg-blue-100 hover:bg-blue-200 text-blue-900 py-3 rounded-xl font-semibold">🔍 Consultar si el SRI ya la recibió</button>
+    </form>
+    {% endif %}
+
+    {% if invoice.xml_generado %}
+    <a href="/billing/{{ invoice.id }}/xml?variant=generado" class="block w-full text-center bg-gray-100 hover:bg-gray-200 py-3 rounded-xl">📄 XML generado</a>
+    {% endif %}
+    {% if invoice.xml_firmado %}
+    <a href="/billing/{{ invoice.id }}/xml?variant=firmado" class="block w-full text-center bg-gray-100 hover:bg-gray-200 py-3 rounded-xl">📄 XML firmado</a>
+    {% endif %}
+    {% if invoice.xml_autorizado %}
+    <a href="/billing/{{ invoice.id }}/xml?variant=autorizado" class="block w-full text-center bg-gray-100 hover:bg-gray-200 py-3 rounded-xl">📄 XML autorizado</a>
+    {% endif %}
+    <a href="/billing/{{ invoice.id }}/ride" class="block w-full text-center bg-purple-100 hover:bg-purple-200 py-3 rounded-xl font-semibold">🧾 Descargar RIDE PDF</a>
+
+    {% if invoice.estado in ['BORRADOR', 'RECHAZADA', 'ERROR', 'PENDIENTE_ENVIO'] %}
+    <div class="pt-4 mt-2 border-t border-gray-200 space-y-2">
+      <p class="text-xs text-gray-500 mb-2">Zona de descarte — no se envía al SRI</p>
+      {% if invoice.estado == 'BORRADOR' and invoice.error_message and 'SRI HTTP 5' in invoice.error_message %}
+      <form method="post" action="/billing/{{ invoice.id }}/regenerar-clave">
+        <button type="submit"
+          class="w-full bg-sky-100 hover:bg-sky-200 border border-sky-300 text-sky-900 py-3 rounded-xl font-semibold"
+          onclick="return confirm('¿Generar una nueva clave de acceso con el mismo secuencial?')">
+          🔑 Regenerar clave de acceso
+        </button>
+      </form>
+      <p class="text-xs text-gray-500">Tras un error HTTP 500 del SRI, una clave nueva evita conflictos por reintento.</p>
+      {% endif %}
+      {% if invoice.estado == 'BORRADOR' and invoice.error_message and 'SECUENCIAL' in invoice.error_message.upper() %}
+      <form method="post" action="/billing/{{ invoice.id }}/renumerar">
+        <button type="submit"
+          class="w-full bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 py-3 rounded-xl font-semibold"
+          onclick="return confirm('¿Asignar el siguiente secuencial libre? Cambiará el número de comprobante y la clave de acceso.')">
+          🔢 Asignar nuevo secuencial
+        </button>
+      </form>
+      <p class="text-xs text-gray-500">El SRI ya tiene registrado {{ invoice.numero_comprobante }}. Use esto para saltar al siguiente número.</p>
+      {% endif %}
+      <form method="post" action="/billing/{{ invoice.id }}/anular">
+        <button type="submit"
+          class="w-full border-2 border-red-300 text-red-700 hover:bg-red-50 py-3 rounded-xl font-semibold"
+          onclick="return confirm('¿Anular esta factura? Quedará marcada como ANULADA y no podrá emitirse.')">
+          {% if invoice.estado == 'BORRADOR' %}🗑️ Anular borrador{% else %}🗑️ Anular factura{% endif %}
+        </button>
+      </form>
+    </div>
+    {% elif invoice.estado == 'AUTORIZADA' and invoice.is_factura %}
+    <div class="bg-white rounded-2xl border p-5 space-y-4">
+      <h3 class="font-bold text-slate-800">📧 Enviar factura por correo</h3>
+      {% if not smtp_configured %}
+      <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+        Configure el servidor SMTP en <a href="/billing/config/sri" class="underline font-medium">Configuración SRI → Envío por correo</a>.
+      </p>
+      {% else %}
+      <div class="text-sm space-y-1">
+        <p><span class="text-gray-500">Destinatarios:</span></p>
+        {% if email_recipients %}
+        <ul class="list-disc ml-5 text-gray-700">
+          {% for e in email_recipients %}
+          <li>{{ e }}{% if invoice.client and e == invoice.client.email %} <span class="text-xs text-gray-400">(SRI)</span>{% elif e in client_additional_emails %} <span class="text-xs text-gray-400">(adicional)</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-red-600">Sin correos. Edite el cliente y agregue email principal.</p>
+        {% endif %}
+      </div>
+      {% if invoice.email_sent_at %}
+      <p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg p-2">
+        ✓ Enviado el {{ invoice.email_sent_at.strftime('%d/%m/%Y %H:%M') }}
+        {% if email_sent_to %} a {{ email_sent_to|join(', ') }}{% endif %}
+      </p>
+      {% endif %}
+      {% if invoice.email_last_error %}
+      <p class="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2 whitespace-pre-wrap">{{ invoice.email_last_error }}</p>
+      {% endif %}
+      <form method="post" action="/billing/{{ invoice.id }}/send-email" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Mensaje personalizado (opcional)</label>
+          <textarea name="custom_message" rows="5" placeholder="{{ default_email_body }}"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Correos extra (solo esta vez)</label>
+          <input type="text" name="extra_emails" placeholder="copia@correo.com"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">Guardar correos en el cliente</label>
+          <input type="text" name="save_extra_emails" placeholder="contabilidad@empresa.com"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+          <p class="text-xs text-gray-400 mt-1">Se suman a los adicionales del cliente (no reemplazan el email SRI).</p>
+        </div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold"
+          {% if not email_recipients %}disabled{% endif %}>
+          📧 Enviar PDF + XML por correo
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% elif invoice.is_nota_credito %}
+    {% if invoice.estado in ['BORRADOR', 'RECHAZADA', 'ERROR', 'PENDIENTE_ENVIO'] and config_ready %}
+    <button type="button" id="btn-validar-emision"
+      class="w-full bg-purple-100 hover:bg-purple-200 text-purple-900 py-3 rounded-xl font-semibold mb-2">
+      ✓ Validar NC antes de emitir
+    </button>
+    <div id="validacion-resultado" class="hidden mb-2 p-3 rounded-xl text-sm"></div>
+    <form method="post" action="/billing/{{ invoice.id }}/emit">
+      <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold"
+        onclick="return confirm('¿Enviar nota de crédito al SRI?')">🚀 Emitir NC al SRI</button>
+    </form>
+    {% elif invoice.estado in ['RECIBIDA', 'ENVIANDO'] %}
+    <form method="post" action="/billing/{{ invoice.id }}/sync">
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold">🔄 Consultar autorización SRI</button>
+    </form>
+    {% endif %}
+    {% if invoice.estado in ['BORRADOR', 'RECHAZADA', 'ERROR', 'PENDIENTE_ENVIO'] %}
+    <div class="pt-4 mt-2 border-t border-gray-200">
+      <form method="post" action="/billing/{{ invoice.id }}/anular">
+        <button type="submit" class="w-full border-2 border-red-300 text-red-700 hover:bg-red-50 py-3 rounded-xl font-semibold"
+          onclick="return confirm('¿Descartar este borrador de nota de crédito?')">🗑️ Descartar borrador NC</button>
+      </form>
+    </div>
+    {% endif %}
+    {% if invoice.estado == 'AUTORIZADA' %}
+    <div class="pt-4 mt-2 border-t border-gray-200">
+      <p class="text-xs text-emerald-700">Nota de crédito autorizada. La factura modificada quedó anulada.</p>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.getElementById('btn-validar-emision')?.addEventListener('click', async () => {
+  const box = document.getElementById('validacion-resultado');
+  const btn = document.getElementById('btn-validar-emision');
+  btn.disabled = true;
+  btn.textContent = 'Validando...';
+  box.classList.remove('hidden', 'bg-red-50', 'bg-emerald-50', 'text-red-800', 'text-emerald-800');
+  try {
+    const res = await fetch('/billing/{{ invoice.id }}/validar', { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if (data.valido) {
+      box.className = 'mb-2 p-3 rounded-xl text-sm bg-emerald-50 text-emerald-800 border border-emerald-200';
+      box.textContent = 'Listo para emitir al SRI.';
+    } else {
+      const msgs = (data.errores || []).map(e => '• ' + (e.mensaje || e.campo)).join('\n');
+      box.className = 'mb-2 p-3 rounded-xl text-sm bg-red-50 text-red-800 border border-red-200 whitespace-pre-line';
+      box.textContent = msgs || 'Hay errores de validación.';
+    }
+    box.classList.remove('hidden');
+  } catch (e) {
+    box.className = 'mb-2 p-3 rounded-xl text-sm bg-red-50 text-red-800';
+    box.textContent = 'No se pudo validar. Recargue la página.';
+    box.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✓ Validar antes de emitir';
+  }
+});
+</script>
+{% endblock %}

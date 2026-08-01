@@ -1,0 +1,462 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="max-w-6xl mx-auto mb-4 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <a href="/billing/" class="text-purple-600 text-sm">← Facturas</a>
+    <h1 class="text-2xl font-bold text-slate-800 mt-1">Configuración SRI</h1>
+    <p class="text-gray-500 text-sm mt-0.5">Empresa emisora, certificado y punto de emisión</p>
+  </div>
+  {% if validation %}
+  <div class="text-sm px-4 py-2 rounded-xl {% if validation.valido %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-900{% endif %}">
+    {% if validation.valido %}✓ Lista para emitir{% else %}⚠ Pendientes: {{ validation.errores|length }}{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if success == 'ok' %}
+<div class="max-w-6xl mx-auto mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">
+  <strong>✓ Guardado con éxito.</strong>
+  {% if validation and validation.valido %} Lista para emitir facturas.{% endif %}
+</div>
+{% elif success == 'email' %}
+<div class="max-w-6xl mx-auto mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Configuración de correo guardada.</div>
+{% elif success == 'email_verified' %}
+<div class="max-w-6xl mx-auto mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">
+  <strong>✓ Correo verificado y guardado.</strong>
+  Se envió un correo de prueba a <strong>{{ email_verified_to or 'su bandeja' }}</strong>.
+  Revise la entrada (y la carpeta de spam). Si lo recibió, las facturas se enviarán correctamente.
+</div>
+{% elif success %}
+<div class="max-w-6xl mx-auto mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Configuración actualizada.</div>
+{% endif %}
+{% if error %}
+<div class="max-w-6xl mx-auto mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm whitespace-pre-wrap">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="/billing/config/sri/save" enctype="multipart/form-data"
+  class="max-w-6xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm text-sm">
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+
+    <!-- Columna izquierda: Empresa emisora -->
+    <section class="p-5 md:p-6 space-y-4">
+      <h2 class="text-base font-bold text-slate-800">Empresa emisora</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">RUC (13 dígitos) *</label>
+          <input name="sri_ruc" value="{{ config.sri_ruc or '' }}" required maxlength="13" pattern="\d{13}"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Ambiente *</label>
+          <select name="sri_ambiente" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:ring-2 focus:ring-purple-500/30">
+            <option value="PRUEBAS" {% if config.sri_ambiente != 'PRODUCCION' %}selected{% endif %}>PRUEBAS</option>
+            <option value="PRODUCCION" {% if config.sri_ambiente == 'PRODUCCION' %}selected{% endif %}>PRODUCCIÓN</option>
+          </select>
+          <p class="text-xs text-amber-700 mt-1">Si ya emitió facturas reales con el facturador SRI, use <strong>PRODUCCIÓN</strong>.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Razón social *</label>
+          <input name="sri_razon_social" value="{{ config.sri_razon_social or '' }}" required
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Nombre comercial</label>
+          <input name="sri_nombre_comercial" value="{{ config.sri_nombre_comercial or '' }}"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-gray-600 mb-1">Dirección matriz *</label>
+          <input name="sri_direccion_matriz" value="{{ config.sri_direccion_matriz or '' }}" required
+            placeholder="Como en el SRI: Barrio, Calle, Número…"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-gray-600 mb-1">Contribuyente RIMPE</label>
+          <input name="sri_contribuyente_rimpe" value="{{ config.sri_contribuyente_rimpe or '' }}"
+            placeholder="Ej: CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+          <p class="text-xs text-gray-500 mt-1">Obligatorio si su RUC es RIMPE (como en facturas aprobadas del SRI).</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Contribuyente especial</label>
+          <input name="sri_contribuyente_especial" value="{{ config.sri_contribuyente_especial or '' }}"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Email notificación *</label>
+          <input type="email" name="sri_email_notificacion" value="{{ config.sri_email_notificacion or '' }}" required
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-600 mb-1">Tipo emisión</label>
+          <select name="sri_tipo_emision" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:ring-2 focus:ring-purple-500/30">
+            <option value="NORMAL" {% if config.sri_tipo_emision != 'CONTINGENCIA' %}selected{% endif %}>NORMAL</option>
+            <option value="CONTINGENCIA" {% if config.sri_tipo_emision == 'CONTINGENCIA' %}selected{% endif %}>CONTINGENCIA</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2 flex flex-wrap gap-5 pt-1">
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="sri_obligado_contabilidad" class="rounded" {% if config.sri_obligado_contabilidad %}checked{% endif %}>
+            Obligado a llevar contabilidad
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="sri_active" class="rounded" {% if config.sri_active %}checked{% endif %}>
+            Activar facturación SRI
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Columna derecha: Establecimiento + Certificado -->
+    <section class="p-5 md:p-6 space-y-5">
+      <div>
+        <h2 class="text-base font-bold text-slate-800 mb-4">Establecimiento y emisión</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Establecimiento *</label>
+            <input name="sri_default_establishment" value="{{ config.sri_default_establishment or '001' }}" required maxlength="3"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Punto de emisión *</label>
+            <input name="sri_default_emission_point" value="{{ config.sri_default_emission_point or '001' }}" required maxlength="3"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Nombre establecimiento</label>
+            <input name="est_nombre" value="{{ default_est.nombre if default_est and default_est.nombre and default_est.nombre != 'None' else '' }}" placeholder="Opcional"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Dirección establecimiento</label>
+            <input name="est_direccion" value="{{ default_est.direccion if default_est else '' }}"
+              placeholder="Si vacío, usa dirección matriz"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="text-base font-bold text-slate-800 mb-1">
+          Certificado electrónico (.p12)
+        </h2>
+        <p class="text-sm text-gray-500 mb-3">
+          Estado:
+          {% if has_certificate %}<span class="text-emerald-700 font-semibold">Configurado</span>{% else %}<span class="text-red-600 font-semibold">Pendiente</span>{% endif %}
+          {% if has_certificate %}— deje vacío para mantener el actual{% endif %}
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Archivo .p12</label>
+            <input type="file" name="certificate" accept=".p12,.pfx"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-purple-50 file:text-purple-700">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Contraseña del certificado</label>
+            <input type="password" name="certificate_password" autocomplete="new-password"
+              placeholder="Solo si sube un archivo nuevo"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-purple-500/30">
+          </div>
+        </div>
+      </div>
+
+      {% if validation and not validation.valido %}
+      <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+        <p class="font-semibold text-amber-900 mb-2">Pendiente para emitir:</p>
+        <ul class="list-disc ml-5 space-y-1 text-amber-800">
+          {% for err in validation.errores %}
+          <li>{{ err.mensaje }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="px-5 md:px-6 py-4 border-t border-gray-100 flex flex-wrap items-center gap-4">
+    <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2.5 rounded-xl text-sm font-semibold">
+      Guardar configuración SRI
+    </button>
+    <a href="/billing/new" class="text-sm text-purple-700 hover:underline font-medium">Ir a nueva factura →</a>
+  </div>
+</form>
+
+<details class="max-w-6xl mx-auto mt-4 bg-white rounded-2xl border border-gray-100 text-sm shadow-sm" {% if not smtp_configured %}open{% endif %}>
+  <summary class="px-5 py-3 cursor-pointer font-semibold text-slate-700">📧 Enviar facturas por correo al cliente</summary>
+  <div class="px-5 pb-5 space-y-5 border-t border-gray-100 pt-4">
+
+    {% if smtp_configured %}
+    <p class="text-emerald-700 text-sm bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+      ✓ Correo configurado. Las facturas autorizadas se pueden enviar con PDF y XML adjuntos.
+    </p>
+    {% else %}
+    <p class="text-slate-600 text-sm bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+      Complete los datos de su correo para que el sistema envíe automáticamente la factura al cliente
+      (con el PDF y el XML) cuando el SRI la autorice.
+    </p>
+    {% endif %}
+
+    <form method="post" action="/billing/config/email/save" class="space-y-5" id="email-config-form">
+
+      <label class="flex items-start gap-3 p-4 bg-purple-50 border border-purple-100 rounded-xl cursor-pointer">
+        <input type="checkbox" name="smtp_enabled" class="rounded mt-0.5" {% if config.smtp_enabled or not smtp_configured %}checked{% endif %}>
+        <span>
+          <span class="font-semibold text-slate-800 block">Activar envío de facturas por correo</span>
+          <span class="text-xs text-gray-600">Si lo desactiva, no se enviará ningún correo aunque guarde la configuración.</span>
+        </span>
+      </label>
+
+      <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4">
+        <h3 class="font-semibold text-slate-800">Paso 1 — ¿Qué correo usa su empresa?</h3>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de correo</label>
+          <select id="smtp-provider" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+            <option value="outlook">Outlook / Hotmail / Live</option>
+            <option value="gmail">Gmail</option>
+            <option value="yahoo">Yahoo</option>
+            <option value="other">Otro (avanzado)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Correo electrónico de la empresa *</label>
+          <input type="email" name="smtp_from" id="smtp-from"
+            value="{{ config.smtp_from or config.smtp_user or config.sri_email_notificacion or '' }}"
+            placeholder="facturacion@empresa.com"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+          <p class="text-xs text-gray-500 mt-1">Es el correo desde el que el cliente verá que llegó la factura.</p>
+        </div>
+        <input type="hidden" name="smtp_user" id="smtp-user" value="{{ config.smtp_user or config.smtp_from or '' }}">
+      </div>
+
+      <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+        <h3 class="font-semibold text-slate-800">Paso 2 — Contraseña de aplicación</h3>
+        <div id="smtp-help-outlook" class="text-xs text-slate-600 bg-white border border-gray-200 rounded-lg p-3 space-y-1 hidden">
+          <p class="font-medium text-slate-800">Para Outlook / Hotmail:</p>
+          <div class="p-2 bg-amber-50 border border-amber-200 rounded text-amber-900 mb-2">
+            <strong>Importante:</strong> Microsoft desactivó el envío SMTP en cuentas personales
+            @hotmail.com / @outlook.com. Aunque use contraseña de aplicación, puede aparecer
+            «basic authentication is disabled». <strong>No es un fallo del ERP.</strong>
+            Si le pasa, use Gmail o un servicio como Brevo (gratis).
+          </div>
+          <ol class="list-decimal list-inside space-y-0.5">
+            <li>Entre a <a href="https://account.microsoft.com/security" target="_blank" rel="noopener" class="text-purple-700 underline">account.microsoft.com → Seguridad</a></li>
+            <li>Active la verificación en dos pasos (si no la tiene)</li>
+            <li>Busque <strong>Contraseñas de aplicación</strong> y cree una nueva</li>
+            <li>Copie la contraseña generada y péguela abajo</li>
+          </ol>
+          <p class="text-amber-700 mt-1">⚠ El correo debe ser exactamente el de la cuenta donde creó la contraseña de aplicación.</p>
+        </div>
+        <div id="smtp-help-gmail" class="text-xs text-slate-600 bg-white border border-gray-200 rounded-lg p-3 space-y-1 hidden">
+          <p class="font-medium text-slate-800">Para Gmail:</p>
+          <ol class="list-decimal list-inside space-y-0.5">
+            <li>Entre a <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" class="text-purple-700 underline">Contraseñas de aplicación de Google</a></li>
+            <li>Cree una contraseña para «Correo»</li>
+            <li>Copie los 16 caracteres y péguelos abajo</li>
+          </ol>
+        </div>
+        <div id="smtp-help-yahoo" class="text-xs text-slate-600 bg-white border border-gray-200 rounded-lg p-3 hidden">
+          <p>En Yahoo: Configuración → Seguridad → Generar contraseña de aplicación.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña de aplicación *</label>
+          <input type="password" name="smtp_password" autocomplete="new-password"
+            placeholder="{% if smtp_password_set %}Dejar vacío para no cambiarla{% else %}Pegue aquí la contraseña de aplicación{% endif %}"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+          {% if smtp_password_set %}
+          <p class="text-xs text-emerald-600 mt-1">✓ Ya hay una contraseña guardada de forma segura.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <details class="group">
+        <summary class="cursor-pointer text-sm font-medium text-gray-600 hover:text-purple-700">
+          Opciones técnicas (solo si su proveedor es «Otro»)
+        </summary>
+        <div class="mt-3 p-4 border border-gray-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Servidor SMTP</label>
+            <input name="smtp_host" id="smtp-host" value="{{ config.smtp_host or '' }}"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Puerto</label>
+            <input type="number" name="smtp_port" id="smtp-port" value="{{ config.smtp_port or 587 }}"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="smtp_use_tls" id="smtp-use-tls" class="rounded"
+                {% if config.smtp_use_tls != False %}checked{% endif %}>
+              Conexión segura (TLS)
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="group">
+        <summary class="cursor-pointer text-sm font-medium text-gray-600 hover:text-purple-700">
+          Personalizar mensaje del correo (opcional)
+        </summary>
+        <div class="mt-3 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Asunto</label>
+            <input name="billing_email_subject"
+              value="{{ config.billing_email_subject or default_email_subject }}"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+            <p class="text-xs text-gray-500 mt-1">Se rellena solo con: cliente, número de factura, fecha, total y empresa.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">Mensaje</label>
+            <textarea name="billing_email_body" rows="6"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">{{ config.billing_email_body or default_email_body }}</textarea>
+            <p class="text-xs text-gray-500 mt-1">Al enviar desde una factura puede cambiar el texto solo para ese envío.</p>
+          </div>
+        </div>
+      </details>
+
+      <div class="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
+        <h3 class="font-semibold text-slate-800">Paso 3 — Verificar que funciona</h3>
+        <p class="text-xs text-slate-600">
+          Enviaremos un correo de prueba con la configuración que ingresó arriba. Si lo recibe, guardamos todo automáticamente.
+        </p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Enviar prueba a este correo *</label>
+          <input type="email" name="test_email" id="test-email"
+            value="{{ email_verified_to or config.smtp_from or config.smtp_user or '' }}"
+            placeholder="su_correo@gmail.com"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+          <p class="text-xs text-gray-500 mt-1">Puede ser su propio correo para comprobar que llega.</p>
+        </div>
+      </div>
+
+      <label class="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="billing_auto_send_email" class="rounded mt-0.5"
+          {% if config.billing_auto_send_email != False %}checked{% endif %}>
+        <span>
+          <span class="font-medium text-slate-800">Enviar automáticamente cuando el SRI autorice la factura</span>
+          <span class="text-xs text-gray-500 block">Recomendado. El cliente recibe la factura sin que usted haga nada más.</span>
+        </span>
+      </label>
+
+      <div class="flex flex-wrap gap-3 pt-1">
+        <button type="submit" name="action" value="verify"
+          class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
+          Guardar y enviar correo de prueba
+        </button>
+        <button type="submit" name="action" value="save"
+          class="border border-gray-300 hover:bg-gray-50 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-medium">
+          Guardar sin probar
+        </button>
+      </div>
+    </form>
+  </div>
+</details>
+
+<script>
+(function () {
+  var PRESETS = {
+    outlook: { host: 'smtp-mail.outlook.com', port: 587, tls: true, help: 'outlook' },
+    gmail:   { host: 'smtp.gmail.com',         port: 587, tls: true, help: 'gmail' },
+    yahoo:   { host: 'smtp.mail.yahoo.com',    port: 587, tls: true, help: 'yahoo' },
+    other:   { host: '',                       port: 587, tls: true, help: null }
+  };
+  var provider = document.getElementById('smtp-provider');
+  var host = document.getElementById('smtp-host');
+  var port = document.getElementById('smtp-port');
+  var tls = document.getElementById('smtp-use-tls');
+  var from = document.getElementById('smtp-from');
+  var user = document.getElementById('smtp-user');
+  var form = document.getElementById('email-config-form');
+
+  function detectProvider(h) {
+    h = (h || '').toLowerCase();
+    if (h.indexOf('outlook') >= 0 || h.indexOf('office365') >= 0 || h.indexOf('live.com') >= 0) return 'outlook';
+    if (h.indexOf('gmail') >= 0) return 'gmail';
+    if (h.indexOf('yahoo') >= 0) return 'yahoo';
+    if (h) return 'other';
+    var email = (from && from.value || '').toLowerCase();
+    if (email.indexOf('@hotmail.') >= 0 || email.indexOf('@outlook.') >= 0 || email.indexOf('@live.') >= 0) return 'outlook';
+    if (email.indexOf('@gmail.') >= 0) return 'gmail';
+    if (email.indexOf('@yahoo.') >= 0) return 'yahoo';
+    return 'outlook';
+  }
+
+  function showHelp(name) {
+    ['outlook', 'gmail', 'yahoo'].forEach(function (k) {
+      var el = document.getElementById('smtp-help-' + k);
+      if (el) el.classList.toggle('hidden', k !== name);
+    });
+  }
+
+  function applyPreset(key, onlyIfEmpty) {
+    var p = PRESETS[key] || PRESETS.other;
+    if (!onlyIfEmpty || !host.value) host.value = p.host;
+    if (!onlyIfEmpty || !port.value) port.value = p.port;
+    if (!onlyIfEmpty) tls.checked = p.tls;
+    showHelp(p.help);
+    if (key !== 'other') {
+      host.readOnly = true;
+      port.readOnly = true;
+    } else {
+      host.readOnly = false;
+      port.readOnly = false;
+    }
+  }
+
+  provider.value = detectProvider(host.value);
+  applyPreset(provider.value, true);
+
+  provider.addEventListener('change', function () {
+    applyPreset(provider.value, false);
+  });
+
+  if (from) {
+    from.addEventListener('input', function () {
+      if (user) user.value = from.value;
+      if (provider.value !== 'other') {
+        var detected = detectProvider('');
+        if (detected !== 'other') {
+          provider.value = detected;
+          applyPreset(detected, false);
+        }
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', function () {
+      if (user && from) user.value = from.value;
+    });
+  }
+})();
+</script>
+
+{% if establishments %}
+<details class="max-w-6xl mx-auto mt-4 bg-white rounded-2xl border border-gray-100 text-sm shadow-sm">
+  <summary class="px-5 py-3 cursor-pointer font-semibold text-slate-700">Establecimientos y secuenciales</summary>
+  <div class="px-5 pb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+    {% for est in establishments %}
+    <div class="p-4 bg-gray-50 rounded-xl">
+      <div class="font-semibold">{{ est.codigo }} — {{ est.nombre or 'Sin nombre' }}</div>
+      <div class="text-gray-500 text-sm mt-0.5">{{ est.direccion }}</div>
+      {% for pto in est.emission_points %}
+      <div class="mt-2 text-sm text-gray-600">
+        Punto {{ pto.codigo }}
+        {% for seq in pto.sequences if seq.tipo_comprobante == 'FACTURA' %}
+        · secuencial {{ seq.ultimo_numero }}
+        <form method="post" action="/billing/config/sri/sequence" class="inline-flex gap-2 items-center mt-1">
+          <input type="hidden" name="emission_point_id" value="{{ pto.id }}">
+          <input type="number" name="proximo_secuencial" min="1" placeholder="Corregir a…"
+            class="border border-gray-200 rounded-lg px-3 py-1.5 w-32 text-sm">
+          <button type="submit" class="text-purple-700 font-semibold text-sm">Aplicar</button>
+        </form>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+{% endblock %}

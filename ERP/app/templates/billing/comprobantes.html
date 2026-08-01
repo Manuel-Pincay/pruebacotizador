@@ -1,0 +1,119 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="mb-6">
+  <a href="/billing/" class="text-purple-600 text-sm">← Facturas</a>
+  <h1 class="text-3xl font-bold text-slate-800 mt-2">Administrar comprobantes</h1>
+  <p class="text-gray-500 mt-1">Busque facturas, notas de crédito y comprobantes anulados</p>
+</div>
+
+<form method="get" class="bg-white rounded-2xl border p-5 mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+  <div class="lg:col-span-2">
+    <label class="block text-xs font-medium text-gray-500 mb-1">Buscar</label>
+    <input name="search" value="{{ search or '' }}" placeholder="Número, clave, cliente, RUC…"
+      class="w-full border border-gray-200 rounded-xl px-3 py-2.5">
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+    <select name="tipo" class="w-full border border-gray-200 rounded-xl px-3 py-2.5">
+      <option value="">Todos</option>
+      <option value="FACTURA" {% if tipo == 'FACTURA' %}selected{% endif %}>Facturas</option>
+      <option value="NOTA_CREDITO" {% if tipo == 'NOTA_CREDITO' %}selected{% endif %}>Notas de crédito</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-500 mb-1">Estado</label>
+    <select name="estado" class="w-full border border-gray-200 rounded-xl px-3 py-2.5">
+      <option value="">Todos</option>
+      <option value="AUTORIZADA" {% if estado == 'AUTORIZADA' %}selected{% endif %}>Autorizada</option>
+      <option value="ANULADA" {% if estado == 'ANULADA' %}selected{% endif %}>Anulada</option>
+      <option value="BORRADOR" {% if estado == 'BORRADOR' %}selected{% endif %}>Borrador</option>
+      <option value="RECHAZADA" {% if estado == 'RECHAZADA' %}selected{% endif %}>Rechazada</option>
+      <option value="pending" {% if estado == 'pending' %}selected{% endif %}>Pendiente SRI</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-500 mb-1">Cliente</label>
+    <select name="client_id" class="w-full border border-gray-200 rounded-xl px-3 py-2.5">
+      <option value="">Todos</option>
+      {% for c in clients %}
+      <option value="{{ c.id }}" {% if client_id|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-500 mb-1">Desde</label>
+    <input type="date" name="date_from" value="{{ date_from or '' }}" class="w-full border border-gray-200 rounded-xl px-3 py-2.5">
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
+    <input type="date" name="date_to" value="{{ date_to or '' }}" class="w-full border border-gray-200 rounded-xl px-3 py-2.5">
+  </div>
+  <div class="flex items-end gap-2 lg:col-span-2">
+    <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-2.5 rounded-xl font-semibold">Buscar</button>
+    <a href="/billing/comprobantes" class="px-5 py-2.5 border border-gray-300 rounded-xl hover:bg-gray-50">Limpiar</a>
+  </div>
+</form>
+
+<div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-left">
+      <tr>
+        <th class="p-3">#</th>
+        <th class="p-3">Tipo</th>
+        <th class="p-3">Comprobante</th>
+        <th class="p-3">Cliente</th>
+        <th class="p-3">Modifica</th>
+        <th class="p-3">Total</th>
+        <th class="p-3">Estado</th>
+        <th class="p-3">Fecha</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in pagination.items %}
+      <tr class="border-t hover:bg-gray-50">
+        <td class="p-3"><a href="/billing/{{ inv.id }}" class="text-purple-700 font-semibold">{{ inv.id }}</a></td>
+        <td class="p-3">
+          {% if inv.is_nota_credito %}
+          <span class="text-orange-700 bg-orange-50 px-2 py-0.5 rounded text-xs font-medium">NC</span>
+          {% else %}
+          <span class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-xs font-medium">Factura</span>
+          {% endif %}
+        </td>
+        <td class="p-3 font-mono text-xs">{{ inv.numero_comprobante }}</td>
+        <td class="p-3">{{ inv.client.company or inv.client.name if inv.client else '-' }}</td>
+        <td class="p-3 text-xs">
+          {% if inv.documento_modificado %}
+          <a href="/billing/{{ inv.documento_modificado.id }}" class="text-purple-600">{{ inv.num_doc_modificado }}</a>
+          {% elif inv.is_factura and inv.estado == 'ANULADA' %}
+          <span class="text-gray-400">Anulada</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="p-3">${{ '%.2f'|format(inv.importe_total) }}</td>
+        <td class="p-3">
+          <span class="px-2 py-1 rounded-full text-xs font-medium
+            {% if inv.estado == 'AUTORIZADA' %}bg-green-100 text-green-800
+            {% elif inv.estado == 'ANULADA' %}bg-gray-200 text-gray-700
+            {% elif inv.estado == 'RECHAZADA' %}bg-red-100 text-red-800
+            {% else %}bg-yellow-100 text-yellow-800{% endif %}">{{ inv.estado }}</span>
+        </td>
+        <td class="p-3">{{ inv.fecha_emision.strftime('%d/%m/%Y') if inv.fecha_emision else '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="p-8 text-center text-gray-500">No hay comprobantes con esos filtros.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="mt-4 flex justify-center gap-2">
+  {% if pagination.has_prev %}
+  <a href="?page={{ pagination.page - 1 }}&search={{ search }}&tipo={{ tipo }}&estado={{ estado }}&client_id={{ client_id }}&date_from={{ date_from }}&date_to={{ date_to }}" class="px-3 py-1 bg-gray-100 rounded">Anterior</a>
+  {% endif %}
+  <span class="px-3 py-1">Página {{ pagination.page }} / {{ pagination.pages }}</span>
+  {% if pagination.has_next %}
+  <a href="?page={{ pagination.page + 1 }}&search={{ search }}&tipo={{ tipo }}&estado={{ estado }}&client_id={{ client_id }}&date_from={{ date_from }}&date_to={{ date_to }}" class="px-3 py-1 bg-gray-100 rounded">Siguiente</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

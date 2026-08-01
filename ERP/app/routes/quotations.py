@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.auth_handler import role_required
+from app.auth.permissions import has_permission
 from app.auth.security import verify_admin_password
 from app.database import get_db
 from app.models.client import Client
@@ -37,6 +38,13 @@ from app.services.product_service import (
     sync_product_image,
 )
 from app.services.quotation_service import compute_item_total, recalculate_quotation
+from app.services.transport_product_service import (
+    TRANSPORT_PRODUCT_NAME,
+    get_or_create_transport_service_product,
+    merge_shipping_into_items,
+    quotation_shipping_amount,
+    sync_quotation_shipping_item,
+)
 from app.services.quotation_design_service import (
     MAX_QUOTATION_DESIGNS,
     DesignLimitError,
@@ -219,6 +227,7 @@ def _add_items_to_quotation(
     quotation: Quotation,
     items_data: list,
     item_images: dict[int, str | None],
+    default_tarifa_iva: float = 0,
 ) -> None:
     for idx, item in enumerate(items_data):
         image_name = item_images.get(idx)
@@ -230,6 +239,7 @@ def _add_items_to_quotation(
             db,
             item_data=item,
             image=image_name,
+            default_tarifa_iva=default_tarifa_iva,
         )
         if product_id is None:
             product_id = _normalize_product_id(item.get("product_id"))
@@ -295,11 +305,20 @@ async def new_quotation(request: Request, db: Session = Depends(get_db)):
     clients = db.query(Client).all()
     products = db.query(Product).all()
     config = db.query(CompanyConfig).first()
+    transport = get_or_create_transport_service_product(db)
+    db.commit()
 
     return templates.TemplateResponse(
         request=request,
         name="quotations/new.html",
-        context={"clients": clients, "products": products, "config": config, "user": user},
+        context={
+            "clients": clients,
+            "products": products,
+            "config": config,
+            "user": user,
+            "transport_product_id": transport.id,
+            "transport_product_name": TRANSPORT_PRODUCT_NAME,
+        },
     )
 
 
@@ -326,6 +345,7 @@ async def quotations_page(
     query = db.query(Quotation).options(
         joinedload(Quotation.client),
         joinedload(Quotation.payments),
+        joinedload(Quotation.electronic_invoice),
     )
 
     if search:
@@ -380,6 +400,7 @@ async def quotations_page(
             "error": error,
             "deleted": deleted,
             "user": user,
+            "can_bill": has_permission(user.role, "billing_create"),
             "page": pagination["page"],
             "pages": pagination["pages"],
             "filtered_total": pagination["total"],
@@ -500,6 +521,8 @@ async def create_quotation(
                 content={"message": "Agrega al menos un producto a la cotización."},
             )
 
+        items_data = merge_shipping_into_items(db, items_data, shipping_cost)
+
         parsed_delivery_date = None
         if delivery_date:
             parsed_delivery_date = datetime.strptime(delivery_date, "%Y-%m-%d").date()
@@ -520,7 +543,7 @@ async def create_quotation(
             delivery_date=parsed_delivery_date,
             iva=iva,
             total=total,
-            shipping_cost=shipping_cost or 0,
+            shipping_cost=0,
             design_file=None,
             status="pendiente",
         )
@@ -549,7 +572,7 @@ async def create_quotation(
         for idx in range(len(items_data)):
             item_images[idx] = await _item_image_from_form(request, idx)
 
-        _add_items_to_quotation(db, quotation, items_data, item_images)
+        _add_items_to_quotation(db, quotation, items_data, item_images, default_tarifa_iva=float(iva or 0))
 
         db.commit()
 
@@ -734,6 +757,7 @@ async def quotation_detail(
             joinedload(Quotation.items).joinedload(QuotationItem.product),
             joinedload(Quotation.payments),
             joinedload(Quotation.designs),
+            joinedload(Quotation.electronic_invoice),
         )
         .filter(Quotation.id == quotation_id)
         .first()
@@ -750,6 +774,8 @@ async def quotation_detail(
             reverse=True,
         )
 
+    transport = get_or_create_transport_service_product(db)
+
     return templates.TemplateResponse(
         request=request,
         name="quotations/detail.html",
@@ -759,6 +785,7 @@ async def quotation_detail(
             "design_urls": get_design_urls(quotation) if quotation else [],
             "max_designs": MAX_QUOTATION_DESIGNS,
             "designs_count": len(quotation.designs) if quotation else 0,
+            "shipping_display": quotation_shipping_amount(quotation, transport.id) if quotation else 0,
         },
     )
 
@@ -897,8 +924,10 @@ async def edit_quotation_page(
     clients = db.query(Client).all()
     products = db.query(Product).all()
     config = db.query(CompanyConfig).first()
-    items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).all()
+    transport = get_or_create_transport_service_product(db)
+    db.commit()
 
+    items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).all()
     items_json = []
     for item in items:
         is_custom = bool(item.product and item.product.custom)
@@ -936,6 +965,8 @@ async def edit_quotation_page(
             "items_json": json.dumps(items_json),
             "edit_mode": True,
             "user": user,
+            "transport_product_id": transport.id,
+            "transport_product_name": TRANSPORT_PRODUCT_NAME,
         },
     )
 
@@ -969,16 +1000,17 @@ async def update_quotation(
     quotation.discount = discount
     quotation.iva = iva
     quotation.total = total
-    quotation.shipping_cost = shipping_cost or 0
+    quotation.shipping_cost = 0
 
     db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation.id).delete()
     items_data = json.loads(items)
+    items_data = merge_shipping_into_items(db, items_data, shipping_cost)
 
     item_images: dict[int, str | None] = {}
     for idx in range(len(items_data)):
         item_images[idx] = await _item_image_from_form(request, idx)
 
-    _add_items_to_quotation(db, quotation, items_data, item_images)
+    _add_items_to_quotation(db, quotation, items_data, item_images, default_tarifa_iva=float(iva or 0))
 
     db.commit()
     return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
@@ -999,8 +1031,8 @@ async def update_shipping_cost(
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
-    quotation.shipping_cost = shipping_cost or 0
-    recalculate_quotation(quotation, db)
+    sync_quotation_shipping_item(db, quotation, shipping_cost)
+    db.commit()
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
 

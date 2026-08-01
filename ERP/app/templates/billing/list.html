@@ -1,0 +1,76 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-3xl font-bold text-slate-800">{{ title }}</h1>
+    <p class="text-gray-500 mt-1">Facturación electrónica SRI</p>
+  </div>
+  <a href="/billing/new" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-semibold">➕ Nueva factura</a>
+</div>
+
+<div class="flex flex-wrap gap-2 mb-4">
+  <a href="/billing/" class="px-3 py-1 rounded-lg {% if filter == 'all' %}bg-purple-100 text-purple-800{% else %}bg-gray-100{% endif %}">Todas</a>
+  <a href="/billing/pending" class="px-3 py-1 rounded-lg {% if filter == 'pending' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100{% endif %}">Pendientes</a>
+  <a href="/billing/authorized" class="px-3 py-1 rounded-lg {% if filter == 'authorized' %}bg-green-100 text-green-800{% else %}bg-gray-100{% endif %}">Autorizadas</a>
+  <a href="/billing/rejected" class="px-3 py-1 rounded-lg {% if filter == 'rejected' %}bg-red-100 text-red-800{% else %}bg-gray-100{% endif %}">Rechazadas</a>
+  <a href="/billing/voided" class="px-3 py-1 rounded-lg {% if filter == 'voided' %}bg-gray-200 text-gray-800{% else %}bg-gray-100{% endif %}">Anuladas</a>
+  <a href="/billing/credit-notes" class="px-3 py-1 rounded-lg {% if filter == 'credit_notes' %}bg-orange-100 text-orange-800{% else %}bg-gray-100{% endif %}">Notas crédito</a>
+  <a href="/billing/comprobantes" class="px-3 py-1 rounded-lg bg-purple-50 text-purple-800 hover:bg-purple-100">🔍 Buscar</a>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-left">
+      <tr>
+        <th class="p-3">#</th>
+        <th class="p-3">Comprobante</th>
+        <th class="p-3">Tipo</th>
+        <th class="p-3">Cliente</th>
+        <th class="p-3">Cotización</th>
+        <th class="p-3">Total</th>
+        <th class="p-3">Estado</th>
+        <th class="p-3">Fecha</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in pagination.items %}
+      <tr class="border-t hover:bg-gray-50">
+        <td class="p-3"><a href="/billing/{{ inv.id }}" class="text-purple-700 font-semibold">{{ inv.id }}</a></td>
+        <td class="p-3 font-mono text-xs">{{ inv.numero_comprobante }}</td>
+        <td class="p-3">
+          {% if inv.is_nota_credito %}<span class="text-orange-700 text-xs font-medium">NC</span>{% else %}Factura{% endif %}
+        </td>
+        <td class="p-3">{{ inv.client.company or inv.client.name if inv.client else '-' }}</td>
+        <td class="p-3">{% if inv.quotation_id %}<a href="/quotations/{{ inv.quotation_id }}" class="text-blue-600">#{{ inv.quotation_id }}</a>{% else %}-{% endif %}</td>
+        <td class="p-3">${{ '%.2f'|format(inv.importe_total) }}</td>
+        <td class="p-3">
+          <span class="px-2 py-1 rounded-full text-xs font-medium
+            {% if inv.estado == 'AUTORIZADA' %}bg-green-100 text-green-800
+            {% elif inv.estado == 'RECHAZADA' %}bg-red-100 text-red-800
+            {% elif inv.estado == 'ANULADA' %}bg-gray-200 text-gray-700
+            {% elif inv.estado == 'ERROR' %}bg-red-100 text-red-800
+            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+            {{ inv.estado }}
+          </span>
+        </td>
+        <td class="p-3">{{ inv.created_at.strftime('%d/%m/%Y %H:%M') if inv.created_at else '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="p-8 text-center text-gray-500">No hay facturas registradas.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="mt-4 flex justify-center gap-2">
+  {% if pagination.has_prev %}
+  <a href="?page={{ pagination.page - 1 }}" class="px-3 py-1 bg-gray-100 rounded">Anterior</a>
+  {% endif %}
+  <span class="px-3 py-1">Página {{ pagination.page }} / {{ pagination.pages }}</span>
+  {% if pagination.has_next %}
+  <a href="?page={{ pagination.page + 1 }}" class="px-3 py-1 bg-gray-100 rounded">Siguiente</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

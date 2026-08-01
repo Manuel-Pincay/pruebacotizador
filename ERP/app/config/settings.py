@@ -41,6 +41,16 @@ class Settings:
     database_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "40"))
     database_pool_recycle: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))
 
+    encryption_key: str = os.getenv("ERP_ENCRYPTION_KEY", "")
+
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "")
+    smtp_use_tls: bool = _env_bool("SMTP_USE_TLS", True)
+    smtp_enabled: bool = _env_bool("SMTP_ENABLED", False)
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"

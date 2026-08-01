@@ -63,6 +63,15 @@
             <input type="email" id="email" name="email" value="{{ f.get('email', '') }}"
               placeholder="cliente@correo.com"
               class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+            <p class="text-xs text-gray-500 mt-1">Correo principal para factura SRI.</p>
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold mb-2" for="additional_emails">Correos adicionales</label>
+            <textarea id="additional_emails" name="additional_emails" rows="2"
+              placeholder="contabilidad@empresa.com"
+              class="w-full border border-gray-200 rounded-2xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">{{ f.get('additional_emails', '') }}</textarea>
+            <p class="text-xs text-gray-500 mt-1">Opcional. Reciben copia PDF+XML; no van al SRI.</p>
           </div>
 
           <div>
@@ -71,6 +80,17 @@
               placeholder="Opcional, debe ser único"
               class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
             <p class="text-xs text-gray-400 mt-1">Si lo ingresas, no puede repetirse en otro cliente.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2" for="tipo_identificacion">Tipo identificación SRI</label>
+            <select id="tipo_identificacion" name="tipo_identificacion" class="w-full border border-gray-200 rounded-2xl px-3 py-2">
+              {% set tid = f.get('tipo_identificacion', 'CEDULA') %}
+              <option value="RUC" {% if tid == 'RUC' %}selected{% endif %}>RUC</option>
+              <option value="CEDULA" {% if tid == 'CEDULA' %}selected{% endif %}>Cédula</option>
+              <option value="PASAPORTE" {% if tid == 'PASAPORTE' %}selected{% endif %}>Pasaporte</option>
+              <option value="CONSUMIDOR_FINAL" {% if tid == 'CONSUMIDOR_FINAL' %}selected{% endif %}>Consumidor final</option>
+            </select>
           </div>
         </div>
 

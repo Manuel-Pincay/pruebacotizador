@@ -70,6 +70,11 @@ class Quotation(Base):
         back_populates="quotation",
         cascade="all, delete-orphan",
     )
+    electronic_invoice = relationship(
+        "ElectronicInvoice",
+        back_populates="quotation",
+        uselist=False,
+    )
 
     @property
     def total_paid(self) -> float:

@@ -15,6 +15,7 @@ from app.utils.activity import log_activity
 from app.auth.auth_handler import role_required
 from app.utils.text_format import format_title_words
 from app.utils.dialog_response import dialog_message_response
+from app.utils.client_emails import parse_additional_emails_raw, save_additional_emails, additional_emails_display, load_additional_emails
 
 from app.models.client import Client
 from app.models.quotation import Quotation
@@ -204,6 +205,7 @@ async def edit_client_page(
             "total_sales": total_sales,
             "last_quote_date": last_quote_date,
             "user": user,
+            "client_additional_emails": "\n".join(load_additional_emails(client)),
         }
     )
 
@@ -264,16 +266,16 @@ async def update_client(
     ruc_ci: str = Form(""),
     company: str = Form(""),
     client_type: str = Form("Minorista"),
+    tipo_identificacion: str = Form("CEDULA"),
     observations: str = Form(""),
+    additional_emails: str = Form(""),
     db: Session = Depends(get_db),
 ):
-
     user = role_required(request, ["admin", "ventas"])
     if isinstance(user, RedirectResponse):
         return user
 
     try:
-
         client = db.query(Client).filter(Client.id == client_id).first()
 
         if not client:
@@ -305,7 +307,9 @@ async def update_client(
         client.ruc_ci = ruc_ci or None
         client.company = format_title_words(company) or None
         client.client_type = (client_type or "").strip()
+        client.tipo_identificacion = (tipo_identificacion or "CEDULA").strip().upper()
         client.observations = (observations or "").strip()
+        client.additional_emails_json = save_additional_emails(parse_additional_emails_raw(additional_emails))
 
         db.commit()
 
@@ -380,7 +384,9 @@ async def create_client(
     email: str = Form(""),
     address: str = Form(""),
     client_type: str = Form(...),
+    tipo_identificacion: str = Form("CEDULA"),
     observations: str = Form(""),
+    additional_emails: str = Form(""),
     db: Session = Depends(get_db),
 ):
 
@@ -395,6 +401,7 @@ async def create_client(
     email = (email or "").strip().lower()
     address = format_title_words(address)
     client_type = (client_type or "minorista").strip()
+    tipo_identificacion = (tipo_identificacion or "CEDULA").strip().upper()
     observations = (observations or "").strip()
 
     form_data = {
@@ -436,7 +443,9 @@ async def create_client(
         email=email or None,
         address=address or None,
         client_type=client_type,
+        tipo_identificacion=tipo_identificacion,
         observations=observations or None,
+        additional_emails_json=save_additional_emails(parse_additional_emails_raw(additional_emails)),
     )
 
     db.add(client)

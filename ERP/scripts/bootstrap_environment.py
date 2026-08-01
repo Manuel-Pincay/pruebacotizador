@@ -1,6 +1,8 @@
-"""Prepara el entorno ERP: venv, dependencias pip y archivo .env."""
+"""Prepara el entorno ERP: venv, dependencias pip, .env y claves."""
 from __future__ import annotations
 
+import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -11,6 +13,7 @@ VENV_PYTHON = ROOT / "venv" / "Scripts" / "python.exe"
 REQUIREMENTS = ROOT / "requirements.txt"
 ENV_FILE = ROOT / ".env"
 ENV_EXAMPLE = ROOT / ".env.example"
+SRI_SIGNER_DIR = ROOT / "scripts" / "sri-signer"
 
 REQUIRED_IMPORTS = (
     "fastapi",
@@ -18,6 +21,7 @@ REQUIRED_IMPORTS = (
     "sqlalchemy",
     "pymysql",
     "alembic",
+    "cryptography",
 )
 
 
@@ -65,17 +69,72 @@ def install_dependencies(python: Path) -> None:
     run([str(python), "-m", "pip", "install", "-r", str(REQUIREMENTS)])
 
 
+def _upsert_env_line(content: str, key: str, value: str) -> str:
+    pattern = re.compile(rf"^{re.escape(key)}=.*$", re.MULTILINE)
+    line = f"{key}={value}"
+    if pattern.search(content):
+        return pattern.sub(line, content, count=1)
+    return content.rstrip() + "\n" + line + "\n"
+
+
 def ensure_env_file() -> None:
-    if ENV_FILE.exists():
+    created = False
+    if not ENV_FILE.exists():
+        if ENV_EXAMPLE.exists():
+            shutil.copy(ENV_EXAMPLE, ENV_FILE)
+            log("  [OK] .env creado desde .env.example")
+            created = True
+        else:
+            log("  [!] .env.example no encontrado")
+            return
+    else:
         log("  [OK] .env encontrado")
+
+    content = ENV_FILE.read_text(encoding="utf-8")
+    updated = False
+
+    if re.search(r"^ERP_ENCRYPTION_KEY=\s*$", content, re.MULTILINE) or (
+        created and "ERP_ENCRYPTION_KEY=" in content
+    ):
+        key = secrets.token_hex(32)
+        content = _upsert_env_line(content, "ERP_ENCRYPTION_KEY", key)
+        updated = True
+        log("  [OK] ERP_ENCRYPTION_KEY generada en .env")
+
+    if updated:
+        ENV_FILE.write_text(content, encoding="utf-8")
+
+    if created:
+        log("  [!] Revise DATABASE_URL en .env (usuario, clave y nombre de base)")
+
+
+def ensure_sri_signer() -> None:
+    package_json = SRI_SIGNER_DIR / "package.json"
+    node_modules = SRI_SIGNER_DIR / "node_modules"
+    if not package_json.exists():
+        return
+    if node_modules.exists():
+        log("  [OK] Firmador SRI (Node) listo")
         return
 
-    if ENV_EXAMPLE.exists():
-        shutil.copy(ENV_EXAMPLE, ENV_FILE)
-        log("  [OK] .env creado desde .env.example")
+    npm = shutil.which("npm")
+    if not npm:
+        log("  [!] Node.js/npm no encontrado — facturación SRI requerirá npm install en scripts/sri-signer")
         return
 
-    log("  [!] .env.example no encontrado; se usaran valores por defecto")
+    log("  Instalando firmador SRI (npm)...")
+    result = subprocess.run(
+        [npm, "install"],
+        cwd=str(SRI_SIGNER_DIR),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode == 0:
+        log("  [OK] Firmador SRI instalado")
+    else:
+        log("  [!] No se pudo instalar firmador SRI (npm install falló)")
 
 
 def main() -> int:
@@ -99,6 +158,7 @@ def main() -> int:
         log("  [OK] Dependencias Python instaladas")
 
     ensure_env_file()
+    ensure_sri_signer()
 
     log("")
     log("=" * 60)

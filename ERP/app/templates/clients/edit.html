@@ -168,6 +168,14 @@
 
             <input type="email" name="email" value="{{ client.email }}"
               class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+            <p class="text-xs text-gray-500 mt-1">Correo principal — es el que se registra en el XML/SRI.</p>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-semibold mb-2">Correos adicionales (solo envío ERP)</label>
+            <textarea name="additional_emails" rows="2" placeholder="contabilidad@empresa.com, otro@correo.com"
+              class="w-full border border-gray-200 rounded-2xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">{{ client_additional_emails or '' }}</textarea>
+            <p class="text-xs text-gray-500 mt-1">Separados por coma o salto de línea. Reciben copia de la factura PDF+XML; no se envían al SRI.</p>
           </div>
 
           <!-- RUC -->
@@ -177,6 +185,17 @@
 
             <input type="text" name="ruc_ci" value="{{ client.ruc_ci }}"
               class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2">Tipo identificación SRI</label>
+            <select name="tipo_identificacion" class="w-full border border-gray-200 rounded-2xl px-3 py-2">
+              {% set tid = client.tipo_identificacion or 'CEDULA' %}
+              <option value="RUC" {% if tid == 'RUC' %}selected{% endif %}>RUC</option>
+              <option value="CEDULA" {% if tid == 'CEDULA' %}selected{% endif %}>Cédula</option>
+              <option value="PASAPORTE" {% if tid == 'PASAPORTE' %}selected{% endif %}>Pasaporte</option>
+              <option value="CONSUMIDOR_FINAL" {% if tid == 'CONSUMIDOR_FINAL' %}selected{% endif %}>Consumidor final</option>
+            </select>
           </div>
         </div>
 

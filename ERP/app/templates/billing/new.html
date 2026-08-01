@@ -1,0 +1,1178 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+{% set cfg = inject_global_config().config %}
+{% set empresa = {
+  'razon_social': (cfg.sri_razon_social if cfg else '') or (cfg.company_name if cfg else ''),
+  'nombre_comercial': (cfg.sri_nombre_comercial if cfg else '') or (cfg.sri_razon_social if cfg else '') or (cfg.company_name if cfg else 'SISTEMA ERP'),
+  'ruc': (cfg.sri_ruc if cfg else '') or '',
+  'direccion_matriz': (cfg.sri_direccion_matriz if cfg else '') or '',
+  'ambiente': (cfg.sri_ambiente if cfg else '') or 'PRUEBAS',
+} %}
+<div class="mb-3">
+  <div class="mb-3">
+    <a href="/billing/" class="text-purple-600 text-sm">← Facturas</a>
+    <h1 class="text-2xl font-bold text-slate-800 mt-0.5">Nueva factura</h1>
+  </div>
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    {% if config_ready %}
+    <div class="flex flex-wrap items-center gap-2 min-w-0">
+      <div class="text-sm px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-700">
+        <span class="text-gray-500">Emisor:</span>
+        <strong>{{ empresa.ruc }}</strong> · {{ empresa.razon_social }}
+        <span class="ml-1 px-2 py-0.5 rounded-full text-xs {% if empresa.ambiente == 'PRODUCCION' %}bg-red-100 text-red-800{% else %}bg-emerald-100 text-emerald-800{% endif %}">{{ empresa.ambiente }}</span>
+      </div>
+      <div class="text-sm px-4 py-2 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 whitespace-nowrap">
+        <span class="text-purple-600">Próximo comprobante:</span>
+        <strong id="numero-comprobante">{{ preview_numero }}</strong>
+      </div>
+    </div>
+    {% else %}
+    <div></div>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-2 shrink-0 ml-auto">
+      <button type="button" id="btn-toggle-borradores"
+        class="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-gray-50 whitespace-nowrap">
+        📂 Borradores (<span id="drafts-count">0</span>)
+      </button>
+      <button type="button" id="btn-guardar-borrador"
+        class="px-4 py-2 border border-purple-200 bg-purple-50 rounded-xl text-sm font-semibold text-purple-800 hover:bg-purple-100 whitespace-nowrap">
+        💾 Guardar borrador
+      </button>
+    </div>
+  </div>
+
+  <div id="drafts-panel" class="hidden mt-3 bg-white border border-gray-200 rounded-xl p-3 shadow-sm max-w-md ml-auto">
+    <p class="text-xs font-semibold text-gray-600 mb-2">Borradores guardados (máx. 5)</p>
+    <div id="drafts-list" class="space-y-1 max-h-48 overflow-y-auto"></div>
+  </div>
+</div>
+
+{% if request.query_params.get('error') %}
+<div class="mb-3 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ request.query_params.get('error') }}</div>
+{% endif %}
+
+{% if not config_ready %}
+<div class="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-xl text-sm">
+  <strong>Complete la configuración SRI antes de emitir.</strong>
+  {% if user.role == 'admin' %}
+  <a href="/billing/config/sri" class="inline-block mt-1 text-purple-700 font-semibold">Ir a configuración SRI →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div id="form-error" class="hidden mb-3 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm"></div>
+
+<form id="invoice-form" method="post" action="/billing/create" class="space-y-4 w-full">
+
+  <input type="hidden" name="client_id" id="client_id" value="">
+  <input type="hidden" name="items_json" id="items_json" value="[]">
+  <input type="hidden" name="pagos_json" id="pagos_json" value="[]">
+  <input type="hidden" name="info_adicional_json" id="info_adicional_json" value="[]">
+  <input type="hidden" name="identificacion" id="identificacion" value="">
+
+  <!-- Emisor: barra compacta colapsable -->
+  <details class="bg-slate-50 border border-slate-200 rounded-xl text-sm group">
+    <summary class="px-4 py-2.5 cursor-pointer font-medium text-slate-600 flex items-center gap-2 select-none">
+      <span class="text-slate-400 group-open:rotate-90 transition-transform">▸</span>
+      Datos del emisor (desde configuración SRI)
+      <span class="text-xs text-gray-400 font-normal ml-2">{{ empresa.ruc }} · {{ fecha_emision }}</span>
+    </summary>
+    <div class="px-4 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 border-t border-slate-200">
+      <div>
+        <label class="block text-xs text-gray-500 mb-0.5">Establecimiento *</label>
+        <select name="codigo_establecimiento" id="codigo_establecimiento" required
+          class="w-full border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-sm">
+          {% if establishments %}
+            {% for est in establishments %}
+            <option value="{{ est.codigo }}" {% if est.codigo == default_estab %}selected{% endif %}>{{ est.codigo }}</option>
+            {% endfor %}
+          {% else %}
+            <option value="{{ default_estab }}" selected>{{ default_estab }}</option>
+          {% endif %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-0.5">Punto emisión *</label>
+        <select name="codigo_punto_emision" id="codigo_punto_emision" required
+          class="w-full border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-sm">
+          {% for est in establishments %}
+            {% if est.codigo == default_estab %}
+              {% for pto in est.emission_points %}
+              <option value="{{ pto.codigo }}" {% if pto.codigo == default_pto %}selected{% endif %}>{{ pto.codigo }}</option>
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+          {% if not establishments %}
+          <option value="{{ default_pto }}" selected>{{ default_pto }}</option>
+          {% endif %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-0.5">Fecha emisión</label>
+        <input type="text" readonly value="{{ fecha_emision }}"
+          class="w-full border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-sm text-gray-600">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-0.5">Guía remisión</label>
+        <input type="text" id="guia_remision" placeholder="Opcional"
+          class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
+      </div>
+      <div class="flex items-end pb-1">
+        <label class="flex items-center gap-1.5 text-xs text-gray-600">
+          <input type="checkbox" id="factura_negociable" class="rounded">
+          Fact. negociable
+        </label>
+      </div>
+      <div class="col-span-2 sm:col-span-3 lg:col-span-6 text-xs text-gray-500 pt-1 border-t border-slate-100">
+        {{ empresa.razon_social }} · {{ empresa.nombre_comercial }} · {{ empresa.direccion_matriz }}
+      </div>
+    </div>
+  </details>
+
+  <!-- Adquirente (arriba, ancho completo) -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+    <h2 class="text-base font-bold text-slate-800 mb-0.5">Adquirente</h2>
+    <p class="text-xs text-gray-500 mb-3">Busque en su catálogo o consulte el SRI en línea</p>
+
+    <div class="relative mb-3">
+      <input type="text" id="client_search" placeholder="Buscar por nombre, RUC o cédula..."
+        autocomplete="off"
+        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500/30">
+      <div id="client_results"
+        class="hidden absolute z-50 bg-white border border-gray-200 rounded-xl mt-1 w-full shadow-lg max-h-60 overflow-y-auto"></div>
+    </div>
+
+    <div id="selected_client_info" class="hidden mb-3">
+      <div class="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm">
+        <span class="text-lg">✅</span>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-medium text-emerald-700 uppercase tracking-wide">Cliente seleccionado</p>
+          <p id="selected_client_name" class="font-bold text-emerald-900 truncate mt-0.5"></p>
+          <p id="selected_client_meta" class="text-xs text-emerald-700/80 mt-0.5"></p>
+        </div>
+        <button type="button" id="btn-clear-client-search"
+          class="text-xs text-emerald-700 hover:text-red-600 underline shrink-0">Quitar</button>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-3">
+      <button type="button" id="btn-consumidor-final"
+        class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">Consumidor final</button>
+      <button type="button" id="btn-toggle-sri"
+        class="px-3 py-1.5 border border-emerald-200 text-emerald-800 hover:bg-emerald-50 rounded-lg text-sm">Consultar SRI</button>
+      <button type="button" id="btn-limpiar-adquirente"
+        class="px-3 py-1.5 border border-gray-200 hover:bg-gray-50 rounded-lg text-sm">Limpiar</button>
+    </div>
+
+    <div id="panel-sri" class="hidden mb-3">
+      <div class="flex gap-2 max-w-xl">
+        <input type="text" id="identificacion_sri" placeholder="Cédula o RUC"
+          class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/30">
+        <button type="button" id="btn-consultar-sri"
+          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shrink-0">Consultar SRI</button>
+      </div>
+    </div>
+
+    <span id="consulta-info" class="block text-xs font-medium mb-2"></span>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-sm border-t border-gray-100 pt-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-0.5">Identificación *</label>
+        <input type="text" id="identificacion_visible" placeholder="Cédula, RUC..."
+          class="w-full border border-gray-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-purple-500/30">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-0.5">Tipo ID *</label>
+        <select name="tipo_identificacion" id="tipo_identificacion" required
+          class="w-full border border-gray-200 rounded-lg px-2.5 py-2 bg-white focus:ring-2 focus:ring-purple-500/30">
+          <option value="">Seleccione</option>
+          {% for t in tipos_identificacion %}
+          <option value="{{ t.value }}">{{ t.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-span-2 md:col-span-3 lg:col-span-2">
+        <label class="block text-xs font-medium text-gray-600 mb-0.5">Razón social *</label>
+        <input type="text" name="razon_social" id="razon_social" required
+          class="w-full border border-gray-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-purple-500/30">
+      </div>
+      <div class="col-span-2 md:col-span-1 lg:col-span-2">
+        <label class="block text-xs font-medium text-gray-600 mb-0.5">Dirección</label>
+        <input type="text" name="direccion" id="direccion"
+          class="w-full border border-gray-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-purple-500/30">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-0.5">Teléfono</label>
+        <input type="text" name="telefono" id="telefono"
+          class="w-full border border-gray-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-purple-500/30">
+      </div>
+      <div class="col-span-2 md:col-span-2 lg:col-span-2">
+        <label class="block text-xs font-medium text-gray-600 mb-0.5">Correo electrónico *</label>
+        <input type="email" name="email" id="email" required
+          class="w-full border border-gray-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-purple-500/30">
+      </div>
+    </div>
+  </section>
+
+  <!-- Productos (izquierda) + Pagos / Info adicional (columna derecha) -->
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+
+    <section class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-800">Detalle de productos</h2>
+          <p class="text-xs text-gray-500 mt-0.5">Catálogo, búsqueda rápida o producto nuevo</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btn-open-custom-product"
+            class="px-3 py-1.5 border border-purple-200 text-purple-800 bg-purple-50 hover:bg-purple-100 rounded-xl text-xs font-semibold">
+            + Personalizado
+          </button>
+          <span id="lines-count-badge" class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">0 ítems</span>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-2 md:items-end">
+          <div class="md:col-span-6">
+            <label class="text-xs text-gray-500 font-medium">Producto</label>
+            <div class="relative mt-0.5">
+              <input type="text" id="product_search" placeholder="Nombre, código o categoría..."
+                autocomplete="off"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-500/30">
+              <div id="search_results"
+                class="absolute z-50 bg-white border border-gray-200 rounded-xl mt-1 w-full shadow-lg hidden max-h-60 overflow-y-auto"></div>
+            </div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-xs text-gray-500 font-medium">Cantidad</label>
+            <input type="number" id="product_quantity" value="1" min="0.0001" step="0.0001"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-0.5 bg-white">
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-xs text-gray-500 font-medium">Precio unit.</label>
+            <input type="number" id="product_price" step="0.01" min="0"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-0.5 bg-white">
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-xs font-medium invisible select-none" aria-hidden="true">.</label>
+            <button type="button" id="btn-add-product"
+              class="w-full bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl text-sm font-medium mt-0.5">
+              + Agregar
+            </button>
+          </div>
+        </div>
+        <input type="hidden" id="selected_product_id">
+      </div>
+
+      <div id="lines-empty" class="text-gray-400 text-sm py-8 text-center border border-dashed border-gray-200 rounded-xl">
+        <div class="text-3xl mb-2">📋</div>
+        <p class="font-medium text-slate-600">Sin productos en la factura</p>
+        <p class="text-xs mt-1">Use la búsqueda rápida para agregar ítems del catálogo</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table id="lines-table" class="w-full text-sm hidden min-w-[640px]">
+          <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+            <tr>
+              <th class="p-2 w-24">Código</th>
+              <th class="p-2">Descripción</th>
+              <th class="p-2 w-20">Cant.</th>
+              <th class="p-2 w-28">Precio</th>
+              <th class="p-2 w-14">IVA</th>
+              <th class="p-2 text-right w-24">Subtotal</th>
+              <th class="p-2 w-8"></th>
+            </tr>
+          </thead>
+          <tbody id="lines-body"></tbody>
+        </table>
+      </div>
+      <div class="mt-4 flex flex-col items-end gap-3 border-t pt-4">
+        <div class="w-full max-w-xs space-y-1.5 text-sm text-gray-600">
+          <div class="flex justify-between gap-6">
+            <span>Subtotal</span>
+            <span class="font-medium text-slate-800">$<span id="tot-subtotal">0.00</span></span>
+          </div>
+          <div class="flex justify-between gap-6">
+            <span>IVA</span>
+            <span class="font-medium text-slate-800">$<span id="tot-iva">0.00</span></span>
+          </div>
+        </div>
+        <div class="w-full max-w-xs bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl px-4 py-3 flex justify-between items-center shadow-sm">
+          <span class="text-sm font-bold text-purple-900 uppercase tracking-wide">Total</span>
+          <span class="text-2xl font-black text-purple-800">$<span id="tot-total">0.00</span></span>
+        </div>
+      </div>
+    </section>
+
+    <div class="space-y-4">
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+        <h2 class="text-base font-bold text-slate-800 mb-3">Formas de pago</h2>
+        <div id="pagos-empty" class="text-gray-400 text-xs mb-2">Agregue una forma de pago con los botones de abajo</div>
+        <div class="overflow-x-auto">
+          <table id="pagos-table" class="w-full text-sm hidden">
+            <thead class="bg-gray-50 text-left text-xs">
+              <tr>
+                <th class="p-2">Forma</th>
+                <th class="p-2">Valor</th>
+                <th class="p-2">Plazo</th>
+                <th class="p-2">Tiempo</th>
+                <th class="p-2"></th>
+              </tr>
+            </thead>
+            <tbody id="pagos-body"></tbody>
+          </table>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center mt-2">
+          <button type="button" class="pago-rapido px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs" data-codigo="01">Efectivo</button>
+          <button type="button" class="pago-rapido px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs" data-codigo="16">Débito</button>
+          <button type="button" class="pago-rapido px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs" data-codigo="19">Crédito</button>
+          <button type="button" id="btn-add-pago" class="px-2 py-1 text-purple-700 font-semibold text-xs">+ Añadir</button>
+          <span class="text-xs text-gray-600 w-full pt-1">Pendiente: $<span id="pendiente-pago">0.00</span></span>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+        <h2 class="text-base font-bold text-slate-800 mb-1">Información adicional</h2>
+        <p class="text-xs text-gray-400 mb-2">Opcional — COTIZACION, REGISTRO, etc.</p>
+        <div id="campos-list" class="space-y-1 mb-2"></div>
+        <div class="flex flex-col gap-2">
+          <input type="text" id="campo-nombre" placeholder="Nombre" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm w-full">
+          <input type="text" id="campo-valor" placeholder="Valor" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm w-full">
+          <button type="button" id="btn-add-campo" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs w-full">Agregar</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="flex justify-end pt-2">
+    <button type="submit"
+      class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-semibold shadow-sm">
+      Generar factura (borrador)
+    </button>
+  </div>
+</form>
+
+<div id="custom_product_modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-slate-800">Producto personalizado</h3>
+      <button type="button" id="btn-close-custom-product" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs text-gray-500 font-medium">Descripción *</label>
+        <input type="text" id="custom_product_name" placeholder="Nombre o detalle del producto/servicio"
+          class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-0.5">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 font-medium">Cantidad</label>
+          <input type="number" id="custom_product_qty" value="1" min="0.0001" step="0.0001"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-0.5">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 font-medium">Precio unit. *</label>
+          <input type="number" id="custom_product_price" step="0.01" min="0"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-0.5">
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 font-medium">IVA</label>
+        <select id="custom_product_iva"
+          class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm mt-0.5 bg-white">
+          {% for opt in billing_tarifas_iva | default([]) %}
+          <option value="{{ opt.tarifa }}" data-codigo="{{ opt.codigo }}"
+            {% if opt.tarifa == default_tarifa_iva %}selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-gray-400 mt-1">Se guardará en catálogo con este IVA para facturación SRI.</p>
+      </div>
+    </div>
+    <button type="button" id="btn-add-custom-product"
+      class="w-full mt-5 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl text-sm font-semibold">
+      Crear y agregar a la factura
+    </button>
+  </div>
+</div>
+
+<script>
+const PRODUCTOS = {{ products_json | default('[]') | safe }};
+const ESTABLECIMIENTOS = {{ establishments_json | default('[]') | safe }};
+const CLIENTES = {{ clients_json | default('[]') | safe }};
+const FORMAS_PAGO = {{ formas_pago | default([]) | tojson }};
+const CONSUMIDOR_FINAL = {{ consumidor_final | default('9999999999999') | tojson }};
+const DEFAULT_EMAIL = {{ default_email | default('') | tojson }};
+const DEFAULT_ESTAB = {{ default_estab | default('001') | tojson }};
+const DEFAULT_PTO = {{ default_pto | default('001') | tojson }};
+const USER_ID = {{ user.id | tojson }};
+const MAX_DRAFTS = 5;
+const DRAFTS_KEY = `erp_invoice_drafts_u${USER_ID}`;
+const DEFAULT_TARIFA_IVA = {{ default_tarifa_iva | default(0) | tojson }};
+const DEFAULT_CODIGO_IVA = {{ default_codigo_iva | default('0') | tojson }};
+const BILLING_TARIFAS_IVA = {{ billing_tarifas_iva | default([]) | tojson }};
+
+let lineas = [];
+let pagos = [];
+let camposAdicionales = [];
+let currentDraftId = null;
+
+function updateSelectedClientUI(c) {
+  const info = document.getElementById('selected_client_info');
+  if (!c) {
+    info.classList.add('hidden');
+    return;
+  }
+  document.getElementById('selected_client_name').textContent = c.razon_social || c.label || '';
+  const meta = [c.identificacion, c.telefono, c.email].filter(Boolean).join(' · ');
+  document.getElementById('selected_client_meta').textContent = meta || 'Sin datos adicionales';
+  info.classList.remove('hidden');
+}
+
+function clearClientSearch() {
+  document.getElementById('client_search').value = '';
+  document.getElementById('client_results').innerHTML = '';
+  document.getElementById('client_results').classList.add('hidden');
+  updateSelectedClientUI(null);
+}
+
+function selectClientFromSearch(c) {
+  aplicarCliente(c);
+  document.getElementById('client_id').value = c.id || '';
+  document.getElementById('client_search').value = c.razon_social || c.label || '';
+  document.getElementById('client_results').classList.add('hidden');
+  updateSelectedClientUI(c);
+  document.getElementById('consulta-info').textContent = 'Cliente seleccionado del catálogo';
+  document.getElementById('consulta-info').className = 'block text-xs font-medium mb-2 text-emerald-700';
+}
+
+function initClientSearch() {
+  const searchInput = document.getElementById('client_search');
+  const resultsBox = document.getElementById('client_results');
+
+  searchInput.addEventListener('input', function () {
+    const query = this.value.trim().toLowerCase();
+    if (query.length < 1) {
+      resultsBox.innerHTML = '';
+      resultsBox.classList.add('hidden');
+      return;
+    }
+    const filtered = CLIENTES.filter(c => {
+      const hay = [c.label, c.identificacion, c.razon_social, c.email, c.telefono].join(' ').toLowerCase();
+      return hay.includes(query);
+    }).slice(0, 10);
+
+    resultsBox.innerHTML = '';
+    if (!filtered.length) {
+      resultsBox.innerHTML = '<div class="p-3 text-sm text-gray-500">Cliente no encontrado</div>';
+      resultsBox.classList.remove('hidden');
+      return;
+    }
+    filtered.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'p-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-0';
+      const uso = c.uso_count > 0 ? ` · ${c.uso_count} fact.` : '';
+      div.innerHTML = `
+        <div class="font-semibold text-sm text-slate-800">${escHtml(c.razon_social || c.label)}</div>
+        <div class="text-xs text-gray-500 mt-0.5">${escHtml(c.identificacion || 'Sin ID')}${uso}${c.email ? ' · ' + escHtml(c.email) : ''}</div>`;
+      div.addEventListener('click', () => selectClientFromSearch(c));
+      resultsBox.appendChild(div);
+    });
+    resultsBox.classList.remove('hidden');
+  });
+
+  searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Escape') resultsBox.classList.add('hidden');
+  });
+
+  document.addEventListener('click', e => {
+    if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+      resultsBox.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('btn-clear-client-search').addEventListener('click', () => {
+    clearClientSearch();
+    document.getElementById('client_id').value = '';
+    limpiarAdquirente(false);
+  });
+}
+
+async function refreshPreviewNumero() {
+  const estab = document.getElementById('codigo_establecimiento')?.value || DEFAULT_ESTAB;
+  const pto = document.getElementById('codigo_punto_emision')?.value || DEFAULT_PTO;
+  try {
+    const res = await fetch(
+      `/billing/api/preview-numero?codigo_establecimiento=${encodeURIComponent(estab)}&codigo_punto_emision=${encodeURIComponent(pto)}`,
+      { credentials: 'same-origin', headers: { Accept: 'application/json' } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const el = document.getElementById('numero-comprobante');
+    if (el && data.numero_comprobante) el.textContent = data.numero_comprobante;
+  } catch (_) {}
+}
+
+function collectFormState() {
+  return {
+    client_id: document.getElementById('client_id').value,
+    identificacion: document.getElementById('identificacion').value,
+    identificacion_visible: document.getElementById('identificacion_visible').value,
+    tipo_identificacion: document.getElementById('tipo_identificacion').value,
+    razon_social: document.getElementById('razon_social').value,
+    direccion: document.getElementById('direccion').value,
+    telefono: document.getElementById('telefono').value,
+    email: document.getElementById('email').value,
+    codigo_establecimiento: document.getElementById('codigo_establecimiento').value,
+    codigo_punto_emision: document.getElementById('codigo_punto_emision').value,
+    guia_remision: document.getElementById('guia_remision').value,
+    factura_negociable: document.getElementById('factura_negociable').checked,
+    lineas: JSON.parse(JSON.stringify(lineas)),
+    pagos: JSON.parse(JSON.stringify(pagos)),
+    camposAdicionales: JSON.parse(JSON.stringify(camposAdicionales)),
+  };
+}
+
+function loadDrafts() {
+  try { return JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]'); } catch { return []; }
+}
+
+function saveDrafts(list) {
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify(list.slice(0, MAX_DRAFTS)));
+  updateDraftsUI();
+}
+
+function updateDraftsUI() {
+  const drafts = loadDrafts();
+  document.getElementById('drafts-count').textContent = drafts.length;
+  const listEl = document.getElementById('drafts-list');
+  listEl.innerHTML = '';
+  if (!drafts.length) {
+    listEl.innerHTML = '<p class="text-xs text-gray-400">No hay borradores guardados.</p>';
+    return;
+  }
+  drafts.forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 text-sm border border-gray-100 rounded-lg px-2 py-1.5';
+    const label = d.label || d.razon_social || 'Sin cliente';
+    const fecha = new Date(d.savedAt).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' });
+    row.innerHTML = `
+      <button type="button" data-load-draft="${d.id}" class="flex-1 text-left hover:text-purple-700 truncate">
+        <span class="font-medium">${label}</span>
+        <span class="block text-[10px] text-gray-400">${fecha} · ${(d.lineas || []).length} ítem(s)</span>
+      </button>
+      <button type="button" data-del-draft="${d.id}" class="text-red-500 text-xs px-1">✕</button>`;
+    listEl.appendChild(row);
+  });
+  listEl.querySelectorAll('[data-load-draft]').forEach(btn => {
+    btn.addEventListener('click', () => applyDraft(+btn.dataset.loadDraft));
+  });
+  listEl.querySelectorAll('[data-del-draft]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      saveDrafts(loadDrafts().filter(d => d.id !== +btn.dataset.delDraft));
+    });
+  });
+}
+
+function applyDraft(id) {
+  const draft = loadDrafts().find(d => d.id === id);
+  if (!draft) return;
+  currentDraftId = id;
+  document.getElementById('client_id').value = draft.client_id || '';
+  document.getElementById('identificacion').value = draft.identificacion || '';
+  document.getElementById('identificacion_visible').value = draft.identificacion_visible || draft.identificacion || '';
+  document.getElementById('tipo_identificacion').value = draft.tipo_identificacion || '';
+  document.getElementById('razon_social').value = draft.razon_social || '';
+  document.getElementById('direccion').value = draft.direccion || '';
+  document.getElementById('telefono').value = draft.telefono || '';
+  document.getElementById('email').value = draft.email || '';
+  if (draft.codigo_establecimiento) document.getElementById('codigo_establecimiento').value = draft.codigo_establecimiento;
+  if (draft.codigo_punto_emision) document.getElementById('codigo_punto_emision').value = draft.codigo_punto_emision;
+  document.getElementById('guia_remision').value = draft.guia_remision || '';
+  document.getElementById('factura_negociable').checked = !!draft.factura_negociable;
+  lineas = draft.lineas || [];
+  pagos = draft.pagos || [];
+  camposAdicionales = draft.camposAdicionales || [];
+  renderLines();
+  renderPagos();
+  renderCampos();
+  refreshPreviewNumero();
+  if (draft.razon_social || draft.client_id) {
+    document.getElementById('client_search').value = draft.razon_social || '';
+    updateSelectedClientUI({
+      razon_social: draft.razon_social,
+      label: draft.razon_social,
+      identificacion: draft.identificacion_visible || draft.identificacion,
+      telefono: draft.telefono,
+      email: draft.email,
+    });
+  } else {
+    clearClientSearch();
+  }
+  document.getElementById('consulta-info').textContent = 'Borrador cargado';
+  document.getElementById('consulta-info').className = 'block text-sm font-medium mb-3 text-emerald-700';
+  document.getElementById('drafts-panel').classList.add('hidden');
+}
+
+function guardarBorrador() {
+  const state = collectFormState();
+  const label = state.razon_social || state.identificacion || 'Factura sin cliente';
+  let drafts = loadDrafts();
+  const entry = {
+    id: currentDraftId || Date.now(),
+    savedAt: new Date().toISOString(),
+    label,
+    ...state,
+  };
+  drafts = drafts.filter(d => d.id !== entry.id);
+  drafts.unshift(entry);
+  saveDrafts(drafts);
+  currentDraftId = entry.id;
+  document.getElementById('consulta-info').textContent = 'Borrador guardado en este navegador';
+  document.getElementById('consulta-info').className = 'block text-sm font-medium mb-3 text-purple-700';
+}
+
+function resaltarCampos(payload) {
+  if (!payload?.razon_social) return;
+  ['razon_social', 'direccion', 'identificacion_visible'].forEach(f => {
+    const el = document.getElementById(f);
+    if (el && payload[f.replace('_visible', '')] || payload.razon_social) {
+      el.classList.add('ring-2', 'ring-emerald-400');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-400'), 1200);
+    }
+  });
+}
+
+async function consultarSriOnline(identificacion) {
+  if (!identificacion.trim()) {
+    showError('Ingrese cédula o RUC para consultar el catastro del SRI');
+    return;
+  }
+  clearError();
+  const info = document.getElementById('consulta-info');
+  const btn = document.getElementById('btn-consultar-sri');
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Consultando SRI...';
+  info.textContent = 'Consultando catastro en línea del SRI...';
+  info.className = 'block text-sm font-medium mb-3 text-slate-600';
+  try {
+    const url = `/billing/api/clientes/consultar-sri?identificacion=${encodeURIComponent(identificacion.trim())}`;
+    const res = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+    if (!(res.headers.get('content-type') || '').includes('application/json')) {
+      showError('Recargue la página (F5) o reinicie iniciar_servidor.bat');
+      info.textContent = '';
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.mensaje || data.message || data.error || 'Error al consultar el SRI');
+      info.textContent = '';
+      return;
+    }
+    if (data.source === 'sri' && data.sugerido?.razon_social) {
+      document.getElementById('client_id').value = '';
+      aplicarCliente(data.sugerido);
+      document.getElementById('client_search').value = data.sugerido.razon_social || '';
+      updateSelectedClientUI({
+        razon_social: data.sugerido.razon_social,
+        identificacion: data.sugerido.identificacion,
+        telefono: data.sugerido.telefono,
+        email: data.sugerido.email,
+      });
+      resaltarCampos(data.sugerido);
+      info.textContent = data.mensaje || 'Datos obtenidos del catastro del SRI';
+      info.className = 'block text-xs font-medium mb-2 text-emerald-700';
+      return;
+    }
+    if (data.sugerido) {
+      document.getElementById('client_id').value = '';
+      aplicarCliente(data.sugerido);
+      document.getElementById('client_search').value = data.sugerido.razon_social || data.sugerido.identificacion || '';
+      updateSelectedClientUI({
+        razon_social: data.sugerido.razon_social,
+        identificacion: data.sugerido.identificacion,
+        telefono: data.sugerido.telefono,
+        email: data.sugerido.email,
+      });
+      info.textContent = data.mensaje || 'No se encontró en el SRI. Complete los datos manualmente.';
+      info.className = 'block text-xs font-medium mb-2 text-amber-700';
+      return;
+    }
+    info.textContent = data.mensaje || 'No se encontró en el catastro del SRI';
+    info.className = 'block text-xs font-medium mb-2 text-amber-700';
+  } catch (e) {
+    showError('No se pudo conectar con el SRI. Verifique su conexión a internet.');
+    info.textContent = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
+  }
+}
+
+function round2(v) { return Math.round(v * 100) / 100; }
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function showError(msg) {
+  const el = document.getElementById('form-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function clearError() { document.getElementById('form-error').classList.add('hidden'); }
+function inferirTipo(id) {
+  if (id === CONSUMIDOR_FINAL) return 'CONSUMIDOR_FINAL';
+  if (/^\d{13}$/.test(id)) return 'RUC';
+  if (/^\d{10}$/.test(id)) return 'CEDULA';
+  if (/^[A-Za-z0-9-]{5,20}$/.test(id)) return 'PASAPORTE';
+  return 'IDENTIFICACION_EXTERIOR';
+}
+
+function calcTotals() {
+  let subtotal = 0, iva = 0;
+  lineas.forEach(l => {
+    const base = l.cantidad * l.precio_unitario;
+    subtotal += base;
+    iva += base * (l.tarifa_iva / 100);
+  });
+  const total = round2(subtotal + iva);
+  document.getElementById('tot-subtotal').textContent = round2(subtotal).toFixed(2);
+  document.getElementById('tot-iva').textContent = round2(iva).toFixed(2);
+  document.getElementById('tot-total').textContent = total.toFixed(2);
+  updatePendiente();
+  return { total };
+}
+
+function updateLinesUI() {
+  const count = lineas.length;
+  const label = count === 1 ? '1 ítem' : `${count} ítems`;
+  const badge = document.getElementById('lines-count-badge');
+  if (badge) badge.textContent = label;
+}
+
+function renderLines() {
+  const body = document.getElementById('lines-body');
+  const table = document.getElementById('lines-table');
+  const empty = document.getElementById('lines-empty');
+  body.innerHTML = '';
+  updateLinesUI();
+  if (!lineas.length) {
+    table.classList.add('hidden');
+    empty.classList.remove('hidden');
+    calcTotals();
+    return;
+  }
+  empty.classList.add('hidden');
+  table.classList.remove('hidden');
+  lineas.forEach((l, i) => {
+    const sub = round2(l.cantidad * l.precio_unitario);
+    const tr = document.createElement('tr');
+    tr.className = 'border-t hover:bg-gray-50';
+    tr.innerHTML = `
+      <td class="p-2 text-xs text-gray-600 font-mono">${escHtml(l.codigo_principal || '—')}</td>
+      <td class="p-2">
+        <input type="text" value="${escHtml(l.descripcion)}" data-i="${i}" data-f="descripcion"
+          class="line-input w-full min-w-[140px] border border-gray-200 rounded-lg px-2 py-1 text-sm">
+      </td>
+      <td class="p-2">
+        <input type="number" min="0.0001" step="0.0001" value="${l.cantidad}" data-i="${i}" data-f="cantidad"
+          class="line-input w-20 border border-gray-200 rounded-lg px-2 py-1">
+      </td>
+      <td class="p-2">
+        <input type="number" min="0" step="0.01" value="${l.precio_unitario}" data-i="${i}" data-f="precio_unitario"
+          class="line-input w-28 border border-gray-200 rounded-lg px-2 py-1">
+      </td>
+      <td class="p-2 text-center text-xs">${l.tarifa_iva}%</td>
+      <td class="p-2 text-right font-medium">$${sub.toFixed(2)}</td>
+      <td class="p-2">
+        <button type="button" data-remove="${i}" class="text-red-600 text-xs font-semibold hover:text-red-800" title="Quitar">✕</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.line-input').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const i = +e.target.dataset.i;
+      const f = e.target.dataset.f;
+      if (f === 'descripcion') lineas[i][f] = e.target.value;
+      else lineas[i][f] = parseFloat(e.target.value) || 0;
+      renderLines();
+    });
+  });
+  body.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => { lineas.splice(+btn.dataset.remove, 1); renderLines(); });
+  });
+  calcTotals();
+}
+
+function renderPagos() {
+  const { total } = calcTotalsOnly();
+  const body = document.getElementById('pagos-body');
+  const table = document.getElementById('pagos-table');
+  const empty = document.getElementById('pagos-empty');
+  body.innerHTML = '';
+  if (!pagos.length) {
+    table.classList.add('hidden');
+    empty.classList.remove('hidden');
+    document.getElementById('pendiente-pago').textContent = total.toFixed(2);
+    return;
+  }
+  empty.classList.add('hidden');
+  table.classList.remove('hidden');
+  pagos.forEach((p, i) => {
+    const opts = FORMAS_PAGO.map(f => `<option value="${f.codigo}" ${p.forma_pago === f.codigo ? 'selected' : ''}>${f.label}</option>`).join('');
+    const tr = document.createElement('tr');
+    tr.className = 'border-t';
+    tr.innerHTML = `
+      <td class="p-2"><select data-i="${i}" data-f="forma_pago" class="pago-input border border-gray-200 rounded-lg px-2 py-1 w-full max-w-xs">${opts}</select></td>
+      <td class="p-2"><input type="number" step="0.01" min="0" value="${p.total}" data-i="${i}" data-f="total" class="pago-input w-28 border border-gray-200 rounded-lg px-2 py-1"></td>
+      <td class="p-2"><input type="number" min="0" value="${p.plazo ?? ''}" data-i="${i}" data-f="plazo" class="pago-input w-20 border border-gray-200 rounded-lg px-2 py-1"></td>
+      <td class="p-2"><select data-i="${i}" data-f="unidad_tiempo" class="pago-input border border-gray-200 rounded-lg px-2 py-1">
+        <option value="">—</option>
+        <option value="dias" ${p.unidad_tiempo === 'dias' ? 'selected' : ''}>días</option>
+        <option value="meses" ${p.unidad_tiempo === 'meses' ? 'selected' : ''}>meses</option>
+      </select></td>
+      <td class="p-2"><button type="button" data-remove-pago="${i}" class="text-red-600 text-xs">Quitar</button></td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.pago-input').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const i = +e.target.dataset.i, f = e.target.dataset.f, val = e.target.value;
+      if (f === 'plazo') pagos[i][f] = val === '' ? undefined : parseInt(val, 10);
+      else if (f === 'total') pagos[i][f] = parseFloat(val) || 0;
+      else pagos[i][f] = val;
+      updatePendiente();
+    });
+  });
+  body.querySelectorAll('[data-remove-pago]').forEach(btn => {
+    btn.addEventListener('click', () => { pagos.splice(+btn.dataset.removePago, 1); renderPagos(); });
+  });
+  updatePendiente();
+}
+
+function calcTotalsOnly() {
+  let subtotal = 0, iva = 0;
+  lineas.forEach(l => { const b = l.cantidad * l.precio_unitario; subtotal += b; iva += b * (l.tarifa_iva / 100); });
+  return { total: round2(subtotal + iva) };
+}
+function updatePendiente() {
+  const { total } = calcTotalsOnly();
+  const pagado = round2(pagos.reduce((s, p) => s + (p.total || 0), 0));
+  document.getElementById('pendiente-pago').textContent = round2(total - pagado).toFixed(2);
+}
+
+let selectedSearchProduct = null;
+
+function catalogProduct(productId) {
+  return PRODUCTOS.find(p => p.id == productId);
+}
+
+function clearProductFields() {
+  document.getElementById('product_search').value = '';
+  document.getElementById('selected_product_id').value = '';
+  document.getElementById('product_quantity').value = '1';
+  document.getElementById('product_price').value = '';
+  document.getElementById('search_results').innerHTML = '';
+  document.getElementById('search_results').classList.add('hidden');
+  selectedSearchProduct = null;
+}
+
+function selectSearchProduct(product) {
+  selectedSearchProduct = product;
+  document.getElementById('product_search').value = product.name || '';
+  document.getElementById('selected_product_id').value = product.id;
+  const catalog = catalogProduct(product.id);
+  const price = catalog?.precio_unitario ?? product.price ?? 0;
+  document.getElementById('product_price').value = parseFloat(price).toFixed(2);
+  document.getElementById('search_results').innerHTML = '';
+  document.getElementById('search_results').classList.add('hidden');
+}
+
+function addProductLine() {
+  clearError();
+  const productId = document.getElementById('selected_product_id').value;
+  const quantity = parseFloat(document.getElementById('product_quantity').value) || 1;
+  const price = parseFloat(document.getElementById('product_price').value);
+  if (!productId) {
+    showError('Seleccione un producto de la búsqueda');
+    document.getElementById('product_search').focus();
+    return;
+  }
+  if (lineas.some(l => l.product_id == productId)) {
+    showError('Este producto ya está en la factura. Edite la cantidad en la tabla.');
+    return;
+  }
+  if (!price || price <= 0) {
+    showError('Ingrese un precio unitario válido');
+    document.getElementById('product_price').focus();
+    return;
+  }
+  const catalog = catalogProduct(productId);
+  const sp = selectedSearchProduct || {};
+  lineas.push({
+    product_id: parseInt(productId, 10),
+    codigo_principal: catalog?.codigo_principal || sp.code || `P${productId}`,
+    codigo_auxiliar: catalog?.codigo_auxiliar || null,
+    descripcion: catalog?.descripcion || sp.name || document.getElementById('product_search').value,
+    cantidad: quantity,
+    precio_unitario: price,
+    tarifa_iva: catalog?.tarifa_iva != null ? Number(catalog.tarifa_iva) : DEFAULT_TARIFA_IVA,
+    codigo_iva: catalog?.codigo_iva || DEFAULT_CODIGO_IVA,
+  });
+  clearProductFields();
+  renderLines();
+}
+
+function initProductSearch() {
+  const searchInput = document.getElementById('product_search');
+  const resultsBox = document.getElementById('search_results');
+
+  searchInput.addEventListener('input', async function () {
+    const query = this.value.trim();
+    document.getElementById('selected_product_id').value = '';
+    selectedSearchProduct = null;
+    if (query.length < 1) {
+      resultsBox.innerHTML = '';
+      resultsBox.classList.add('hidden');
+      return;
+    }
+    try {
+      const res = await fetch(`/products/search?q=${encodeURIComponent(query)}`, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        resultsBox.innerHTML = '<div class="p-3 text-sm text-red-600">No se pudo buscar productos</div>';
+        resultsBox.classList.remove('hidden');
+        return;
+      }
+      const data = await res.json();
+      resultsBox.innerHTML = '';
+      if (!data.length) {
+        resultsBox.innerHTML = '<div class="p-3 text-sm text-gray-500">Producto no encontrado</div>';
+        resultsBox.classList.remove('hidden');
+        return;
+      }
+      data.forEach(product => {
+        const div = document.createElement('div');
+        div.className = 'p-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-0';
+        div.innerHTML = `
+          <div class="font-semibold text-sm text-slate-800">${escHtml(product.code || '')} ${escHtml(product.name)}</div>
+          <div class="text-xs text-gray-500 mt-0.5">${escHtml(product.category || 'Sin categoría')} · $${parseFloat(product.price || 0).toFixed(2)}</div>`;
+        div.addEventListener('click', () => selectSearchProduct(product));
+        resultsBox.appendChild(div);
+      });
+      resultsBox.classList.remove('hidden');
+    } catch (_) {
+      resultsBox.innerHTML = '<div class="p-3 text-sm text-red-600">Error de conexión</div>';
+      resultsBox.classList.remove('hidden');
+    }
+  });
+
+  searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addProductLine();
+    }
+    if (e.key === 'Escape') {
+      resultsBox.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('btn-add-product').addEventListener('click', addProductLine);
+
+  document.addEventListener('click', e => {
+    if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+      resultsBox.classList.add('hidden');
+    }
+  });
+}
+
+function initEstablecimientos() {
+  const estSel = document.getElementById('codigo_establecimiento');
+  const ptoSel = document.getElementById('codigo_punto_emision');
+  if (!ESTABLECIMIENTOS.length) return;
+  function refreshPuntos() {
+    const prev = ptoSel.value;
+    ptoSel.innerHTML = '';
+    const est = ESTABLECIMIENTOS.find(e => e.codigo === estSel.value);
+    (est?.points || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.codigo;
+      opt.textContent = p.codigo;
+      if (p.codigo === prev || p.codigo === DEFAULT_PTO) opt.selected = true;
+      ptoSel.appendChild(opt);
+    });
+  }
+  estSel.addEventListener('change', () => { refreshPuntos(); refreshPreviewNumero(); });
+  ptoSel.addEventListener('change', refreshPreviewNumero);
+}
+
+async function consultarSri() {
+  const id = document.getElementById('identificacion_sri').value.trim();
+  await consultarSriOnline(id);
+}
+
+function limpiarAdquirente(clearSearch = true) {
+  document.getElementById('client_id').value = '';
+  ['identificacion_visible', 'identificacion', 'razon_social', 'direccion', 'telefono', 'email'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('tipo_identificacion').value = '';
+  document.getElementById('identificacion_sri').value = '';
+  document.getElementById('consulta-info').textContent = '';
+  if (clearSearch) clearClientSearch();
+}
+
+function normalizarIdentificacion(val, tipo) {
+  const raw = (val || '').trim();
+  const t = (tipo || '').toUpperCase();
+  if (t === 'PASAPORTE' || t === 'IDENTIFICACION_EXTERIOR') return raw;
+  const digits = raw.replace(/\D/g, '');
+  return digits || raw;
+}
+
+function aplicarCliente(c) {
+  const tipo = (c.tipo_identificacion || inferirTipo(c.identificacion || '')).toUpperCase();
+  const ident = normalizarIdentificacion(c.identificacion, tipo);
+  document.getElementById('client_id').value = c.id || '';
+  document.getElementById('identificacion_visible').value = ident;
+  document.getElementById('identificacion').value = ident;
+  document.getElementById('identificacion_sri').value = ident;
+  document.getElementById('tipo_identificacion').value = tipo || inferirTipo(ident);
+  document.getElementById('razon_social').value = c.razon_social || '';
+  document.getElementById('direccion').value = c.direccion || '';
+  document.getElementById('telefono').value = c.telefono || '';
+  document.getElementById('email').value = c.email || '';
+}
+
+document.getElementById('btn-guardar-borrador').addEventListener('click', guardarBorrador);
+document.getElementById('btn-toggle-borradores').addEventListener('click', () => {
+  const panel = document.getElementById('drafts-panel');
+  panel.classList.toggle('hidden');
+  updateDraftsUI();
+});
+document.getElementById('btn-toggle-sri').addEventListener('click', () => {
+  document.getElementById('panel-sri').classList.toggle('hidden');
+});
+document.getElementById('btn-consultar-sri').addEventListener('click', consultarSri);
+document.getElementById('identificacion_sri').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); consultarSri(); }
+});
+document.getElementById('btn-limpiar-adquirente').addEventListener('click', limpiarAdquirente);
+document.getElementById('identificacion_visible').addEventListener('input', e => {
+  const val = e.target.value.trim();
+  document.getElementById('identificacion').value = val;
+  const tipo = document.getElementById('tipo_identificacion').value;
+  if (val && !['PASAPORTE', 'IDENTIFICACION_EXTERIOR'].includes(tipo)) {
+    const digits = val.replace(/\D/g, '');
+    if (digits) document.getElementById('tipo_identificacion').value = inferirTipo(digits);
+  }
+});
+document.getElementById('btn-consumidor-final').addEventListener('click', () => {
+  aplicarCliente({
+    tipo_identificacion: 'CONSUMIDOR_FINAL', identificacion: CONSUMIDOR_FINAL,
+    razon_social: 'CONSUMIDOR FINAL', direccion: '', telefono: '',
+    email: DEFAULT_EMAIL || '',
+  });
+  document.getElementById('client_id').value = '';
+  document.getElementById('client_search').value = 'CONSUMIDOR FINAL';
+  updateSelectedClientUI({ razon_social: 'CONSUMIDOR FINAL', identificacion: CONSUMIDOR_FINAL, email: DEFAULT_EMAIL || '' });
+  document.getElementById('consulta-info').textContent = 'Consumidor final';
+  document.getElementById('consulta-info').className = 'block text-xs font-medium mb-2 text-emerald-700';
+});
+
+document.querySelectorAll('.pago-rapido').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const { total } = calcTotalsOnly();
+    const pagado = round2(pagos.reduce((s, p) => s + (p.total || 0), 0));
+    const monto = round2(total - pagado);
+    if (monto <= 0) return;
+    pagos.push({ forma_pago: btn.dataset.codigo, total: monto > 0 ? monto : total });
+    renderPagos();
+  });
+});
+document.getElementById('btn-add-pago').addEventListener('click', () => {
+  const { total } = calcTotalsOnly();
+  const pagado = round2(pagos.reduce((s, p) => s + (p.total || 0), 0));
+  pagos.push({ forma_pago: '20', total: Math.max(0, round2(total - pagado)) });
+  renderPagos();
+});
+
+function renderCampos() {
+  const list = document.getElementById('campos-list');
+  list.innerHTML = camposAdicionales.map((c, i) =>
+    `<div class="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded-xl">
+      <span class="font-medium">${c.nombre}:</span> ${c.valor}
+      <button type="button" data-rm-campo="${i}" class="ml-auto text-red-600 text-xs font-semibold">Quitar</button></div>`).join('');
+  list.querySelectorAll('[data-rm-campo]').forEach(btn => {
+    btn.addEventListener('click', () => { camposAdicionales.splice(+btn.dataset.rmCampo, 1); renderCampos(); });
+  });
+}
+document.getElementById('btn-add-campo').addEventListener('click', () => {
+  const nombre = document.getElementById('campo-nombre').value.trim();
+  const valor = document.getElementById('campo-valor').value.trim();
+  if (!nombre || !valor) return;
+  camposAdicionales.push({ nombre, valor });
+  document.getElementById('campo-nombre').value = '';
+  document.getElementById('campo-valor').value = '';
+  renderCampos();
+});
+
+function buildInfoAdicional() {
+  const extra = [...camposAdicionales];
+  const guia = document.getElementById('guia_remision').value.trim();
+  if (guia) extra.push({ nombre: 'GuiaRemision', valor: guia });
+  if (document.getElementById('factura_negociable').checked) {
+    extra.push({ nombre: 'FacturaNegociable', valor: 'SI' });
+  }
+  return extra;
+}
+
+document.getElementById('invoice-form').addEventListener('submit', e => {
+  clearError();
+  const ident = document.getElementById('identificacion').value.trim()
+    || document.getElementById('identificacion_visible').value.trim();
+  document.getElementById('identificacion').value = ident;
+  if (!lineas.length) { e.preventDefault(); showError('Agregue al menos un producto'); return; }
+  if (!ident || !document.getElementById('razon_social').value.trim()) {
+    e.preventDefault(); showError('Complete los datos del adquirente'); return;
+  }
+  if (!document.getElementById('tipo_identificacion').value) {
+    e.preventDefault(); showError('Seleccione el tipo de identificación'); return;
+  }
+  if (!document.getElementById('email').value.trim()) {
+    e.preventDefault(); showError('El correo electrónico es obligatorio'); return;
+  }
+  const { total } = calcTotalsOnly();
+  if (!pagos.length) {
+    e.preventDefault();
+    showError('Agregue al menos una forma de pago');
+    return;
+  }
+  const pagado = round2(pagos.reduce((s, p) => s + (p.total || 0), 0));
+  if (Math.abs(total - pagado) > 0.01) {
+    e.preventDefault();
+    showError(`Las formas de pago deben sumar $${total.toFixed(2)}. Suma actual: $${pagado.toFixed(2)}.`);
+    return;
+  }
+  document.getElementById('items_json').value = JSON.stringify(lineas);
+  document.getElementById('pagos_json').value = JSON.stringify(pagos);
+  document.getElementById('info_adicional_json').value = JSON.stringify(buildInfoAdicional());
+  if (currentDraftId) {
+    saveDrafts(loadDrafts().filter(d => d.id !== currentDraftId));
+    currentDraftId = null;
+  }
+});
+
+initProductSearch();
+initClientSearch();
+initEstablecimientos();
+renderLines();
+renderPagos();
+updateDraftsUI();
+refreshPreviewNumero();
+</script>
+{% endblock %}

@@ -29,11 +29,13 @@ ROLE_PERMISSIONS = {
         "dashboard", "clients", "products", "quotations", "production",
         "production_condensed", "fabrication_condensed", "inventory", "shipments", "users", "imports", "product_settings", "config",
         "design_dashboard", "design_pending", "design_orders",
+        "billing", "billing_view", "billing_create", "billing_emit", "billing_config", "billing_sequences",
     },
     ROLE_VENTAS: {
         "dashboard", "clients", "products_read", "products", "quotations", "sales_tracking",
         "production_condensed", "fabrication_condensed",
         "shipments",
+        "billing", "billing_view", "billing_create", "billing_emit",
     },
     ROLE_PRODUCCION: {
         "dashboard", "production", "fabrication_condensed",

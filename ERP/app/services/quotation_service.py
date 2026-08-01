@@ -34,14 +34,6 @@ def recalculate_quotation(
         )
     )
 
-    shipping = float(getattr(quotation, "shipping_cost", None) or 0)
-
-    quotation.total = (
-        subtotal_discount *
-        (
-            1 +
-            iva / 100
-        )
-    ) + shipping
+    quotation.total = subtotal_discount * (1 + iva / 100)
 
     db.commit()

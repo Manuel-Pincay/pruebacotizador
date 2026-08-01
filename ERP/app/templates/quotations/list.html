@@ -281,6 +281,22 @@
                                 title="PDF">
                                 📄
                             </a>
+                            {% set st_bill = (quotation.status or "")|lower|trim %}
+                            {% if can_bill and st_bill in ['aprobada', 'produccion', 'enviada', 'enviado', 'entregada', 'entregado'] %}
+                            {% if quotation.electronic_invoice %}
+                            <a href="/billing/{{ quotation.electronic_invoice.id }}"
+                                class="w-10 h-10 flex items-center justify-center bg-green-100 hover:bg-green-200 rounded-xl text-green-800"
+                                title="Facturada — ver comprobante">
+                                ✅
+                            </a>
+                            {% elif quotation.payment_status == 'pagada' %}
+                            <a href="/billing/from-quotation/{{ quotation.id }}/preview"
+                                class="w-10 h-10 flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 rounded-xl"
+                                title="Realizar factura SRI">
+                                🧾
+                            </a>
+                            {% endif %}
+                            {% endif %}
                             {% if quotation.status == "pendiente" %}
                             <a href="/quotations/{{ quotation.id }}/edit" title="Editar"
                                 class="w-10 h-10 flex items-center justify-center bg-blue-100 hover:bg-blue-200 rounded-xl">

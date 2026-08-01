@@ -1,0 +1,153 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="mb-6">
+  <a href="/quotations/{{ quotation.id }}" class="text-purple-600 text-sm font-medium hover:underline">← Cotización #{{ quotation.id }}</a>
+  <h1 class="text-3xl font-bold text-slate-800 mt-2">Revisar factura electrónica</h1>
+  <p class="text-gray-500 mt-1">
+    Los datos se tomarán de la cotización aprobada. La cotización no se modifica.
+  </p>
+</div>
+
+{% if request.query_params.get('error') %}
+<div class="mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl whitespace-pre-wrap">{{ request.query_params.get('error') }}</div>
+{% endif %}
+
+{% if not validation.valido %}
+<div class="mb-4 p-4 bg-red-50 border border-red-300 rounded-xl">
+  <h2 class="font-bold text-red-900 mb-2">Corrija estos problemas antes de facturar</h2>
+  <ul class="list-disc ml-5 text-sm text-red-800 space-y-1">
+    {% for err in validation.errores %}
+    <li>{{ err.mensaje }}</li>
+    {% endfor %}
+  </ul>
+  {% if user.role == 'admin' %}
+  <a href="/billing/config/sri" class="inline-block mt-3 text-purple-700 font-semibold text-sm">Configuración SRI →</a>
+  {% endif %}
+  {% if quotation.client %}
+  <a href="/clients/{{ quotation.client.id }}/edit" class="inline-block mt-3 ml-4 text-purple-700 font-semibold text-sm">Editar cliente →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if validation.advertencias %}
+<div class="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-xl">
+  <h2 class="font-bold text-amber-900 mb-2">Advertencias — revise antes de emitir al SRI</h2>
+  <ul class="list-disc ml-5 text-sm text-amber-900 space-y-1">
+    {% for adv in validation.advertencias %}
+    <li>{{ adv.mensaje }}</li>
+    {% endfor %}
+  </ul>
+  <p class="text-xs text-amber-800 mt-2">
+    Puede crear el borrador de factura, pero conviene corregir productos o cliente antes de enviar al SRI.
+  </p>
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 space-y-6">
+    <div class="bg-white rounded-2xl border p-6">
+      <h2 class="font-bold text-lg mb-4">Cliente (desde cotización)</h2>
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span class="text-gray-500">Razón social</span>
+          <p class="font-semibold">{{ quotation.client.company or quotation.client.name if quotation.client else '-' }}</p>
+        </div>
+        <div>
+          <span class="text-gray-500">RUC / CI</span>
+          <p>{{ quotation.client.ruc_ci if quotation.client else '-' }}</p>
+        </div>
+        <div>
+          <span class="text-gray-500">Email</span>
+          <p>{{ quotation.client.email if quotation.client else '-' }}</p>
+        </div>
+        <div>
+          <span class="text-gray-500">Teléfono</span>
+          <p>{{ quotation.client.phone if quotation.client else '-' }}</p>
+        </div>
+      </div>
+      {% if quotation.client %}
+      <a href="/clients/{{ quotation.client.id }}/edit" class="inline-block mt-3 text-sm text-purple-600 hover:underline">Editar datos del cliente</a>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-2xl border p-6 overflow-x-auto">
+      <h2 class="font-bold text-lg mb-4">Detalle a facturar</h2>
+      <table class="w-full text-sm min-w-[640px]">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="p-2 text-left">Código</th>
+            <th class="p-2 text-left">Descripción</th>
+            <th class="p-2 text-center">Cant.</th>
+            <th class="p-2 text-right">P.U.</th>
+            <th class="p-2 text-right">IVA %</th>
+            <th class="p-2 text-right">IVA $</th>
+            <th class="p-2 text-right">Total</th>
+            <th class="p-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr class="border-t">
+            <td class="p-2 font-mono text-xs">{{ line.codigo_principal }}</td>
+            <td class="p-2">{{ line.descripcion }}</td>
+            <td class="p-2 text-center">{{ line.cantidad }}</td>
+            <td class="p-2 text-right">${{ '%.2f'|format(line.precio_unitario) }}</td>
+            <td class="p-2 text-right">{{ '%.0f'|format(line.tarifa_iva) }}%</td>
+            <td class="p-2 text-right">${{ '%.2f'|format(line.valor_iva) }}</td>
+            <td class="p-2 text-right font-semibold">${{ '%.2f'|format(line.line_total) }}</td>
+            <td class="p-2">
+              {% if line.product_id %}
+              <a href="/products/{{ line.product_id }}/edit" class="text-purple-600 text-xs hover:underline">Producto</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="bg-white rounded-2xl border p-6">
+      <h2 class="font-bold mb-4">Totales</h2>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between"><span class="text-gray-500">Subtotal sin impuestos</span><span>${{ '%.2f'|format(totals.subtotal_sin_impuestos) }}</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">IVA</span><span>${{ '%.2f'|format(totals.subtotal_iva) }}</span></div>
+        <div class="flex justify-between text-lg font-bold border-t pt-2"><span>Total</span><span>${{ '%.2f'|format(totals.importe_total) }}</span></div>
+      </div>
+    </div>
+
+    {% if validation.valido %}
+    <form method="post" action="/billing/from-quotation/{{ quotation.id }}" class="bg-white rounded-2xl border p-6 space-y-4">
+      <h2 class="font-bold">Forma de pago</h2>
+      <select name="forma_pago" class="w-full border rounded-lg p-2 text-sm">
+        {% for fp in formas_pago %}
+        <option value="{{ fp.codigo }}" {% if fp.codigo == '01' %}selected{% endif %}>{{ fp.codigo }} — {{ fp.label }}</option>
+        {% endfor %}
+      </select>
+
+      {% if validation.advertencias %}
+      <button type="submit"
+        onclick="return confirm('Hay advertencias en productos o cliente. ¿Crear borrador de factura de todos modos?')"
+        class="w-full bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-semibold">
+        Crear borrador de factura (con advertencias)
+      </button>
+      {% else %}
+      <button type="submit"
+        onclick="return confirm('¿Crear borrador de factura desde la cotización #{{ quotation.id }}?')"
+        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold">
+        Crear borrador de factura
+      </button>
+      {% endif %}
+      <p class="text-xs text-gray-500">
+        Se creará un borrador. Luego podrá validar y emitir al SRI desde el detalle de la factura.
+      </p>
+    </form>
+    {% else %}
+    <div class="bg-gray-100 rounded-2xl border p-6 text-sm text-gray-600">
+      Corrija los errores indicados para habilitar la creación de la factura.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

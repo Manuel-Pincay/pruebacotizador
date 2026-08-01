@@ -107,6 +107,141 @@ lucide.createIcons();
         font-weight: 600;
       }
 
+      .sidebar-nav-section {
+        padding: 0.75rem 1rem 0.35rem;
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.42);
+        user-select: none;
+      }
+
+      .sidebar-nav-section:first-child {
+        padding-top: 0.25rem;
+      }
+
+      .sidebar-quick-actions {
+        padding: 0 0.75rem 0.75rem;
+      }
+
+      .sidebar-quick-actions__label {
+        padding: 0 0.25rem 0.5rem;
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.38);
+      }
+
+      .sidebar-quick-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        width: 100%;
+        padding: 0.65rem 0.85rem;
+        border-radius: 0.85rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        text-decoration: none;
+        color: white;
+      }
+
+      .sidebar-quick-btn:hover {
+        transform: translateY(-1px);
+        color: white;
+      }
+
+      .sidebar-quick-btn.is-active {
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+      }
+
+      .sidebar-quick-btn__icon {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.65rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.16);
+      }
+
+      .sidebar-quick-btn__text {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+      }
+
+      .sidebar-quick-btn__title {
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .sidebar-quick-btn__hint {
+        font-size: 0.65rem;
+        opacity: 0.78;
+        margin-top: 0.1rem;
+      }
+
+      .sidebar-quick-btn__arrow {
+        font-size: 0.85rem;
+        opacity: 0.55;
+        flex-shrink: 0;
+      }
+
+      .sidebar-quick-btn--quote {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.92));
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+      }
+
+      .sidebar-quick-btn--quote:hover {
+        background: linear-gradient(135deg, rgba(5, 150, 105, 1), rgba(4, 120, 87, 1));
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+      }
+
+      .sidebar-quick-btn--invoice {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      }
+
+      .sidebar-quick-btn--invoice:hover {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+      }
+
+      .header-quick-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+        transition: transform 0.15s ease, filter 0.15s ease;
+      }
+
+      .header-quick-btn:hover {
+        transform: scale(1.04);
+        filter: brightness(1.05);
+      }
+
+      .header-quick-btn--quote {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+      }
+
+      .header-quick-btn--invoice {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: white;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+      }
+
       /* Override common Tailwind purple classes to use configured colors */
       .bg-purple-700 { background-color: var(--primary) !important; }
       .hover\:bg-purple-800:hover { background-color: var(--accent) !important; }
@@ -247,12 +382,20 @@ lucide.createIcons();
         <p class="text-xs text-gray-500 truncate">ERP Empresarial</p>
       </div>
       {% if user is defined and user and user.role in ['admin', 'ventas'] %}
-      <a
-        href="/quotations/new"
-        class="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg"
-        title="Nueva cotización"
-        aria-label="Nueva cotización"
-      >+</a>
+      <div class="shrink-0 flex items-center gap-1.5">
+        <a
+          href="/quotations/new"
+          class="header-quick-btn header-quick-btn--quote"
+          title="Nueva cotización"
+          aria-label="Nueva cotización"
+        >📋</a>
+        <a
+          href="/billing/new"
+          class="header-quick-btn header-quick-btn--invoice"
+          title="Nueva factura"
+          aria-label="Nueva factura"
+        >🧾</a>
+      </div>
       {% endif %}
     </header>
 
@@ -328,7 +471,7 @@ lucide.createIcons();
 
         <!-- NAVIGATION -->
 
-        <nav class="flex-1 p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto" id="sidebarNav">
+        <nav class="flex-1 p-3 sm:p-4 space-y-1 overflow-y-auto" id="sidebarNav">
           {% set current_role = user.role if user is defined and user else '' %}
           {% set nav_path = request.url.path if request is defined else '' %}
 
@@ -350,14 +493,97 @@ lucide.createIcons();
             {%- endif -%}
           {%- endmacro %}
 
+          {% macro nav_section(label) -%}
+          <p class="sidebar-nav-section" role="presentation">{{ label }}</p>
+          {%- endmacro %}
+
+          {% macro billing_submenu(menu_id, show_sri_config=false) -%}
+          <div>
+            <button
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if billing_menu_open %} is-active{% endif %}"
+              aria-controls="{{ menu_id }}"
+              aria-expanded="{{ 'true' if billing_menu_open else 'false' }}"
+            >
+              <div class="flex items-center gap-3">
+                <span>🧾</span>
+                <span>Facturación</span>
+              </div>
+              <span class="sidebar-chevron text-xs">▼</span>
+            </button>
+            <div id="{{ menu_id }}" class="sidebar-submenu {% if not billing_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-1">
+              <a href="/billing/new" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/new') }}">➕ Nueva factura</a>
+              <a href="/billing/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/') }}">📋 Todas las facturas</a>
+              <a href="/billing/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/pending') }}">⏳ Pendientes SRI</a>
+              <a href="/billing/authorized" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/authorized') }}">✅ Autorizadas</a>
+              <a href="/billing/rejected" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/rejected') }}">❌ Rechazadas</a>
+              <a href="/billing/voided" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/voided') }}">🚫 Anuladas</a>
+              <a href="/billing/credit-notes" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/credit-notes') }}">📋 Notas de crédito</a>
+              <a href="/billing/comprobantes" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/comprobantes') }}">🔍 Buscar comprobantes</a>
+              {% if show_sri_config %}
+              <a href="/billing/config/sri" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/billing/config/sri') }}">⚙️ Configuración SRI</a>
+              {% endif %}
+            </div>
+          </div>
+          {%- endmacro %}
+
+          {% macro sidebar_quick_actions() -%}
+          <div class="sidebar-quick-actions space-y-2">
+            <p class="sidebar-quick-actions__label">Acciones rápidas</p>
+            <a
+              href="/quotations/new"
+              class="sidebar-quick-btn sidebar-quick-btn--quote{% if nav_path == '/quotations/new' %} is-active{% endif %}"
+              title="Nueva cotización"
+            >
+              <span class="sidebar-quick-btn__icon">📋</span>
+              <span class="sidebar-quick-btn__text">
+                <span class="sidebar-quick-btn__title">Nueva cotización</span>
+                <span class="sidebar-quick-btn__hint">Crear presupuesto</span>
+              </span>
+              <span class="sidebar-quick-btn__arrow">→</span>
+            </a>
+            <a
+              href="/billing/new"
+              class="sidebar-quick-btn sidebar-quick-btn--invoice{% if nav_path == '/billing/new' %} is-active{% endif %}"
+              title="Nueva factura"
+            >
+              <span class="sidebar-quick-btn__icon">🧾</span>
+              <span class="sidebar-quick-btn__text">
+                <span class="sidebar-quick-btn__title">Nueva factura</span>
+                <span class="sidebar-quick-btn__hint">Comprobante electrónico</span>
+              </span>
+              <span class="sidebar-quick-btn__arrow">→</span>
+            </a>
+          </div>
+          {%- endmacro %}
+
+          {% macro catalog_submenu(menu_id, show_admin_links=false) -%}
+          <div>
+            <button
+              type="button"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if catalog_menu_open %} is-active{% endif %}"
+              aria-controls="{{ menu_id }}"
+              aria-expanded="{{ 'true' if catalog_menu_open else 'false' }}"
+            >
+              <div class="flex items-center gap-3">
+                <span>📚</span>
+                <span>Catálogo</span>
+              </div>
+              <span class="sidebar-chevron text-xs">▼</span>
+            </button>
+            <div id="{{ menu_id }}" class="sidebar-submenu {% if not catalog_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-1">
+              <a href="/clients" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/clients') }}">👥 Clientes</a>
+              <a href="/products" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/products') }}">📦 Productos</a>
+              {% if show_admin_links %}
+              <a href="/product-settings" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/product-settings') }}">⚙️ Config. productos</a>
+              <a href="/imports/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/imports') }}">📥 Importar Excel</a>
+              {% endif %}
+            </div>
+          </div>
+          {%- endmacro %}
+
           {% if current_role in ['admin', 'ventas'] %}
-          <a
-            href="/quotations/new"
-            class="sidebar-nav-link flex items-center justify-center gap-2 mx-1 mb-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold transition shadow-md shadow-emerald-900/20{% if nav_path == '/quotations/new' %} ring-2 ring-white/40{% endif %}"
-          >
-            <span>➕</span>
-            <span>Nueva cotización</span>
-          </a>
+          {{ sidebar_quick_actions() }}
           {% endif %}
 
           {% if current_role == 'produccion' %}
@@ -380,60 +606,51 @@ lucide.createIcons();
           </a>
 
           {% elif current_role == 'ventas' %}
-          {% set ventas_catalog_open = nav_path.startswith('/clients') or nav_path.startswith('/products') %}
+          {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') %}
+          {% set billing_menu_open = nav_path.startswith('/billing') %}
+          {{ nav_section('Inicio') }}
           <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
             <span>📊</span>
             <span>Dashboard</span>
           </a>
+          {{ nav_section('Comercial') }}
           <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
             <span>📄</span>
             <span>Cotizaciones</span>
           </a>
+          {{ billing_submenu('billingMenuVentas') }}
+          <a href="/quotations/tracking" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations/tracking') }}">
+            <span>📈</span>
+            <span>Seguimiento comercial</span>
+          </a>
+          {{ nav_section('Operaciones') }}
           <a href="/production/condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/condensed') }}">
             <span>📋</span>
             <span>Condensado</span>
           </a>
-          <a href="/quotations/tracking" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations/tracking') }}">
-            <span>📈</span>
-            <span>Seguimiento Comercial</span>
+          <a href="/production/fabrication-condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/fabrication-condensed') }}">
+            <span>🖨️</span>
+            <span>Condensado fabricación</span>
           </a>
           <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
             <span>🚚</span>
-            <span>Guías de Envío</span>
+            <span>Guías de envío</span>
           </a>
-          <a href="/production/fabrication-condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/fabrication-condensed') }}">
-            <span>🖨️</span>
-            <span>Condensado Fabricación</span>
-          </a>
-          <div>
-            <button
-              type="button"
-              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
-              aria-controls="databaseMenu"
-              aria-expanded="{{ 'true' if ventas_catalog_open else 'false' }}"
-            >
-              <div class="flex items-center gap-3">
-                <span>📚</span>
-                <span>Catálogo</span>
-              </div>
-              <span class="sidebar-chevron text-xs">▼</span>
-            </button>
-            <div id="databaseMenu" class="sidebar-submenu {% if not ventas_catalog_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
-              <a href="/clients" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/clients') }}">👥 Clientes</a>
-              <a href="/products" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/products') }}">📦 Productos</a>
-            </div>
-          </div>
+          {{ nav_section('Catálogo') }}
+          {{ catalog_submenu('catalogMenuVentas') }}
 
           {% elif current_role == 'disenador' %}
           {% set design_prod_open = nav_path.startswith('/design') or nav_path.startswith('/production/condensed') or nav_path.startswith('/production/fabrication-condensed') %}
+          {{ nav_section('Inicio') }}
           <a href="/design/dashboard" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/design/dashboard') }}">
             <span>🎨</span>
-            <span>Dashboard Diseño</span>
+            <span>Dashboard diseño</span>
           </a>
+          {{ nav_section('Operaciones') }}
           <div>
             <button
               type="button"
-              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition"
+              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if design_prod_open %} is-active{% endif %}"
               aria-controls="designProductionMenu"
               aria-expanded="{{ 'true' if design_prod_open else 'false' }}"
             >
@@ -443,20 +660,21 @@ lucide.createIcons();
               </div>
               <span class="sidebar-chevron text-xs">▼</span>
             </button>
-            <div id="designProductionMenu" class="sidebar-submenu {% if not design_prod_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
-              <a href="/design/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/pending') }}">⏳ Diseños Pendientes</a>
+            <div id="designProductionMenu" class="sidebar-submenu {% if not design_prod_open %}hidden{% endif %} ml-6 mt-2 space-y-1">
+              <a href="/design/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/pending') }}">⏳ Diseños pendientes</a>
               <a href="/design/orders" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/orders') }}">🖨️ Datos de fabricación</a>
               <a href="/production/condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/condensed') }}">📋 Condensado</a>
-              <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado Fabricación</a>
+              <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado fabricación</a>
             </div>
           </div>
           <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
             <span>🚚</span>
-            <span>Guías de Envío</span>
+            <span>Guías de envío</span>
           </a>
+          {{ nav_section('Cuenta') }}
           <a href="/design/profile" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/design/profile') }}">
             <span>👤</span>
-            <span>Perfil</span>
+            <span>Mi perfil</span>
           </a>
 
           {% elif current_role in ['despacho', 'transporte'] %}
@@ -474,23 +692,27 @@ lucide.createIcons();
           {% set design_menu_open = nav_path.startswith('/design') %}
           {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') or nav_path.startswith('/product-settings') or nav_path.startswith('/imports') %}
           {% set system_menu_open = nav_path.startswith('/users') or nav_path.startswith('/inventory') or nav_path.startswith('/secretadmin') %}
-          {% set inventory_menu_open = nav_path.startswith('/inventory') %}
+          {% set billing_menu_open = nav_path.startswith('/billing') %}
           {% set admin_prod_order_active = nav_path in ['/production', '/production/'] or (nav_path.startswith('/production/') and nav_path.split('/')[2].isdigit() if nav_path.split('/')|length > 2 else false) %}
+          {{ nav_section('Inicio') }}
           <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
             <span>📊</span>
             <span>Dashboard</span>
           </a>
+          {{ nav_section('Comercial') }}
           <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
             <span>📄</span>
             <span>Cotizaciones</span>
           </a>
+          {{ billing_submenu('billingMenuAdmin', show_sri_config=true) }}
+          <a href="/quotations/tracking" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations/tracking') }}">
+            <span>📈</span>
+            <span>Seguimiento comercial</span>
+          </a>
+          {{ nav_section('Operaciones') }}
           <a href="/production/condensed" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/condensed') }}">
             <span>📋</span>
             <span>Condensado</span>
-          </a>
-          <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
-            <span>🚚</span>
-            <span>Guías de Envío</span>
           </a>
           <div>
             <button
@@ -505,11 +727,11 @@ lucide.createIcons();
               </div>
               <span class="sidebar-chevron text-xs">▼</span>
             </button>
-            <div id="productionMenu" class="sidebar-submenu {% if not production_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+            <div id="productionMenu" class="sidebar-submenu {% if not production_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-1">
               <a href="/production/kanban" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/kanban') }}">📋 Kanban</a>
               <a href="/production/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{% if admin_prod_order_active %} is-active{% endif %}">📝 Órdenes</a>
               <a href="/production/calendar" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/calendar') }}">🗓️ Calendario</a>
-              <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado Fabricación</a>
+              <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado fabricación</a>
             </div>
           </div>
           <div>
@@ -525,32 +747,19 @@ lucide.createIcons();
               </div>
               <span class="sidebar-chevron text-xs">▼</span>
             </button>
-            <div id="adminDesignMenu" class="sidebar-submenu {% if not design_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+            <div id="adminDesignMenu" class="sidebar-submenu {% if not design_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-1">
               <a href="/design/dashboard" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/dashboard') }}">📊 Dashboard</a>
-              <a href="/design/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/pending') }}">⏳ Diseños Pendientes</a>
+              <a href="/design/pending" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/pending') }}">⏳ Pendientes</a>
               <a href="/design/orders" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/orders') }}">🖨️ Datos de fabricación</a>
             </div>
           </div>
-          <div>
-            <button
-              type="button"
-              class="sidebar-submenu-toggle w-full flex justify-between items-center px-4 py-3 rounded-xl hover:bg-purple-700 transition{% if catalog_menu_open %} is-active{% endif %}"
-              aria-controls="databaseMenu"
-              aria-expanded="{{ 'true' if catalog_menu_open else 'false' }}"
-            >
-              <div class="flex items-center gap-3">
-                <span>📚</span>
-                <span>Catálogo</span>
-              </div>
-              <span class="sidebar-chevron text-xs">▼</span>
-            </button>
-            <div id="databaseMenu" class="sidebar-submenu {% if not catalog_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
-              <a href="/clients" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/clients') }}">👥 Clientes</a>
-              <a href="/products" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/products') }}">📦 Productos</a>
-              <a href="/product-settings" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/product-settings') }}">⚙️ Config. productos</a>
-              <a href="/imports/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/imports') }}">📥 Importar Excel</a>
-            </div>
-          </div>
+          <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
+            <span>🚚</span>
+            <span>Guías de envío</span>
+          </a>
+          {{ nav_section('Catálogo') }}
+          {{ catalog_submenu('catalogMenuAdmin', show_admin_links=true) }}
+          {{ nav_section('Sistema') }}
           <div>
             <button
               type="button"
@@ -560,16 +769,16 @@ lucide.createIcons();
             >
               <div class="flex items-center gap-3">
                 <span>🛠️</span>
-                <span>Sistema</span>
+                <span>Administración</span>
               </div>
               <span class="sidebar-chevron text-xs">▼</span>
             </button>
-            <div id="systemMenu" class="sidebar-submenu {% if not system_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-2">
+            <div id="systemMenu" class="sidebar-submenu {% if not system_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-1">
               <a href="/users" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/users') }}">👤 Usuarios</a>
-              <a href="/inventory" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{% if nav_path == '/inventory' or nav_path == '/inventory/' %} is-active{% endif %}">📦 Movimientos</a>
+              <a href="/inventory" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{% if nav_path == '/inventory' or nav_path == '/inventory/' %} is-active{% endif %}">📦 Movimientos inventario</a>
               <a href="/inventory/stock" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/stock') }}">📊 Stock</a>
               <a href="/inventory/labels" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/labels') }}">🏷️ Etiquetas</a>
-              <a href="/secretadmin/config" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/secretadmin') }}">⚙️ Configuración</a>
+              <a href="/secretadmin/config" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/secretadmin') }}">⚙️ Configuración ERP</a>
             </div>
           </div>
 

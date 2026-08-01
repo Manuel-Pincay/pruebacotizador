@@ -24,3 +24,6 @@ class Product(Base):
     stock = Column(Integer)
     custom = Column(Boolean, default=False, nullable=False)
     image = Column(String)
+    codigo_auxiliar = Column(String(50), nullable=True)
+    codigo_iva = Column(String(5), default="0")
+    tarifa_iva = Column(Float, default=0)

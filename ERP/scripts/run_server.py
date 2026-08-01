@@ -19,6 +19,36 @@ OPEN_BROWSER = os.getenv("ERP_OPEN_BROWSER", "1").strip().lower() not in {
 STARTUP_CREDIT = "Desarrollado por Manuel Pincay"
 
 
+def free_listening_port(port: int) -> None:
+    """Cierra un proceso previo que escuche en el puerto (solo Windows)."""
+    if sys.platform != "win32":
+        return
+    result = subprocess.run(
+        ["netstat", "-aon"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    target = f":{port}"
+    pids: set[str] = set()
+    for line in result.stdout.splitlines():
+        if "LISTENING" not in line or target not in line:
+            continue
+        parts = line.split()
+        if parts:
+            pids.add(parts[-1])
+    for pid in pids:
+        if pid.isdigit() and int(pid) != os.getpid():
+            print(f"  [!] Cerrando proceso anterior en puerto {port} (PID {pid})")
+            subprocess.run(
+                ["taskkill", "/F", "/PID", pid],
+                capture_output=True,
+                check=False,
+            )
+
+
 def get_lan_ip() -> str | None:
     """IP en la red local (ej. 192.168.x.x) para acceder desde otros equipos."""
     try:
@@ -60,6 +90,8 @@ def main() -> int:
 
     run_verification()
 
+    free_listening_port(int(PORT))
+
     print_startup_banner()
 
     if OPEN_BROWSER:
@@ -71,6 +103,8 @@ def main() -> int:
         "uvicorn",
         "app.main:app",
         "--reload",
+        "--reload-dir",
+        "app",
         "--host",
         HOST,
         "--port",

@@ -223,16 +223,15 @@
             else (
                 config.iva_default
                 if config and config.iva_default is not none
-                else 15
+                else 0
             )
         }}" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30" oninput="calculateTotals()" />
             </div>
 
             <div>
                 <label class="block text-xs font-semibold text-gray-500 mb-1.5">Costo de envío</label>
-                <input type="number" id="shipping_cost" name="shipping_cost" step="0.01" min="0" value="{{
-            quotation.shipping_cost if edit_mode else 0
-        }}" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30" oninput="calculateTotals()" />
+                <input type="number" id="shipping_cost" name="shipping_cost" step="0.01" min="0" value="0"
+        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30" oninput="syncShippingItem()" />
             </div>
 
             <div class="space-y-2.5 pt-3 border-t border-gray-100 text-sm">
@@ -743,6 +742,53 @@
 
     let quotationItems = []
 
+    const TRANSPORT_PRODUCT_ID = {{ transport_product_id | default('null') | tojson }}
+    const TRANSPORT_PRODUCT_NAME = {{ transport_product_name | default('Servicio de transporte') | tojson }}
+
+    function isTransportItem(item) {
+        if (!item) return false
+        if (item.is_transport) return true
+        if (TRANSPORT_PRODUCT_ID && item.product_id == TRANSPORT_PRODUCT_ID) return true
+        return (item.detail || "").trim().toLowerCase() === TRANSPORT_PRODUCT_NAME.toLowerCase()
+    }
+
+    function findTransportItemIndex() {
+        return quotationItems.findIndex(isTransportItem)
+    }
+
+    function syncShippingItem() {
+        const shipping = parseFloat(document.getElementById("shipping_cost")?.value) || 0
+        const idx = findTransportItemIndex()
+
+        if (shipping <= 0) {
+            if (idx >= 0) quotationItems.splice(idx, 1)
+        } else {
+            const item = {
+                type: "inventory",
+                product_id: TRANSPORT_PRODUCT_ID,
+                is_transport: true,
+                quantity: 1,
+                detail: TRANSPORT_PRODUCT_NAME,
+                measure: "-",
+                theme: "-",
+                color: "-",
+                logo_type: "sin_logo",
+                item_discount: 0,
+                price: shipping,
+                total: shipping,
+            }
+            computeItemTotal(item)
+            if (idx >= 0) {
+                Object.assign(quotationItems[idx], item)
+            } else {
+                quotationItems.push(item)
+            }
+        }
+
+        renderItems()
+        calculateTotals()
+    }
+
     const LOGO_TYPES = {
         sin_logo: "Sin Logo",
         con_logo: "Con logo",
@@ -840,6 +886,17 @@
         item_discount: parseFloat(item.item_discount) || 0,
         logo_type: normalizeLogoType(item.logo_type ?? item.logo),
     }))
+
+    ;(function initShippingFromItems() {
+        const transportItem = quotationItems.find(isTransportItem)
+        const shippingInput = document.getElementById("shipping_cost")
+        if (transportItem && shippingInput) {
+            shippingInput.value = parseFloat(transportItem.price) || 0
+        } else if (shippingInput && {{ quotation.shipping_cost or 0 }}) {
+            shippingInput.value = {{ quotation.shipping_cost or 0 }}
+            syncShippingItem()
+        }
+    })()
 
     {% endif %}
 
@@ -1353,6 +1410,11 @@
 
     function removeItem(index) {
 
+        if (isTransportItem(quotationItems[index])) {
+            const shippingInput = document.getElementById("shipping_cost")
+            if (shippingInput) shippingInput.value = 0
+        }
+
         quotationItems.splice(index, 1)
 
         renderItems()
@@ -1388,6 +1450,11 @@
             parseFloat(value)
 
         computeItemTotal(quotationItems[index])
+
+        if (isTransportItem(quotationItems[index])) {
+            const shippingInput = document.getElementById("shipping_cost")
+            if (shippingInput) shippingInput.value = quotationItems[index].price || 0
+        }
 
         renderItems()
 
@@ -1440,11 +1507,12 @@
             ivaPercent / 100
         )
 
-        let shipping = parseFloat(
-            document.getElementById("shipping_cost")?.value
-        ) || 0
+        const transportIdx = findTransportItemIndex()
+        let shipping = transportIdx >= 0
+            ? (parseFloat(quotationItems[transportIdx].total) || 0)
+            : (parseFloat(document.getElementById("shipping_cost")?.value) || 0)
 
-        let total = subtotalAfterDiscount + iva + shipping
+        let total = subtotalAfterDiscount + iva
 
         document.getElementById(
             "subtotal_text"

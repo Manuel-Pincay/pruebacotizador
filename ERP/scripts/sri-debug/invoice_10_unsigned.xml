@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<factura id="comprobante" version="1.1.0">
+  <infoTributaria>
+    <ambiente>1</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>PINCAY GONZALEZ MANUEL JAROD</razonSocial>
+    
+    <ruc>1313614495001</ruc>
+    <claveAcceso>0108202601131361449500110010010000000095746137415</claveAcceso>
+    <codDoc>01</codDoc>
+    <estab>001</estab>
+    <ptoEmi>001</ptoEmi>
+    <secuencial>000000009</secuencial>
+    <dirMatriz>Barrio: URBANIZACION SAN JOSE Calle: 407 Numero: VILLA 20 Manzana: I</dirMatriz>
+    <contribuyenteRimpe>CONTRIBUYENTE NEGOCIO POPULAR - RÉGIMEN RIMPE</contribuyenteRimpe>
+  </infoTributaria>
+  <infoFactura>
+    <fechaEmision>01/08/2026</fechaEmision>
+    <dirEstablecimiento>Barrio: URBANIZACION SAN JOSE Calle: 407 Numero: VILLA 20 Manzana: I</dirEstablecimiento>
+    <obligadoContabilidad>NO</obligadoContabilidad>
+    
+    <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+    <razonSocialComprador>EDISON MANUEL PINCAY CEPEDA</razonSocialComprador>
+    <identificacionComprador>1308386000</identificacionComprador>
+    <totalSinImpuestos>10.00</totalSinImpuestos>
+    <totalDescuento>0.00</totalDescuento>
+    <totalConImpuestos>
+            <totalImpuesto>
+                <codigo>2</codigo>
+                <codigoPorcentaje>0</codigoPorcentaje>
+                <baseImponible>10.00</baseImponible>
+                <valor>1.50</valor>
+            </totalImpuesto>
+        </totalConImpuestos>
+    <propina>0</propina>
+    <importeTotal>11.50</importeTotal>
+    <moneda>DOLAR</moneda>
+    <pagos>
+            <pago>
+                <formaPago>01</formaPago>
+                <total>11.50</total>
+                <plazo>0</plazo><unidadTiempo>Dias</unidadTiempo>
+            </pago>
+        </pagos>
+  </infoFactura>
+  <detalles><detalle>
+      <codigoPrincipal>P1</codigoPrincipal>
+      <codigoAuxiliar>paux1</codigoAuxiliar>
+      <descripcion>Prueba De Sistema</descripcion>
+      <cantidad>1</cantidad>
+      <precioUnitario>10</precioUnitario>
+      <descuento>0</descuento>
+      <precioTotalSinImpuesto>10.00</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>0</codigoPorcentaje>
+          <tarifa>15.0</tarifa>
+          <baseImponible>10.00</baseImponible>
+          <valor>1.50</valor>
+        </impuesto>
+      </impuestos>
+    </detalle></detalles>
+  <infoAdicional><campoAdicional nombre="Telefono">0959427677</campoAdicional><campoAdicional nombre="Email">manuelpincay2009@hotmail.com</campoAdicional><campoAdicional nombre="Direccion">Manta</campoAdicional><campoAdicional nombre="Cotizacion">1</campoAdicional><campoAdicional nombre="Condicion de Pago">Contado</campoAdicional></infoAdicional>
+</factura>

@@ -176,9 +176,12 @@
       <div>
         <label class="block mb-2"> Descripción </label>
 
-        <textarea name="description" rows="5" class="w-full border border-gray-200 p-3 rounded-xl"></textarea>
+        <textarea name="description" rows="5" class="w-full border border-gray-200 p-3 rounded-xl"
+          placeholder="Descripción comercial y texto que aparecerá en la factura SRI si se completa"></textarea>
       </div>
     </div>
+
+    {% include "partials/products/sri_fields.html" %}
 
     <!-- BOTONES -->
 

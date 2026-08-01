@@ -27,6 +27,7 @@ from app.models.product import Product
 
 from app.auth.auth_handler import role_required
 from app.services.product_catalog_service import ensure_product_catalog_values
+from app.utils.sri_constants import TARIFAS_IVA_PRODUCTO, codigo_iva_from_tarifa
 from app.utils.text_format import format_title_words
 from app.utils.dialog_response import dialog_message_response
 from app.utils.image_storage import (
@@ -54,6 +55,20 @@ from app.utils.context import get_global_config
 
 templates.env.globals["inject_global_config"] = get_global_config
 templates.env.globals["product_image_url"] = product_image_url
+
+
+def _parse_sri_product_fields(
+    codigo_auxiliar: str = "",
+    tarifa_iva: str = "0",
+    codigo_iva: str = "",
+) -> tuple[str | None, float, str]:
+    aux = (codigo_auxiliar or "").strip()[:50] or None
+    try:
+        tarifa = float(tarifa_iva) if tarifa_iva not in (None, "") else 0.0
+    except (TypeError, ValueError):
+        tarifa = 0.0
+    codigo = codigo_iva_from_tarifa(tarifa, (codigo_iva or "").strip() or None)
+    return aux, tarifa, codigo
 
 
 # =====================================
@@ -127,6 +142,7 @@ async def new_product_page(request: Request, db: Session = Depends(get_db)):
             "themes": themes,
             "thicknesses": thicknesses,
             "units": units,
+            "tarifas_iva": TARIFAS_IVA_PRODUCTO,
         },
     )
 
@@ -195,6 +211,9 @@ async def create_product(
     cost: float = Form(...),
     stock: int = Form(0),
     custom: str = Form("no"),
+    codigo_auxiliar: str = Form(""),
+    tarifa_iva: str = Form("0"),
+    codigo_iva: str = Form(""),
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -239,6 +258,10 @@ async def create_product(
         color=color,
     )
 
+    sri_aux, sri_tarifa, sri_codigo = _parse_sri_product_fields(
+        codigo_auxiliar, tarifa_iva, codigo_iva
+    )
+
     product = Product(
         code=(code or "").strip(),
         name=format_title_words(name),
@@ -254,6 +277,9 @@ async def create_product(
         stock=stock,
         custom=True if custom == "yes" else False,
         image=image_name,
+        codigo_auxiliar=sri_aux,
+        tarifa_iva=sri_tarifa,
+        codigo_iva=sri_codigo,
     )
 
     db.add(product)
@@ -319,6 +345,7 @@ async def edit_product_page(
             "thicknesses": thicknesses,
             "units": units,
             "user": user,
+            "tarifas_iva": TARIFAS_IVA_PRODUCTO,
             "saved": request.query_params.get("saved") == "1",
             "error": request.query_params.get("error"),
         },
@@ -348,6 +375,9 @@ async def update_product(
     cost: float = Form(...),
     stock: int = Form(0),
     custom: str = Form("no"),
+    codigo_auxiliar: str = Form(""),
+    tarifa_iva: str = Form("0"),
+    codigo_iva: str = Form(""),
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -457,6 +487,13 @@ async def update_product(
         product.stock = stock
 
         product.custom = True if custom == "yes" else False
+
+        sri_aux, sri_tarifa, sri_codigo = _parse_sri_product_fields(
+            codigo_auxiliar, tarifa_iva, codigo_iva
+        )
+        product.codigo_auxiliar = sri_aux
+        product.tarifa_iva = sri_tarifa
+        product.codigo_iva = sri_codigo
 
         db.commit()
 

@@ -1,0 +1,7 @@
+{
+  "name": "erp-sri-signer",
+  "private": true,
+  "dependencies": {
+    "ec-sri-invoice-signer": "^1.8.1"
+  }
+}

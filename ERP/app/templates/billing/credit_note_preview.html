@@ -1,0 +1,75 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="mb-6">
+  <a href="/billing/{{ invoice.id }}" class="text-purple-600 text-sm">← Factura {{ invoice.numero_comprobante }}</a>
+  <h1 class="text-3xl font-bold text-slate-800 mt-2">Nota de crédito</h1>
+  <p class="text-gray-500">Anular factura autorizada ante el SRI</p>
+</div>
+
+{% if error %}
+<div class="mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl whitespace-pre-wrap">{{ error }}</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 space-y-4">
+    <div class="bg-white rounded-2xl border p-6">
+      <h2 class="font-bold text-lg mb-4">Factura a anular</h2>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div><span class="text-gray-500">Comprobante</span><p class="font-mono font-semibold">{{ invoice.numero_comprobante }}</p></div>
+        <div><span class="text-gray-500">Estado</span><p class="font-semibold text-green-700">{{ invoice.estado }}</p></div>
+        <div><span class="text-gray-500">Cliente</span><p>{{ invoice.client.company or invoice.client.name }}</p></div>
+        <div><span class="text-gray-500">Total</span><p class="font-bold">${{ '%.2f'|format(invoice.importe_total) }}</p></div>
+      </div>
+      <table class="w-full text-sm mt-4">
+        <thead class="bg-gray-50"><tr><th class="p-2 text-left">Descripción</th><th class="p-2">Cant.</th><th class="p-2 text-right">Total</th></tr></thead>
+        <tbody>
+          {% for line in invoice.lines %}
+          <tr class="border-t">
+            <td class="p-2">{{ line.descripcion }}</td>
+            <td class="p-2 text-center">{{ line.cantidad }}</td>
+            <td class="p-2 text-right">${{ '%.2f'|format(line.precio_total_sin_impuesto + line.valor_iva) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if not validation.valido %}
+    <div class="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
+      <strong>No se puede crear la nota de crédito:</strong>
+      <ul class="mt-2 list-disc ml-5">
+        {% for err in validation.errores %}<li>{{ err.mensaje }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="space-y-4">
+    {% if existing_nc and existing_nc.estado != 'AUTORIZADA' %}
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+      Ya existe una NC en estado <strong>{{ existing_nc.estado }}</strong>.
+      <a href="/billing/{{ existing_nc.id }}" class="underline font-medium block mt-2">Ir a la nota de crédito →</a>
+    </div>
+    {% else %}
+    <form method="post" action="/billing/{{ invoice.id }}/credit-note" class="bg-white rounded-2xl border p-6 space-y-4">
+      <h3 class="font-bold">Motivo SRI</h3>
+      <select name="motivo" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+        {% for m in motivos %}
+        <option value="{{ m }}" {% if motivo == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+      <p class="text-xs text-gray-500">Se creará una nota de crédito por el total de la factura (anulación completa).</p>
+      <button type="submit" name="action" value="create" {% if not validation.valido %}disabled{% endif %}
+        class="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white py-3 rounded-xl font-semibold">
+        Crear borrador NC
+      </button>
+      <button type="submit" name="action" value="create_and_emit" {% if not validation.valido %}disabled{% endif %}
+        class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white py-3 rounded-xl font-semibold"
+        onclick="return confirm('¿Crear y enviar la nota de crédito al SRI?')">
+        Crear y emitir al SRI
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -285,6 +285,21 @@ def design_image_url(filename: str | None) -> str | None:
     return None
 
 
+def resolve_logo_path(filename: str | None) -> str | None:
+    """Ruta en disco del logo de empresa (PDF, RIDE, etc.)."""
+    if not filename:
+        return None
+    stem = Path(filename).stem
+    path = _file_exists(
+        LOGOS_DIR / filename,
+        LOGOS_DIR / f"{stem}.webp",
+        LOGOS_DIR / f"{stem}.png",
+        LOGOS_DIR / f"{stem}.jpg",
+        LOGOS_DIR / f"{stem}.jpeg",
+    )
+    return str(path) if path else None
+
+
 def logo_image_url(filename: str | None) -> str | None:
     if not filename:
         return None

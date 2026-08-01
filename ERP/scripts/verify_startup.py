@@ -1,4 +1,4 @@
-"""Verifica Python, dependencias y conexión MySQL antes de iniciar el ERP."""
+"""Verifica Python, dependencias y MySQL antes de iniciar el ERP."""
 from __future__ import annotations
 
 import importlib
@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# import_name -> nombre en pip (solo si difiere)
 REQUIRED_PACKAGES: tuple[tuple[str, str], ...] = (
     ("fastapi", "fastapi"),
     ("uvicorn", "uvicorn"),
@@ -46,7 +45,8 @@ def _header(title: str) -> None:
 def _fail(title: str, detail: str = "") -> CheckResult:
     print(f"  [X] {title}")
     if detail:
-        print(f"      {detail}")
+        for line in detail.splitlines():
+            print(f"      {line}")
     return CheckResult(False, title, detail)
 
 
@@ -91,98 +91,32 @@ def check_env_file() -> CheckResult:
     example_path = ROOT / ".env.example"
 
     if env_path.exists():
+        sys.path.insert(0, str(ROOT))
+        from app.config.settings import settings
+
+        if not (settings.database_url or "").strip():
+            return _fail(
+                "DATABASE_URL vacía en .env",
+                "Configure mysql+pymysql://usuario:clave@127.0.0.1:3306/erp?charset=utf8mb4",
+            )
         return _ok(".env encontrado")
 
-    print("  [!] .env no encontrado (se usaran valores por defecto)")
+    print("  [!] .env no encontrado")
     if example_path.exists():
-        print("      Recomendado: copy .env.example .env")
-    return CheckResult(True, ".env no encontrado (opcional)")
+        print("      Ejecute iniciar_servidor.bat para crearlo automaticamente")
+    return _fail(
+        ".env no encontrado",
+        "Copie .env.example a .env o ejecute iniciar_servidor.bat",
+    )
 
 
-def _load_database_url() -> str:
-    sys.path.insert(0, str(ROOT))
-    from app.config.settings import settings
+def check_and_prepare_mysql() -> CheckResult:
+    from ensure_database import ensure_database
 
-    return settings.database_url
-
-
-def _parse_mysql_url(database_url: str) -> dict:
-    if not database_url.startswith("mysql"):
-        raise ValueError("DATABASE_URL debe ser MySQL (mysql+pymysql://...)")
-
-    parsed = urlparse(database_url.replace("+pymysql", "", 1))
-    port = parsed.port or 3306
-    database = (parsed.path or "").lstrip("/").split("?")[0]
-    return {
-        "host": parsed.hostname or "127.0.0.1",
-        "port": port,
-        "user": parsed.username or "",
-        "password": parsed.password or "",
-        "database": database,
-    }
-
-
-def _try_mysql_connect(params: dict) -> tuple[bool, str]:
-    try:
-        import pymysql
-    except ImportError:
-        return False, "pymysql no instalado"
-
-    try:
-        conn = pymysql.connect(
-            host=params["host"],
-            port=params["port"],
-            user=params["user"],
-            password=params["password"],
-            database=params["database"],
-            connect_timeout=3,
-            charset="utf8mb4",
-        )
-        conn.close()
-        return True, ""
-    except Exception as exc:
-        return False, str(exc)
-
-
-def _mysql_help(params: dict, error: str) -> str:
-    host = params["host"]
-    port = params["port"]
-    db = params["database"]
-
-    lines = [
-        f"No se pudo conectar a MySQL en {host}:{port} (base: {db}).",
-        "",
-        "Verifique:",
-        "  1. MySQL 8+ instalado y el servicio en ejecución",
-        "  2. Usuario, contraseña y base en DATABASE_URL (.env)",
-        f"  3. La base '{db}' existe (docs/mysql_setup.sql)",
-        "",
-        f"Detalle: {error}",
-    ]
-    return "\n      ".join(lines)
-
-
-def check_mysql() -> CheckResult:
-    try:
-        database_url = _load_database_url()
-    except Exception as exc:
-        return _fail("No se pudo leer DATABASE_URL", str(exc))
-
-    if not database_url.startswith("mysql"):
-        return _fail(
-            "DATABASE_URL no es MySQL",
-            "Configure mysql+pymysql://usuario:clave@host:puerto/base?charset=utf8mb4",
-        )
-
-    params = _parse_mysql_url(database_url)
-    connected, error = _try_mysql_connect(params)
-
-    if connected:
-        return _ok(
-            f"MySQL conectado ({params['host']}:{params['port']}/{params['database']})",
-        )
-
-    return _fail("MySQL no disponible", _mysql_help(params, error))
+    ok, message = ensure_database(verbose=True)
+    if ok:
+        return _ok(message)
+    return _fail("MySQL no disponible", message)
 
 
 def run_all_checks() -> int:
@@ -195,7 +129,7 @@ def run_all_checks() -> int:
     ]
 
     if all(item.ok for item in checks):
-        checks.append(check_mysql())
+        checks.append(check_and_prepare_mysql())
     else:
         print("\n  [!] Se omitio la verificacion de MySQL hasta corregir lo anterior.")
 
@@ -212,8 +146,10 @@ def run_all_checks() -> int:
                 for line in item.detail.splitlines():
                     print(f"    {line}")
         print()
-        print("Dependencias:  ejecute iniciar_servidor.bat o python scripts/bootstrap_environment.py")
-        print("MySQL:         revise DATABASE_URL en .env y docs/mysql_setup.sql")
+        print("Pasos sugeridos:")
+        print("  1. Edite DATABASE_URL en ERP\\.env (usuario, clave, base)")
+        print("  2. Verifique que MySQL este en ejecucion")
+        print("  3. Vuelva a ejecutar iniciar_servidor.bat")
         print("=" * 60)
         return 1
 
@@ -224,6 +160,9 @@ def run_all_checks() -> int:
 
 
 def main() -> int:
+    scripts_dir = str(ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
     return run_all_checks()
 
 

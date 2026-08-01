@@ -3,6 +3,9 @@
 {% from "components/design_carousel_scripts.html" import design_carousel_scripts %}
 {% block content %}
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+{% if request.query_params.get('billing_error') %}
+<div class="mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl">{{ request.query_params.get('billing_error') }}</div>
+{% endif %}
 <!-- HEADER PRO -->
 <div class="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-6 mb-8">
   <div>
@@ -48,6 +51,20 @@
       class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl shadow-sm">
       📄 Descargar PDF
     </a>
+
+    {% if quotation.status in ['aprobada', 'produccion', 'enviada', 'enviado', 'entregada', 'entregado'] %}
+      {% if quotation.electronic_invoice %}
+      <a href="/billing/{{ quotation.electronic_invoice.id }}"
+        class="bg-green-700 text-white px-6 py-3 rounded-xl shadow-sm">
+        ✓ Ya facturada
+      </a>
+      {% elif quotation.payment_status == 'pagada' %}
+      <a href="/billing/from-quotation/{{ quotation.id }}/preview"
+        class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl shadow-sm">
+        🧾 Realizar factura SRI
+      </a>
+      {% endif %}
+    {% endif %}
 
     <button onclick="printQuotationPDF({{ quotation.id }})"
       class="bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 rounded-xl shadow-sm">
@@ -355,7 +372,7 @@
           <span class="text-gray-600">Envío</span>
           <form action="/quotations/{{ quotation.id }}/shipping-cost" method="POST" class="flex items-center gap-2">
             <input type="number" step="0.01" min="0" name="shipping_cost"
-              value="{{ quotation.shipping_cost or 0 }}"
+              value="{{ shipping_display or 0 }}"
               class="w-24 border rounded-lg px-2 py-1 text-right text-sm" />
             <button type="submit" class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-lg hover:bg-purple-200">
               Actualizar

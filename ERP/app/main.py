@@ -40,8 +40,10 @@ from app.routes import users
 from app.routes import config
 from app.routes import imports
 from app.routes import product_settings
+from app.routes import billing
 
 from app.config.settings import settings
+from app.error_handlers import register_error_handlers
 
 try:
     prepare_database()
@@ -55,6 +57,7 @@ except Exception as e:
     print(str(e))
     raise
 app = FastAPI(title="SISTEMA ERP")
+register_error_handlers(app)
 
 app.mount(
     "/static",
@@ -88,6 +91,7 @@ app.include_router(imports.router)
 app.include_router(
     product_settings.router
 )
+app.include_router(billing.router)
 
 
 def create_admin():

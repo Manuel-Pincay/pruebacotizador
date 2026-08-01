@@ -443,15 +443,11 @@ def build_design_totals_section(quotation, config, design_paths=None):
     iva_percent = float(quotation.iva or 0)
     iva_amount = subtotal_after_discount * (iva_percent / 100)
 
-    shipping = float(getattr(quotation, "shipping_cost", None) or 0)
-
     summary_rows = [
         ["SUBTOTAL", f"${subtotal:.2f}"],
         ["DESCUENTO", f"${discount_amount:.2f}"],
         [f"IVA ({iva_percent:.2f}%)", f"${iva_amount:.2f}"],
     ]
-    if shipping > 0:
-        summary_rows.append(["ENVÍO", f"${shipping:.2f}"])
 
     summary_table = Table(
         summary_rows,
