@@ -9,6 +9,7 @@ from app.auth.design_permissions import (
     can_edit_design_order,
     can_export_design_orders,
     can_reassign_design_order,
+    can_self_assign_design_order,
     can_view_design_item,
     can_view_design_order,
     is_design_admin,
@@ -26,6 +27,7 @@ from app.services.production_order_service import (
     assign_designer as assign_production_designer,
     build_history_list,
     build_order_dict,
+    claim_design_order,
     ensure_production_order,
     export_design_sheet_pdf,
     get_production_order,
@@ -76,6 +78,7 @@ async def design_orders_list(request: Request, db: Session = Depends(get_db)):
     for row in rows:
         order_model = get_production_order(db, row["id"])
         row["can_edit"] = bool(order_model and can_edit_design_order(user, order_model))
+        row["can_claim"] = bool(order_model and can_self_assign_design_order(user, order_model))
 
     return templates.TemplateResponse(
         request=request,
@@ -85,8 +88,35 @@ async def design_orders_list(request: Request, db: Session = Depends(get_db)):
             "rows": rows,
             "can_delete": can_delete_design_order(user),
             "can_export": can_export_design_orders(user),
+            "claim_error": request.query_params.get("claim_error", ""),
+            "claimed": request.query_params.get("claimed", ""),
         },
     )
+
+
+@router.post("/orders/{order_id}/claim")
+async def design_claim_order(order_id: int, request: Request, db: Session = Depends(get_db)):
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+    from urllib.parse import quote
+
+    if user.role != ROLE_DISENADOR:
+        return RedirectResponse(
+            url=f"/design/orders?claim_error={quote('Solo diseñadores pueden autoasignarse.')}",
+            status_code=302,
+        )
+    order = get_production_order(db, order_id)
+    if not order or not can_view_design_order(user, order):
+        return RedirectResponse(url="/design/orders", status_code=302)
+    try:
+        claim_design_order(db, order, user=user)
+        return RedirectResponse(url=f"/design/orders/{order_id}?claimed=1", status_code=302)
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/design/orders?claim_error={quote(str(exc))}",
+            status_code=302,
+        )
 
 
 @router.get("/orders/for-item/{item_id}")
@@ -137,11 +167,14 @@ async def design_order_detail(order_id: int, request: Request, db: Session = Dep
             "order": order,
             "history": build_history_list(order_model),
             "can_edit": can_edit_design_order(user, order_model),
+            "can_claim": can_self_assign_design_order(user, order_model),
             "can_reassign": can_reassign_design_order(user),
             "designers": list_designers(db) if is_design_admin(user) else [],
             "materials": DESIGN_MATERIALS,
             "sizes": DESIGN_SIZES,
             "usb_references": USB_REFERENCES,
+            "claimed": request.query_params.get("claimed", ""),
+            "claim_error": request.query_params.get("claim_error", ""),
         },
     )
 
@@ -157,6 +190,9 @@ async def design_order_save(
     detail: str = Form(""),
     copies: int = Form(1),
     assigned_to_user_id: str = Form(""),
+    use_fabrication_materials: str = Form("0"),
+    raw_material_id: str = Form(""),
+    raw_material_qty: str = Form(""),
     action: str = Form("save"),
     db: Session = Depends(get_db),
 ):
@@ -167,6 +203,13 @@ async def design_order_save(
     order_model = get_production_order(db, order_id)
     if not order_model or not can_view_design_order(user, order_model):
         return RedirectResponse(url="/design/orders", status_code=302)
+
+    use_fab = str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
+    rm_id = int(raw_material_id) if str(raw_material_id or "").strip().isdigit() else None
+    try:
+        rm_qty = float(raw_material_qty) if str(raw_material_qty or "").strip() else None
+    except (TypeError, ValueError):
+        rm_qty = None
 
     try:
         if can_reassign_design_order(user) and assigned_to_user_id.strip().isdigit():
@@ -180,14 +223,25 @@ async def design_order_save(
                 db, order_model,
                 file_name=file_name, material=material, size=size,
                 usb_reference=usb_reference, notes=detail, copies=copies, user=user,
+                use_fabrication_materials=use_fab,
+                raw_material_id=rm_id,
+                raw_material_qty=rm_qty,
             )
             order_model = get_production_order(db, order_id) or order_model
-            approve_design(db, order_model, user=user)
+            approve_design(
+                db, order_model, user=user,
+                use_fabrication_materials=use_fab,
+                raw_material_id=rm_id,
+                raw_material_qty=rm_qty,
+            )
         elif can_edit_design_order(user, order_model):
             update_design_fields(
                 db, order_model,
                 file_name=file_name, material=material, size=size,
                 usb_reference=usb_reference, notes=detail, copies=copies, user=user,
+                use_fabrication_materials=use_fab,
+                raw_material_id=rm_id,
+                raw_material_qty=rm_qty,
             )
     except ValueError as exc:
         client = order_model.quotation.client if order_model.quotation else None

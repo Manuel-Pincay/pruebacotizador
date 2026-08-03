@@ -1,6 +1,5 @@
 {% extends 'layouts/base.html' %}
 {% from "components/design_status_badge.html" import design_status_badge %}
-{% from "components/design_carousel.html" import design_carousel %}
 {% from "components/design_carousel_scripts.html" import design_carousel_scripts %}
 
 {% block content %}
@@ -30,16 +29,66 @@
         </div>
 
         <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-            <h2 class="text-lg font-bold mb-4">Imágenes de referencia</h2>
-            {{ design_carousel(detail.design_urls, 'carousel-detail-' ~ detail.item_id) }}
-            {% if detail.design_urls %}
-            <div class="flex flex-wrap gap-2 mt-4">
-                {% for url in detail.design_urls %}
-                <a href="{{ url }}" download class="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50">Descargar {{ loop.index }}</a>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <h2 class="text-lg font-bold">Imágenes de diseño</h2>
+                <span class="text-sm text-gray-500">{{ detail.designs_count or 0 }} / {{ detail.max_designs or 4 }}</span>
+            </div>
+
+            {% if upload_ok %}
+            <div class="mb-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Imagen guardada correctamente.</div>
+            {% endif %}
+            {% if upload_error %}
+            <div class="mb-3 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ upload_error }}</div>
+            {% endif %}
+
+            {% if detail.designs %}
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                {% for design in detail.designs %}
+                <div class="relative group rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                    <button type="button" onclick="openDesignPreview('{{ design.url }}')"
+                        class="w-full h-36 flex items-center justify-center p-2 hover:bg-gray-100 transition"
+                        title="Ver imagen {{ loop.index }}">
+                        <img src="{{ design.url }}" alt="Diseño {{ loop.index }}"
+                             class="max-w-full max-h-full object-contain" />
+                    </button>
+                    <span class="absolute top-2 left-2 text-[10px] font-medium bg-black/55 text-white px-1.5 py-0.5 rounded-md">{{ loop.index }}</span>
+                    {% if can_attach_images %}
+                    <form method="post" action="/design/items/{{ detail.item_id }}/designs/{{ design.id }}/delete"
+                          class="absolute top-2 right-2"
+                          onsubmit="return erpConfirmForm(event, '¿Eliminar esta imagen?')">
+                        <button type="submit"
+                            class="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 text-white text-xs shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition"
+                            title="Eliminar">✕</button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ design.url }}" download
+                       class="absolute bottom-2 right-2 text-[10px] px-2 py-1 rounded-md bg-white/90 border text-slate-700 hover:bg-white">
+                        Descargar
+                    </a>
+                </div>
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-gray-400 text-sm">Sin imágenes adjuntas.</p>
+            <p class="text-gray-400 text-sm mb-4">Sin imágenes adjuntas todavía.</p>
+            {% endif %}
+
+            {% if can_attach_images and (detail.designs_count or 0) < (detail.max_designs or 4) %}
+            <form method="post" action="/design/items/{{ detail.item_id }}/designs"
+                  enctype="multipart/form-data"
+                  class="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                <label class="block text-sm font-medium text-gray-700">Adjuntar imagen</label>
+                <input type="file" name="design_file" accept=".png,.jpg,.jpeg,.webp" required
+                       class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+                <p class="text-xs text-gray-400">PNG, JPG o WEBP. Máximo {{ detail.max_designs or 4 }} imágenes por cotización. Quedan guardadas en el sistema.</p>
+                <button type="submit"
+                        class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium">
+                    Guardar imagen
+                </button>
+            </form>
+            {% elif can_attach_images %}
+            <p class="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                Ya alcanzó el máximo de {{ detail.max_designs or 4 }} imágenes. Elimine una para subir otra.
+            </p>
             {% endif %}
         </div>
 
@@ -77,6 +126,25 @@
                 {% endif %}
             </div>
         </div>
+
+        {% if claimed %}
+        <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Esta cotización quedó asignada a ti.</div>
+        {% endif %}
+        {% if claim_error %}
+        <div class="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ claim_error }}</div>
+        {% endif %}
+
+        {% if can_claim %}
+        <div class="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm">
+            <h2 class="text-lg font-bold mb-2 text-amber-900">Tomar esta cotización</h2>
+            <p class="text-sm text-amber-800/80 mb-3">Está sin diseñador. Al asignártela podrás iniciar el trabajo de inmediato.</p>
+            <form method="post" action="/design/items/{{ detail.item_id }}/claim">
+                <button type="submit" class="w-full px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold">
+                    Asignarme esta cotización
+                </button>
+            </form>
+        </div>
+        {% endif %}
 
         {% if user.role == 'admin' and designers %}
         <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">

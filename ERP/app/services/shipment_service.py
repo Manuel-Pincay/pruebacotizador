@@ -16,6 +16,43 @@ from app.services.production_order_service import PRODUCTION_STATUS_LABELS, norm
 # Roles con acceso al módulo de despacho / guías
 SHIPMENT_ROLES = ["admin", "disenador", "ventas", "despacho", "transporte"]
 
+DEFAULT_GUIDE_COLORS = {
+    "accent": "#d6452a",
+    "border": "#8a97a8",
+    "muted": "#6b7785",
+}
+
+
+def _normalize_hex_color(value: str | None, fallback: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return fallback
+    if not raw.startswith("#"):
+        raw = f"#{raw}"
+    if len(raw) == 4 and all(c in "0123456789abcdefABCDEF#" for c in raw):
+        # #RGB -> #RRGGBB
+        raw = f"#{raw[1]*2}{raw[2]*2}{raw[3]*2}"
+    if len(raw) == 7 and all(c in "0123456789abcdefABCDEF#" for c in raw):
+        return raw.lower()
+    return fallback
+
+
+def get_guide_colors(config: CompanyConfig | None) -> dict[str, str]:
+    return {
+        "accent": _normalize_hex_color(
+            getattr(config, "guide_accent_color", None) if config else None,
+            DEFAULT_GUIDE_COLORS["accent"],
+        ),
+        "border": _normalize_hex_color(
+            getattr(config, "guide_border_color", None) if config else None,
+            DEFAULT_GUIDE_COLORS["border"],
+        ),
+        "muted": _normalize_hex_color(
+            getattr(config, "guide_muted_color", None) if config else None,
+            DEFAULT_GUIDE_COLORS["muted"],
+        ),
+    }
+
 # Cotizaciones desde las que se puede generar o imprimir guía
 GUIDE_QUOTATION_STATUSES = frozenset({
     "aprobada",
@@ -148,6 +185,7 @@ def build_label_context(
         "company_logo": config.logo if config else None,
         "print_size": size_norm,
         "is_draft": shipment is None,
+        "colors": get_guide_colors(config),
         **quotation_internal_status(quotation),
     }
 

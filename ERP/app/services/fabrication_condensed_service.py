@@ -37,6 +37,11 @@ from app.services.production_order_service import (
 from app.services.quotation_design_service import get_design_urls, sync_legacy_design_file
 
 COMPLETED_FABRICATION_STATUSES = {"envio", "entregado", "cancelado"}
+# Aún sin datos de fabricación (archivo/material/medida): no van al condensado
+PRE_FABRICATION_STATUSES = {"pendiente", "diseno"}
+# Listas solo cuando ya pasaron a producción (y opcionalmente ya realizadas)
+ACTIVE_FABRICATION_STATUSES = {"produccion"}
+VISIBLE_FABRICATION_STATUSES = ACTIVE_FABRICATION_STATUSES | {"envio", "entregado"}
 
 
 def _load_fabrication_orders(db: Session) -> list[ProductionOrder]:
@@ -192,11 +197,16 @@ def get_fabrication_order_groups(
             if order.quotation and order.quotation.client_id == filters["client_id"]
         ]
 
-    if not filters.get("show_completed"):
-        orders = [
-            order for order in orders
-            if normalize_status(order.status) not in COMPLETED_FABRICATION_STATUSES
-        ]
+    # Solo órdenes ya enviadas a producción (con datos de fabricación)
+    if filters.get("show_completed"):
+        allowed = VISIBLE_FABRICATION_STATUSES
+    else:
+        allowed = ACTIVE_FABRICATION_STATUSES
+    orders = [
+        order for order in orders
+        if normalize_status(order.status) in allowed
+        and normalize_status(order.status) not in PRE_FABRICATION_STATUSES
+    ]
 
     quotation_ids = {order.quotation_id for order in orders if order.quotation_id}
     if not quotation_ids:
@@ -231,15 +241,14 @@ def compute_fabrication_kpis(groups: list[dict[str, Any]]) -> dict[str, int]:
         products = group.get("products") or []
         count = len(products)
 
-        if status == "pendiente":
+        if status == "produccion":
             pending_products += count
-        if status in {"diseno", "produccion"}:
             in_production_products += count
         if status in {"envio", "entregado"}:
             ready_products += count
         if delivery and delivery < today and status not in {"entregado", "cancelado"}:
             overdue_products += count
-        if status != "entregado":
+        if status == "produccion":
             pending_units += sum(int(product.get("quantity") or 0) for product in products)
 
     return {
@@ -298,7 +307,7 @@ def active_filter_labels(filters: dict[str, Any], clients: list) -> list[str]:
     if filters.get("show_completed"):
         labels.append("Incluye ya realizadas (envío/entregadas)")
     else:
-        labels.append("Solo pendientes de fabricar")
+        labels.append("Solo en producción")
 
     return labels
 
@@ -317,7 +326,7 @@ def list_fabricator_names(db: Session) -> list[str]:
     return names
 
 
-PENDING_FABRICATION_DASHBOARD_STATUSES = {"pendiente", "diseno", "produccion"}
+PENDING_FABRICATION_DASHBOARD_STATUSES = {"produccion"}
 DONE_FABRICATION_DASHBOARD_STATUSES = {"envio", "entregado"}
 
 

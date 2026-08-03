@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -36,12 +36,18 @@ class ProductionOrder(Base):
     design_completed_at = Column(DateTime)
     design_completed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
+    # Origen de material al pasar a producción
+    use_fabrication_materials = Column(Boolean, nullable=False, default=False)
+    raw_material_id = Column(Integer, ForeignKey("raw_materials.id"), nullable=True)
+    raw_material_qty = Column(Float, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     quotation = relationship("Quotation", back_populates="production_order")
     assignee = relationship("User", foreign_keys=[assigned_to_user_id])
     design_completer = relationship("User", foreign_keys=[design_completed_by])
+    raw_material = relationship("RawMaterial", foreign_keys=[raw_material_id])
     history = relationship(
         "ProductionOrderHistory",
         back_populates="production_order",

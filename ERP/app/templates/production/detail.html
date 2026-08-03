@@ -381,6 +381,40 @@
                     <textarea name="detail" rows="3" placeholder="Instrucciones para impresión..."
                         class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">{{ fabrication.detail or '' }}</textarea>
                 </div>
+
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+                    <p class="text-sm font-semibold text-emerald-900">Origen del material</p>
+                    <div class="flex flex-col sm:flex-row gap-3 text-sm">
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="use_fabrication_materials" value="0" class="fab-source-radio"
+                                {% if not order.use_fabrication_materials %}checked{% endif %}>
+                            <span>Stock de producto terminado</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="use_fabrication_materials" value="1" class="fab-source-radio"
+                                {% if order.use_fabrication_materials %}checked{% endif %}>
+                            <span>Usar material de fabricación</span>
+                        </label>
+                    </div>
+                    <div id="fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Materia prima *</label>
+                            <select name="raw_material_id" id="raw_material_id"
+                                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                                <option value="">Cargando...</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Si no hay stock de producto, elige plancha o vinil de tu inventario.</p>
+                        </div>
+                        <div class="max-w-xs">
+                            <label class="block text-xs text-gray-600 mb-1">Cantidad a consumir *</label>
+                            <input type="number" name="raw_material_qty" id="raw_material_qty" step="0.01" min="0.01"
+                                value="{{ order.raw_material_qty or fabrication.copies or 1 }}"
+                                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                            <p id="raw_material_unit_hint" class="text-xs text-gray-400 mt-1">planchas o metros</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="flex flex-wrap gap-3 pt-2">
                     <button type="submit" name="action" value="save"
                         class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium">
@@ -393,6 +427,60 @@
                 </div>
                 <p class="text-xs text-gray-400">Para pasar a producción se requiere archivo, material, medida y copias.</p>
             </form>
+            <script>
+            (function () {
+              const selectedId = {{ order.raw_material_id | tojson }};
+              const radios = document.querySelectorAll('.fab-source-radio');
+              const fields = document.getElementById('fab-raw-fields');
+              const sel = document.getElementById('raw_material_id');
+              const materialSelect = document.querySelector('select[name="material"]');
+              const unitHint = document.getElementById('raw_material_unit_hint');
+
+              function toggleFields() {
+                const useFab = document.querySelector('.fab-source-radio:checked')?.value === '1';
+                fields?.classList.toggle('hidden', !useFab);
+                if (useFab) loadMaterials();
+              }
+
+              async function loadMaterials() {
+                if (!sel) return;
+                const designMat = materialSelect?.value || '';
+                sel.innerHTML = '<option value="">Cargando...</option>';
+                try {
+                  const res = await fetch(`/inventory/api/materials?design_material=${encodeURIComponent(designMat)}`, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                  });
+                  const data = await res.json();
+                  sel.innerHTML = '<option value="">Seleccionar materia prima...</option>';
+                  (data || []).forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.dataset.unit = m.unit;
+                    const low = m.is_low_stock ? ' ⚠ bajo' : '';
+                    opt.textContent = `${m.label} — ${m.stock} ${m.unit}${low}`;
+                    if (selectedId && m.id == selectedId) opt.selected = true;
+                    sel.appendChild(opt);
+                  });
+                  updateUnitHint();
+                } catch (_) {
+                  sel.innerHTML = '<option value="">No se pudo cargar materia prima</option>';
+                }
+              }
+
+              function updateUnitHint() {
+                const opt = sel?.options[sel.selectedIndex];
+                if (unitHint && opt?.dataset?.unit) unitHint.textContent = opt.dataset.unit;
+              }
+
+              radios.forEach(r => r.addEventListener('change', toggleFields));
+              materialSelect?.addEventListener('change', () => {
+                if (document.querySelector('.fab-source-radio:checked')?.value === '1') loadMaterials();
+              });
+              sel?.addEventListener('change', updateUnitHint);
+              toggleFields();
+            })();
+            </script>
             {% else %}
             <div class="p-5">
                 {% if fabrication.file_name or fabrication.material %}
@@ -402,6 +490,20 @@
                     <div><dt class="text-gray-500">Medida</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.size or '—' }}</dd></div>
                     <div><dt class="text-gray-500">USB</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.usb_reference or '—' }}</dd></div>
                     <div><dt class="text-gray-500">Copias</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.copies or '—' }}</dd></div>
+                    <div class="sm:col-span-2">
+                        <dt class="text-gray-500">Origen material</dt>
+                        <dd class="font-semibold text-slate-900 mt-0.5">
+                            {% if order.use_fabrication_materials %}
+                            Material de fabricación
+                            {% if order.raw_material %}
+                            — {{ order.raw_material.label }}
+                            ({{ '%.2f'|format(order.raw_material_qty or 0) }} {{ order.raw_material.unit }})
+                            {% endif %}
+                            {% else %}
+                            Stock de producto terminado
+                            {% endif %}
+                        </dd>
+                    </div>
                     <div><dt class="text-gray-500">Diseñador</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.assigned_to_name or order.designer or '—' }}</dd></div>
                 </dl>
                 {% if fabrication.detail %}
@@ -430,15 +532,9 @@
                 <p class="font-bold text-lg text-slate-900">{{ shipment.guide_number }}</p>
                 <p class="text-sm text-gray-500 mt-1">Estado: {{ shipment.status or '—' }}</p>
             </div>
-            <a href="/shipments/{{ shipment.id }}/label?size=a4&print=1"
-                target="_blank" rel="noopener noreferrer"
+            <a href="/shipments/{{ shipment.id }}/label?size=a4"
                 class="flex w-full justify-center bg-blue-700 hover:bg-blue-800 text-white px-4 py-3 rounded-xl text-sm font-medium mb-2">
-                Imprimir guía A4
-            </a>
-            <a href="/shipments/{{ shipment.id }}/label?size=a5&print=1"
-                target="_blank" rel="noopener noreferrer"
-                class="flex w-full justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl text-sm font-medium mb-2">
-                Imprimir guía A5
+                Ver / imprimir etiqueta
             </a>
             <a href="/shipments/{{ shipment.id }}/edit"
                 class="flex w-full justify-center border border-gray-200 hover:bg-gray-50 px-4 py-2 rounded-xl text-sm">
@@ -446,10 +542,9 @@
             </a>
             {% else %}
             <p class="text-sm text-gray-500 mb-4">Aún no hay guía registrada.</p>
-            <a href="/shipments/quotation/{{ order.quotation_id }}/label?size=a4&print=1"
-                target="_blank" rel="noopener noreferrer"
+            <a href="/shipments/quotation/{{ order.quotation_id }}/label?size=a4"
                 class="flex w-full justify-center bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-xl text-sm font-medium mb-2">
-                Imprimir guía A4 (cotización)
+                Ver / imprimir etiqueta
             </a>
             <a href="/shipments/new/{{ order.quotation_id }}"
                 class="flex w-full justify-center bg-blue-700 hover:bg-blue-800 text-white px-4 py-3 rounded-xl text-sm font-medium">

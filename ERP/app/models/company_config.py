@@ -36,6 +36,11 @@ class CompanyConfig(Base):
     guide_sender_phone = Column(String, nullable=True)
     guide_sender_address = Column(String, nullable=True)
 
+    # Colores de la etiqueta / guía de envío
+    guide_accent_color = Column(String(20), default="#d6452a")
+    guide_border_color = Column(String(20), default="#8a97a8")
+    guide_muted_color = Column(String(20), default="#6b7785")
+
     # Facturación electrónica SRI
     sri_ruc = Column(String(13), nullable=True)
     sri_razon_social = Column(String(300), nullable=True)

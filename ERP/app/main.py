@@ -14,6 +14,8 @@ from app.models.production_order_history import ProductionOrderHistory
 from app.models.design_observation import DesignObservation
 from app.models.production_tracking import ProductionTracking
 from app.models.inventory_movement import InventoryMovement
+from app.models.raw_material import RawMaterial
+from app.models.raw_material_movement import RawMaterialMovement
 from app.models.shipment import Shipment
 from app.models.company_config import CompanyConfig
 from app.models.activity_log import ActivityLog

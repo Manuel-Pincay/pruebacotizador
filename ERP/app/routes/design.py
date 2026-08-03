@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Form, Request
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
@@ -11,6 +13,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth.auth_handler import role_required
 
 from app.auth.design_permissions import (
+    can_attach_design_images,
+    can_self_assign_design_item,
     can_view_design_item,
     designer_item_scope_user_id,
     is_design_admin,
@@ -37,6 +41,8 @@ from app.services.design_service import (
 
     assign_designer,
 
+    claim_design_item,
+
     compute_design_kpis,
 
     get_design_detail,
@@ -49,9 +55,19 @@ from app.services.design_service import (
 
 )
 
+from app.services.quotation_design_service import (
+    DesignLimitError,
+    add_design_image,
+    delete_design_image,
+    sync_legacy_design_file,
+)
 from app.utils.context import get_global_config
-
-from app.utils.image_storage import design_image_url
+from app.utils.image_storage import (
+    UploadValidationError,
+    design_image_url,
+    read_upload_bytes,
+    validate_upload_filename,
+)
 
 
 
@@ -121,17 +137,33 @@ async def design_dashboard(request: Request, db: Session = Depends(get_db)):
 
     kpis = compute_design_kpis(db, designer_scope_user_id=designer_scope)
 
-    recent = list_design_items(
-
+    available_items = list_design_items(
         db,
-
-        design_filter="pending",
-
+        design_filter="available",
         designer_scope_user_id=designer_scope,
-
-        limit=8,
-
+        limit=12,
     )
+
+    # Abajo: solo diseños ya asignados / aceptados por el diseñador (fase pendiente/diseño)
+    if user.role == ROLE_DISENADOR:
+        recent = list_design_items(
+            db,
+            design_filter="mine",
+            assigned_user_id=user.id,
+            limit=20,
+        )
+        recent = [
+            row
+            for row in recent
+            if row.get("production_status") in {"pendiente", "diseno"}
+        ][:8]
+    else:
+        recent = list_design_items(
+            db,
+            design_filter="pending",
+            designer_scope_user_id=designer_scope,
+            limit=8,
+        )
 
 
 
@@ -147,9 +179,14 @@ async def design_dashboard(request: Request, db: Session = Depends(get_db)):
 
             "kpis": kpis,
 
+            "available_items": available_items,
+
             "recent_items": recent,
 
             "design_statuses": DESIGN_STATUSES,
+
+            "claim_success": request.query_params.get("claimed", ""),
+            "claim_error": request.query_params.get("claim_error", ""),
 
         },
 
@@ -187,6 +224,10 @@ async def design_pending(
 
         design_filter = "mine"
 
+    elif filter in {"available", "disponibles", "unassigned"}:
+
+        design_filter = "available"
+
     elif filter in {"diseno", "produccion", "envio", "entregado"}:
 
         design_filter = filter
@@ -211,6 +252,8 @@ async def design_pending(
 
 
 
+    active = "available" if design_filter == "available" else filter
+
     return templates.TemplateResponse(
 
         request=request,
@@ -223,11 +266,14 @@ async def design_pending(
 
             "rows": rows,
 
-            "active_filter": filter,
+            "active_filter": active,
 
             "design_statuses": DESIGN_STATUSES,
 
             "designers": list_designers(db) if is_design_admin(user) else [],
+
+            "claim_error": request.query_params.get("claim_error", ""),
+            "claim_success": request.query_params.get("claimed", ""),
 
         },
 
@@ -315,9 +361,105 @@ async def design_detail_page(
 
             "design_statuses": DESIGN_STATUSES,
 
+            "can_claim": bool(
+                user.role == ROLE_DISENADOR
+                and detail.get("can_claim")
+            ),
+            "can_attach_images": can_attach_design_images(user, item),
+            "claimed": request.query_params.get("claimed", ""),
+            "claim_error": request.query_params.get("claim_error", ""),
+            "upload_ok": request.query_params.get("uploaded", ""),
+            "upload_error": request.query_params.get("upload_error", ""),
+
         },
 
     )
+
+
+@router.post("/items/{item_id}/designs")
+async def design_upload_image(
+    item_id: int,
+    request: Request,
+    design_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Diseñador/admin adjunta imagen de diseño (queda guardada en la cotización)."""
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    item = _load_item_for_access(db, item_id)
+    if not item or not can_attach_design_images(user, item):
+        return RedirectResponse(url="/design/pending", status_code=302)
+
+    quotation = item.quotation
+    if not quotation:
+        return RedirectResponse(url=f"/design/items/{item_id}", status_code=302)
+
+    try:
+        sync_legacy_design_file(db, quotation)
+        validate_upload_filename(design_file.filename)
+        data = await read_upload_bytes(design_file, 10 * 1024 * 1024)
+        add_design_image(db, quotation, data)
+        try:
+            add_design_observation(
+                db,
+                item_id,
+                user=user,
+                note=f"Adjuntó imagen de diseño: {design_file.filename or 'archivo'}",
+            )
+        except ValueError:
+            db.commit()
+        return RedirectResponse(
+            url=f"/design/items/{item_id}?uploaded=1",
+            status_code=302,
+        )
+    except (UploadValidationError, DesignLimitError, ValueError) as exc:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/design/items/{item_id}?upload_error={quote(str(exc))}",
+            status_code=302,
+        )
+
+
+@router.post("/items/{item_id}/designs/{design_id}/delete")
+async def design_delete_image(
+    item_id: int,
+    design_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    item = _load_item_for_access(db, item_id)
+    if not item or not can_attach_design_images(user, item):
+        return RedirectResponse(url="/design/pending", status_code=302)
+
+    quotation = item.quotation
+    if not quotation:
+        return RedirectResponse(url=f"/design/items/{item_id}", status_code=302)
+
+    try:
+        delete_design_image(db, quotation, design_id)
+        try:
+            add_design_observation(
+                db,
+                item_id,
+                user=user,
+                note="Eliminó una imagen de diseño",
+            )
+        except ValueError:
+            db.commit()
+    except ValueError as exc:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/design/items/{item_id}?upload_error={quote(str(exc))}",
+            status_code=302,
+        )
+
+    return RedirectResponse(url=f"/design/items/{item_id}", status_code=302)
 
 
 
@@ -477,6 +619,54 @@ async def design_add_observation(
 
 
 
+
+
+@router.post("/items/{item_id}/claim")
+async def design_claim_item(
+    item_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Diseñador se autoasigna una cotización/ítem disponible."""
+    user = role_required(request, [ROLE_DISENADOR, ROLE_ADMIN])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    from urllib.parse import quote
+
+    # Admin no se autoasigna; solo diseñadores
+    if user.role != ROLE_DISENADOR:
+        return RedirectResponse(
+            url=f"/design/items/{item_id}?claim_error={quote('Solo diseñadores pueden autoasignarse.')}",
+            status_code=302,
+        )
+
+    item = (
+        db.query(QuotationItem)
+        .options(joinedload(QuotationItem.quotation).joinedload(Quotation.production_order))
+        .filter(QuotationItem.id == item_id)
+        .first()
+    )
+    if not item or not can_view_design_item(user, item):
+        return RedirectResponse(url="/design/pending?filter=available", status_code=302)
+
+    if not can_self_assign_design_item(user, item):
+        return RedirectResponse(
+            url=f"/design/pending?filter=available&claim_error={quote('Esta cotización ya no está disponible.')}",
+            status_code=302,
+        )
+
+    try:
+        order = claim_design_item(db, item_id, user=user)
+        return RedirectResponse(
+            url=f"/design/items/{item_id}?claimed=1",
+            status_code=302,
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/design/pending?filter=available&claim_error={quote(str(exc))}",
+            status_code=302,
+        )
 
 
 @router.post("/items/{item_id}/assign")

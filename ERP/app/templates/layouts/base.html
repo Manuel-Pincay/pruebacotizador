@@ -776,7 +776,8 @@ lucide.createIcons();
             <div id="systemMenu" class="sidebar-submenu {% if not system_menu_open %}hidden{% endif %} ml-6 mt-2 space-y-1">
               <a href="/users" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/users') }}">👤 Usuarios</a>
               <a href="/inventory" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{% if nav_path == '/inventory' or nav_path == '/inventory/' %} is-active{% endif %}">📦 Movimientos inventario</a>
-              <a href="/inventory/stock" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/stock') }}">📊 Stock</a>
+              <a href="/inventory/stock" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/stock') }}">📊 Stock productos</a>
+              <a href="/inventory/materials" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/materials') }}">🪵 Materia prima</a>
               <a href="/inventory/labels" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/labels') }}">🏷️ Etiquetas</a>
               <a href="/secretadmin/config" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/secretadmin') }}">⚙️ Configuración ERP</a>
             </div>

@@ -9,13 +9,20 @@
     </div>
     <div class="flex flex-wrap gap-2">
         <a href="/design/pending" class="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium">
-            ← Productos personalizados
+            ← Diseños
         </a>
         <a href="/design/dashboard" class="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium">
             Dashboard
         </a>
     </div>
 </div>
+
+{% if claimed %}
+<div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Orden asignada a ti.</div>
+{% endif %}
+{% if claim_error %}
+<div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ claim_error }}</div>
+{% endif %}
 
 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
@@ -48,11 +55,22 @@
                     <td class="p-3">{{ row.size }}</td>
                     <td class="p-3">{{ row.usb_reference or '—' }}</td>
                     <td class="p-3 font-semibold">{{ row.copies }}</td>
-                    <td class="p-3 text-xs">{{ row.assigned_to_name }}</td>
+                    <td class="p-3 text-xs">
+                        {% if row.assigned_to %}
+                        {{ row.assigned_to_name }}
+                        {% else %}
+                        <span class="text-amber-700 text-xs font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Sin asignar</span>
+                        {% endif %}
+                    </td>
                     <td class="p-3">
                         {{ production_status_badge(row.status, 'sm') }}
                     </td>
                     <td class="p-3 whitespace-nowrap">
+                        {% if row.can_claim %}
+                        <form method="post" action="/design/orders/{{ row.id }}/claim" class="inline mr-2">
+                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold">Asignarme</button>
+                        </form>
+                        {% endif %}
                         {% if row.can_edit %}
                         <a href="/design/orders/{{ row.id }}" class="text-purple-700 hover:underline font-medium mr-3">Editar</a>
                         {% else %}

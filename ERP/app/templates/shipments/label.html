@@ -2,175 +2,939 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Guía {{ label.guide_number }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Vista previa — Guía {{ label.guide_number }}</title>
+    {% set colors = label.colors if label.colors is defined and label.colors else {'accent': '#d6452a', 'border': '#8a97a8', 'muted': '#6b7785'} %}
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.469.0"></script>
     <style>
-        .label-sheet.size-a4 { max-width: 210mm; margin: 0 auto; }
-        .label-sheet.size-a5 { max-width: 148mm; margin: 0 auto; font-size: 0.88rem; }
-        .label-sheet.size-a5 .text-hero { font-size: 1.35rem; }
-        .label-sheet.size-a5 .text-carrier { font-size: 1.75rem; }
-        .label-sheet.size-a5 .text-section { font-size: 1.1rem; }
-        .text-hero { font-size: 1.75rem; }
-        .text-carrier { font-size: 2.25rem; }
-        .text-section { font-size: 1.35rem; }
+        :root {
+            --guide-accent: {{ colors.accent }};
+            --guide-border: {{ colors.border }};
+            --guide-muted: {{ colors.muted }};
+            --guide-ink: #1a1f26;
+            --guide-line: #a8b2bf;
+            --modal-purple: #6d28d9;
+        }
 
-        @media print {
-            body { background: white !important; padding: 0 !important; margin: 0 !important; }
-            .no-print { display: none !important; }
-            .label-sheet { border-width: 2px !important; box-shadow: none !important; }
-            {% if label.print_size == 'a5' %}
-            @page { size: A5 portrait; margin: 8mm; }
-            {% else %}
-            @page { size: A4 portrait; margin: 10mm; }
-            {% endif %}
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+            color: var(--guide-ink);
+            background: rgba(15, 23, 42, 0.55);
+        }
+
+        /* ===== Modal emergente ===== */
+        .modal-overlay {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+        }
+
+        .modal {
+            width: min(920px, 100%);
+            max-height: calc(100vh - 2.5rem);
+            background: #f8fafc;
+            border-radius: 1.25rem;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .modal-header {
+            padding: 1rem 1.25rem 0.85rem;
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            flex-shrink: 0;
+        }
+
+        .modal-title-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.85rem;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .modal-subtitle {
+            margin: 0.25rem 0 0;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .btn-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #475569;
+            font-size: 1.25rem;
+            line-height: 1;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .btn-close:hover { background: #f1f5f9; }
+
+        .status-chip {
+            display: inline-block;
+            font-size: 0.78rem;
+            color: #334155;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.65rem;
+            padding: 0.45rem 0.75rem;
+            margin-bottom: 0.85rem;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            align-items: flex-end;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .control-group label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+        }
+
+        .control-group select {
+            min-width: 180px;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.7rem;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            background: #fff;
+            color: #0f172a;
+        }
+
+        .size-toggle {
+            display: inline-flex;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.7rem;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .size-toggle a {
+            padding: 0.55rem 0.9rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: #334155;
+            border-right: 1px solid #e2e8f0;
+        }
+        .size-toggle a:last-child { border-right: none; }
+        .size-toggle a.active {
+            background: var(--modal-purple);
+            color: #fff;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.7rem;
+            padding: 0.55rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #1e293b;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--modal-purple);
+            border-color: var(--modal-purple);
+            color: #fff;
+            padding: 0.65rem 1.35rem;
+            font-size: 0.95rem;
+        }
+        .btn-primary:hover { background: #5b21b6; }
+        .btn-link { border: none; background: transparent; color: var(--modal-purple); }
+        .badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            border-radius: 999px;
+            padding: 0.3rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .controls-spacer { flex: 1; min-width: 0.5rem; }
+
+        .modal-body {
+            overflow: auto;
+            padding: 1.25rem;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(109, 40, 217, 0.05), transparent 40%),
+                #eef2f7;
+        }
+
+        .preview-hint {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-bottom: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .print-sheet {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            align-items: stretch;
+            max-width: 210mm;
+            margin: 0 auto;
+        }
+
+        .print-sheet[data-copies="1"] .label-slot-2 { display: none; }
+
+        .print-sheet[data-copies="2"] .label-slot {
+            transform-origin: top center;
+        }
+
+        /* ===== Diseño etiqueta (igual que antes) ===== */
+        .label-sheet {
+            background: #fff;
+            border: 3px solid var(--guide-border);
+            border-radius: 14px;
+            overflow: hidden;
+            color: var(--guide-ink);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .label-sheet.size-a4 { width: 100%; }
+        .label-sheet.size-a5 { max-width: 148mm; margin: 0 auto; width: 100%; }
+
+        .label-header {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            border-bottom: 2px solid var(--guide-border);
+            min-height: 88px;
+        }
+
+        .logo-box {
+            border-right: 2px solid var(--guide-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+
+        .logo-box img {
+            max-height: 64px;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+        .logo-fallback {
+            width: 72px;
+            height: 64px;
+            border: 2px dashed var(--guide-line);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--guide-muted);
+            line-height: 1.2;
+            padding: 4px;
+            text-transform: uppercase;
+        }
+
+        .company-name {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 18px;
+            text-align: center;
+            font-size: 1.55rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--guide-accent);
+            line-height: 1.15;
+        }
+
+        .label-body {
+            display: grid;
+            grid-template-columns: 1.05fr 1fr;
+            border-bottom: 2px solid var(--guide-border);
+            min-height: 200px;
+        }
+
+        .col-to, .col-from { padding: 16px 18px 14px; }
+
+        .col-to {
+            border-right: 2px solid var(--guide-border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .field-label {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--guide-muted);
+            letter-spacing: 0.03em;
+            margin-bottom: 8px;
+        }
+
+        .to-name {
+            font-size: 1.25rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+
+        .to-line {
+            font-size: 0.92rem;
+            color: #334155;
+            line-height: 1.4;
+            margin-bottom: 3px;
+        }
+
+        .envelope-icon {
+            margin-top: auto;
+            padding-top: 12px;
+            color: var(--guide-accent);
+        }
+
+        .priority-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--guide-accent);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            margin-bottom: 10px;
+            line-height: 1.15;
+        }
+
+        .from-block {
+            font-size: 0.88rem;
+            color: var(--guide-muted);
+            line-height: 1.45;
+            margin-bottom: 14px;
+        }
+
+        .from-block strong { color: var(--guide-muted); font-weight: 800; }
+
+        .meta-list { display: grid; gap: 6px; }
+
+        .meta-row {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 6px;
+            font-size: 0.8rem;
+            align-items: baseline;
+        }
+
+        .meta-key {
+            font-weight: 800;
+            color: var(--guide-muted);
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .meta-val {
+            font-weight: 700;
+            color: var(--guide-ink);
+            word-break: break-word;
+        }
+
+        .label-footer-grid {
+            display: grid;
+            grid-template-columns: 1.05fr 1fr;
+            border-bottom: 2px solid var(--guide-border);
+            min-height: 130px;
+        }
+
+        .handling {
+            border-right: 2px solid var(--guide-border);
+            padding: 14px 16px 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .handling-title {
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--guide-muted);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .handling-icons {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .handle-item {
+            text-align: center;
+            color: var(--guide-accent);
+            flex: 1;
+        }
+
+        .handle-item svg,
+        .handle-item i[data-lucide] {
+            width: 38px;
+            height: 38px;
+            display: block;
+            margin: 0 auto 5px;
+            stroke-width: 2.25;
+        }
+
+        .handle-item span {
+            display: block;
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .barcode-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 14px;
+        }
+
+        .barcode-panel svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .tracking-bar {
+            padding: 9px 16px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--guide-muted);
+        }
+
+        .tracking-bar strong {
+            color: var(--guide-ink);
+            font-weight: 800;
+        }
+
+        .notes-line {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: var(--guide-muted);
+            border-top: 1px dashed var(--guide-line);
+            padding-top: 7px;
+        }
+
+        /* Compacto cuando hay 2 etiquetas */
+        .print-sheet[data-copies="2"] .company-name { font-size: 1.2rem; }
+        .print-sheet[data-copies="2"] .to-name { font-size: 1.05rem; }
+        .print-sheet[data-copies="2"] .priority-title { font-size: 1.05rem; }
+        .print-sheet[data-copies="2"] .label-header { min-height: 68px; grid-template-columns: 84px 1fr; }
+        .print-sheet[data-copies="2"] .logo-box img { max-height: 46px; }
+        .print-sheet[data-copies="2"] .label-body { min-height: 150px; }
+        .print-sheet[data-copies="2"] .label-footer-grid { min-height: 100px; }
+        .print-sheet[data-copies="2"] .col-to,
+        .print-sheet[data-copies="2"] .col-from { padding: 10px 12px; }
+        .print-sheet[data-copies="2"] .handle-item svg { width: 30px; height: 30px; }
+
+        .label-sheet.size-a5 .company-name { font-size: 1.15rem; }
+        .label-sheet.size-a5 .label-header { grid-template-columns: 84px 1fr; min-height: 70px; }
+
+        /* La etiqueta siempre mantiene el diseño de 2 columnas (la captura/impresión usa imagen) */
+        @media (max-width: 720px) {
+            .controls { align-items: stretch; }
+            .control-group select { width: 100%; }
+        }
+
+        /* Escenario oculto a ancho fijo para capturar imagen sin romper layout */
+        #captureStage {
+            position: fixed;
+            left: -10000px;
+            top: 0;
+            width: 794px;
+            background: #fff;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        #captureStage .label-sheet {
+            width: 794px;
+            max-width: 794px;
+            margin: 0;
+            box-shadow: none;
+        }
+
+        #captureStage .label-sheet.size-a5 {
+            width: 560px;
+            max-width: 560px;
+        }
+
+        .print-busy {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .colors-panel {
+            margin-top: 0.85rem;
+            padding-top: 0.85rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem 1rem;
+            align-items: flex-end;
+        }
+
+        .color-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .color-field label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+        }
+
+        .color-field .row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .color-field input[type="color"] {
+            width: 42px;
+            height: 36px;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.55rem;
+            padding: 0;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .color-field input[type="text"] {
+            width: 92px;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.55rem;
+            padding: 0.4rem 0.5rem;
+            font-size: 0.78rem;
+            font-family: ui-monospace, Consolas, monospace;
+        }
+
+        .flash-ok {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
+            border-radius: 0.65rem;
+            padding: 0.45rem 0.75rem;
+            font-size: 0.8rem;
+            margin-bottom: 0.75rem;
         }
     </style>
 </head>
-<body class="bg-gray-200 p-6 md:p-10">
+<body class="copies-1 size-{{ label.print_size }}">
 
-<div class="max-w-4xl mx-auto no-print mb-4 rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700">
-    <span class="font-semibold">Uso interno:</span>
-    Cotización <strong>{{ label.quotation_status_label }}</strong>
-    · Producción <strong>{{ label.production_status_label }}</strong>
-    <span class="text-slate-500">(no se imprime)</span>
-</div>
+{% from "shipments/_label_card.html" import label_card %}
+{% set logo_src = logo_image_url(label.company_logo) if label.company_logo else none %}
+{% set barcode_value = label.guide_number or ('COT-' ~ label.quotation_id) %}
+{% set priority_label = label.carrier if label.carrier else 'ENVÍO PRIORITARIO' %}
+{% set back_url = '/shipments/quotations' %}
 
-<div class="max-w-4xl mx-auto no-print mb-6 flex flex-wrap gap-3 items-center">
-    {% if label.is_draft %}
-    <span class="text-sm bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-medium">Vista previa — sin guía registrada</span>
-    <a href="/shipments/new/{{ label.quotation_id }}"
-        class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium">
-        Registrar guía completa
-    </a>
-    {% elif label.shipment_id %}
-    <a href="/shipments/{{ label.shipment_id }}/edit"
-        class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-xl text-sm font-medium">
-        Editar destinatario
-    </a>
-    {% endif %}
-    <a href="/shipments/quotation/{{ label.quotation_id }}/label?size=a4"
-        class="px-4 py-2 rounded-xl text-sm font-medium {% if label.print_size == 'a4' %}bg-purple-700 text-white{% else %}bg-white border{% endif %}">
-        Formato A4
-    </a>
-    <a href="/shipments/quotation/{{ label.quotation_id }}/label?size=a5"
-        class="px-4 py-2 rounded-xl text-sm font-medium {% if label.print_size == 'a5' %}bg-purple-700 text-white{% else %}bg-white border{% endif %}">
-        Formato A5
-    </a>
-    {% if label.shipment_id %}
-    <a href="/shipments/{{ label.shipment_id }}/label?size=a4"
-        class="px-4 py-2 rounded-xl text-sm font-medium bg-white border text-sm">Guía registrada A4</a>
-    {% endif %}
-    <a href="/shipments/quotations"
-        class="text-purple-700 hover:underline text-sm font-medium">
-        ← Volver al listado
-    </a>
-    <button type="button" onclick="window.print()"
-        class="bg-purple-700 hover:bg-purple-800 text-white px-6 py-2.5 rounded-xl font-medium ml-auto">
-        Imprimir
-    </button>
-</div>
-
-<div class="label-sheet size-{{ label.print_size }} bg-white border-2 border-black shadow-lg">
-
-    <!-- ENCABEZADO -->
-    <div class="grid grid-cols-1 md:grid-cols-3 border-b-2 border-black">
-        <div class="border-b-2 md:border-b-0 md:border-r-2 border-black flex items-center justify-center p-6 min-h-[100px]">
-            {% set logo_src = logo_image_url(label.company_logo) if label.company_logo else none %}
-            {% if logo_src %}
-            <img src="{{ logo_src }}" alt="Logo" class="max-h-20 max-w-full object-contain" />
-            {% else %}
-            <div class="text-center font-black text-2xl leading-tight text-slate-900">
-                {{ label.company_name or ' ' }}
+<div class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="labelModalTitle">
+        <div class="modal-header no-print">
+            <div class="modal-title-row">
+                <div>
+                    <h1 class="modal-title" id="labelModalTitle">Vista previa de etiqueta</h1>
+                    <p class="modal-subtitle">Guía {{ label.guide_number }} · Cotización #{{ label.quotation_id }}</p>
+                </div>
+                <button type="button" class="btn-close" onclick="closeLabelModal()" title="Cerrar" aria-label="Cerrar">×</button>
             </div>
-            {% endif %}
-        </div>
-        <div class="md:col-span-2 p-5">
-            <div class="text-xs font-bold text-gray-600 mb-1">DESTINATARIO</div>
-            <div class="text-hero font-black uppercase leading-tight">{{ label.customer_name }}</div>
-            {% if label.customer_id_number %}
-            <div class="text-sm mt-2 font-semibold">C.I. / RUC: {{ label.customer_id_number }}</div>
-            {% endif %}
-            {% if label.destination_city %}
-            <div class="text-base mt-2 font-medium">{{ label.destination_city }}</div>
-            {% endif %}
-            {% if label.destination_address %}
-            <div class="text-sm mt-1">{{ label.destination_address }}</div>
-            {% endif %}
-            {% if label.customer_phone %}
-            <div class="mt-3 text-sm">TEL: <span class="font-bold">{{ label.customer_phone }}</span></div>
-            {% endif %}
-        </div>
-    </div>
 
-    <!-- TRANSPORTADORA -->
-    {% if label.carrier %}
-    <div class="border-b-2 border-black text-center py-4">
-        <div class="text-carrier font-black tracking-widest uppercase">{{ label.carrier }}</div>
-    </div>
-    {% endif %}
+            {% if colors_saved %}
+            <div class="flash-ok">Colores guardados. Se aplicarán a todas las guías.</div>
+            {% endif %}
 
-    <!-- REMITENTE -->
-    <div class="border-b-2 border-black p-5">
-        <div class="text-xs font-bold text-gray-600 mb-1">REMITENTE</div>
-        {% if label.sender.show_name %}
-        <div class="text-section font-black mt-1">{{ label.sender.name }}</div>
-        {% endif %}
-        <div class="text-sm mt-2">
-            {% if label.sender.address %}{{ label.sender.address }} · {% endif %}
-            {{ label.sender.city }}{% if label.sender.region %} — {{ label.sender.region }}{% endif %}
-        </div>
-        {% if label.sender.phone %}
-        <div class="text-sm mt-1">TEL: {{ label.sender.phone }}</div>
-        {% endif %}
-    </div>
-
-    <!-- DETALLE -->
-    <div class="grid grid-cols-1 md:grid-cols-2">
-        <div class="border-b-2 md:border-b-0 md:border-r-2 border-black p-5">
-            <div class="text-xs font-bold text-gray-600">GUÍA</div>
-            <div class="text-section font-black mt-1">{{ label.guide_number }}</div>
-            <div class="text-xs text-gray-500 mt-1">Cotización #{{ label.quotation_id }}</div>
-        </div>
-        <div class="p-5 border-b-2 md:border-b-0 border-black">
-            <div class="text-xs font-bold text-gray-600">BULTOS</div>
-            <div class="text-section font-black mt-1">{{ label.boxes }}</div>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 border-t-2 border-black">
-        <div class="md:border-r-2 border-black p-5">
-            <div class="text-xs font-bold text-gray-600">FECHA</div>
-            <div class="text-lg font-black mt-1">
-                {% if label.created_at %}{{ label.created_at.strftime('%d/%m/%Y') }}{% else %}—{% endif %}
+            <div class="status-chip">
+                <strong>Uso interno:</strong>
+                Cotización <strong>{{ label.quotation_status_label }}</strong>
+                · Producción <strong>{{ label.production_status_label }}</strong>
+                <span style="color:#94a3b8">(no se imprime)</span>
+                {% if label.is_draft %}
+                <span class="badge" style="margin-left:0.5rem">Sin guía registrada</span>
+                {% endif %}
             </div>
-        </div>
-        <div class="p-5">
-            <div class="text-xs font-bold text-gray-600">OBSERVACIONES</div>
-            <div class="text-sm mt-1">{{ label.notes or '—' }}</div>
-        </div>
-    </div>
 
-    <!-- PIE -->
-    <div class="border-t-2 border-black p-5">
-        <div class="flex justify-around items-center gap-4 text-center">
-            <div>
-                <div class="text-4xl">⚠</div>
-                <div class="font-black text-sm">FRÁGIL</div>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="copiesSelect">Cantidad en la hoja</label>
+                    <select id="copiesSelect">
+                        <option value="1" selected>1 etiqueta (hoja completa)</option>
+                        <option value="2">2 etiquetas (arriba y abajo)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Formato</label>
+                    <div class="size-toggle">
+                        <a href="/shipments/quotation/{{ label.quotation_id }}/label?size=a4"
+                           class="{% if label.print_size == 'a4' %}active{% endif %}">A4</a>
+                        <a href="/shipments/quotation/{{ label.quotation_id }}/label?size=a5"
+                           class="{% if label.print_size == 'a5' %}active{% endif %}">A5</a>
+                    </div>
+                </div>
+
+                {% if label.is_draft %}
+                <a href="/shipments/new/{{ label.quotation_id }}" class="btn">Registrar guía</a>
+                {% elif label.shipment_id %}
+                <a href="/shipments/{{ label.shipment_id }}/edit" class="btn">Editar destinatario</a>
+                {% endif %}
+
+                <a href="{{ back_url }}" class="btn btn-link">← Volver</a>
+
+                <div class="controls-spacer"></div>
+
+                <button type="button" class="btn btn-primary" id="printBtn" onclick="printLabels()">
+                    Imprimir
+                </button>
             </div>
-            <div>
-                <div class="text-4xl font-black leading-none">↑↑</div>
-                <div class="font-black text-sm">ESTE LADO ARRIBA</div>
+
+            <form method="post" action="/shipments/label-colors" class="colors-panel" id="colorsForm">
+                <input type="hidden" name="return_url" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
+                <div class="color-field">
+                    <label for="colorAccent">Acento</label>
+                    <div class="row">
+                        <input type="color" id="colorAccent" name="accent" value="{{ colors.accent }}" />
+                        <input type="text" id="colorAccentTxt" value="{{ colors.accent }}" maxlength="7" />
+                    </div>
+                </div>
+                <div class="color-field">
+                    <label for="colorBorder">Bordes</label>
+                    <div class="row">
+                        <input type="color" id="colorBorder" name="border" value="{{ colors.border }}" />
+                        <input type="text" id="colorBorderTxt" value="{{ colors.border }}" maxlength="7" />
+                    </div>
+                </div>
+                <div class="color-field">
+                    <label for="colorMuted">Textos</label>
+                    <div class="row">
+                        <input type="color" id="colorMuted" name="muted" value="{{ colors.muted }}" />
+                        <input type="text" id="colorMutedTxt" value="{{ colors.muted }}" maxlength="7" />
+                    </div>
+                </div>
+                <button type="submit" class="btn">Guardar colores</button>
+                <button type="button" class="btn btn-link" id="resetColorsBtn">Restablecer</button>
+            </form>
+        </div>
+
+        <div class="modal-body">
+            <div class="preview-hint no-print" id="previewHint">Vista previa · 1 etiqueta</div>
+
+            <div class="print-sheet" id="printSheet" data-copies="1">
+                <div class="label-slot label-slot-1">
+                    {{ label_card(label, logo_src, barcode_value, priority_label, 'guideBarcode-1') }}
+                </div>
+                <div class="label-slot label-slot-2">
+                    {{ label_card(label, logo_src, barcode_value, priority_label, 'guideBarcode-2') }}
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+{# Escenario a ancho fijo: se clona aquí para generar PNG sin deformar el diseño #}
+<div id="captureStage" aria-hidden="true"></div>
 
 <script>
 (function () {
-    if (new URLSearchParams(window.location.search).get('print') === '1') {
-        window.addEventListener('load', function () {
-            setTimeout(function () { window.print(); }, 400);
+    var barcodeValue = {{ barcode_value|tojson }};
+    var printSize = {{ label.print_size|tojson }};
+    var backUrl = {{ back_url|tojson }};
+    var guideTitle = {{ (label.guide_number or ('COT-' ~ label.quotation_id))|tojson }};
+
+    function renderIcons(root) {
+        if (typeof lucide === "undefined" || typeof lucide.createIcons !== "function") return;
+        try {
+            lucide.createIcons({
+                root: root || document,
+                attrs: { "stroke-width": "2.25" }
+            });
+        } catch (e) {
+            lucide.createIcons();
+        }
+    }
+
+    function renderBarcodes(root) {
+        (root || document).querySelectorAll(".guide-barcode").forEach(function (el) {
+            try {
+                JsBarcode(el, String(barcodeValue), {
+                    format: "CODE128",
+                    width: 2,
+                    height: 64,
+                    displayValue: false,
+                    margin: 0,
+                    background: "#ffffff",
+                    lineColor: "#111111"
+                });
+            } catch (e) {
+                el.outerHTML = '<div style="font-family:monospace;font-weight:700;">' + String(barcodeValue) + '</div>';
+            }
         });
+    }
+
+    function setCopies(n) {
+        var copies = n === 2 ? 2 : 1;
+        var sheet = document.getElementById("printSheet");
+        var hint = document.getElementById("previewHint");
+        sheet.setAttribute("data-copies", String(copies));
+        document.body.classList.toggle("copies-1", copies === 1);
+        document.body.classList.toggle("copies-2", copies === 2);
+        if (hint) {
+            hint.textContent = copies === 2
+                ? "Vista previa · 2 etiquetas en la misma hoja (arriba y abajo)"
+                : "Vista previa · 1 etiqueta";
+        }
+    }
+
+    function waitImages(node) {
+        var imgs = Array.prototype.slice.call(node.querySelectorAll("img"));
+        if (!imgs.length) return Promise.resolve();
+        return Promise.all(imgs.map(function (img) {
+            if (img.complete) return Promise.resolve();
+            return new Promise(function (resolve) {
+                img.onload = img.onerror = function () { resolve(); };
+            });
+        }));
+    }
+
+    function captureLabelSheet(sourceSheet) {
+        var stage = document.getElementById("captureStage");
+        stage.innerHTML = "";
+        var clone = sourceSheet.cloneNode(true);
+        // IDs únicos en el clon para el código de barras
+        clone.querySelectorAll("[id]").forEach(function (el, idx) {
+            el.id = el.id + "-cap-" + idx;
+        });
+        stage.appendChild(clone);
+        // Si el clon aún tiene placeholders Lucide, renderizarlos
+        renderIcons(stage);
+        renderBarcodes(stage);
+
+        return waitImages(clone).then(function () {
+            return html2canvas(clone, {
+                scale: 2,
+                backgroundColor: "#ffffff",
+                useCORS: true,
+                allowTaint: true,
+                logging: false,
+                scrollX: 0,
+                scrollY: 0
+            });
+        }).then(function (canvas) {
+            var dataUrl = canvas.toDataURL("image/png");
+            stage.innerHTML = "";
+            return dataUrl;
+        });
+    }
+
+    function openPrintWindow(imageUrls, copies) {
+        var page = (copies === 2 || printSize === "a4") ? "A4" : "A5";
+        var stackClass = copies === 2 ? "stack-2" : "stack-1";
+        var imgsHtml = imageUrls.map(function (src, i) {
+            return '<div class="slot"><img src="' + src + '" alt="Etiqueta ' + (i + 1) + '" /></div>';
+        }).join("");
+
+        var html = [
+            "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\">",
+            "<title>Imprimir " + String(guideTitle) + "</title>",
+            "<style>",
+            "html,body{margin:0;padding:0;background:#fff;}",
+            "@page{size:" + page + " portrait;margin:8mm;}",
+            ".page{width:100%;min-height:100vh;box-sizing:border-box;}",
+            ".stack-1 .slot{width:100%;}",
+            ".stack-1 img{width:100%;height:auto;display:block;}",
+            ".stack-2{display:flex;flex-direction:column;justify-content:space-between;gap:5mm;min-height:calc(100vh - 2px);}",
+            ".stack-2 .slot{flex:0 0 48%;display:flex;align-items:center;justify-content:center;overflow:hidden;}",
+            ".stack-2 img{width:100%;max-height:100%;height:auto;object-fit:contain;display:block;}",
+            "@media print{html,body{height:auto;}.page{min-height:0;height:auto;}",
+            ".stack-2{min-height:277mm;height:277mm;}}",
+            "</style></head><body>",
+            "<div class=\"page " + stackClass + "\">" + imgsHtml + "</div>",
+            "<script>",
+            "window.onload=function(){setTimeout(function(){window.focus();window.print();},250);};",
+            "<\/script></body></html>"
+        ].join("");
+
+        var w = window.open("", "_blank");
+        if (!w) {
+            alert("Permita ventanas emergentes para imprimir la etiqueta.");
+            return;
+        }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    }
+
+    window.printLabels = async function () {
+        var btn = document.getElementById("printBtn");
+        if (!btn || btn.dataset.busy === "1") return;
+        if (typeof html2canvas !== "function") {
+            alert("No se pudo cargar el generador de imagen. Recargue la página.");
+            return;
+        }
+
+        var copies = parseInt(document.getElementById("copiesSelect").value, 10) === 2 ? 2 : 1;
+        var sources = copies === 2
+            ? [
+                document.querySelector(".label-slot-1 .label-sheet"),
+                document.querySelector(".label-slot-2 .label-sheet")
+            ]
+            : [document.querySelector(".label-slot-1 .label-sheet")];
+
+        btn.dataset.busy = "1";
+        btn.classList.add("print-busy");
+        var original = btn.textContent;
+        btn.textContent = "Generando imagen...";
+
+        try {
+            var images = [];
+            for (var i = 0; i < sources.length; i++) {
+                if (!sources[i]) continue;
+                btn.textContent = copies === 2
+                    ? ("Generando imagen " + (i + 1) + "/2...")
+                    : "Generando imagen...";
+                images.push(await captureLabelSheet(sources[i]));
+            }
+            if (!images.length) throw new Error("Sin etiquetas para capturar");
+            openPrintWindow(images, copies);
+        } catch (err) {
+            console.error(err);
+            alert("No se pudo generar la imagen de la etiqueta. Intente de nuevo.");
+        } finally {
+            btn.dataset.busy = "0";
+            btn.classList.remove("print-busy");
+            btn.textContent = original;
+        }
+    };
+
+    window.closeLabelModal = function () {
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            window.location.href = backUrl;
+        }
+    };
+
+    document.getElementById("copiesSelect").addEventListener("change", function () {
+        setCopies(parseInt(this.value, 10));
+    });
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") closeLabelModal();
+    });
+
+    function applyGuideColors(accent, border, muted) {
+        var root = document.documentElement;
+        root.style.setProperty("--guide-accent", accent);
+        root.style.setProperty("--guide-border", border);
+        root.style.setProperty("--guide-muted", muted);
+    }
+
+    function bindColorPair(colorId, textId, cssVar) {
+        var colorEl = document.getElementById(colorId);
+        var textEl = document.getElementById(textId);
+        if (!colorEl || !textEl) return;
+        function syncFromColor() {
+            textEl.value = colorEl.value;
+            document.documentElement.style.setProperty(cssVar, colorEl.value);
+        }
+        function syncFromText() {
+            var v = (textEl.value || "").trim();
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                colorEl.value = v;
+                document.documentElement.style.setProperty(cssVar, v);
+            }
+        }
+        colorEl.addEventListener("input", syncFromColor);
+        textEl.addEventListener("input", syncFromText);
+        textEl.addEventListener("change", syncFromText);
+    }
+
+    bindColorPair("colorAccent", "colorAccentTxt", "--guide-accent");
+    bindColorPair("colorBorder", "colorBorderTxt", "--guide-border");
+    bindColorPair("colorMuted", "colorMutedTxt", "--guide-muted");
+
+    var resetBtn = document.getElementById("resetColorsBtn");
+    if (resetBtn) {
+        resetBtn.addEventListener("click", function () {
+            var defaults = { accent: "#d6452a", border: "#8a97a8", muted: "#6b7785" };
+            document.getElementById("colorAccent").value = defaults.accent;
+            document.getElementById("colorAccentTxt").value = defaults.accent;
+            document.getElementById("colorBorder").value = defaults.border;
+            document.getElementById("colorBorderTxt").value = defaults.border;
+            document.getElementById("colorMuted").value = defaults.muted;
+            document.getElementById("colorMutedTxt").value = defaults.muted;
+            applyGuideColors(defaults.accent, defaults.border, defaults.muted);
+        });
+    }
+
+    // Limpiar query colors_saved del return_url
+    var returnInput = document.querySelector('#colorsForm input[name="return_url"]');
+    if (returnInput) {
+        try {
+            var u = new URL(returnInput.value, window.location.origin);
+            u.searchParams.delete("colors_saved");
+            u.searchParams.delete("colors_error");
+            returnInput.value = u.pathname + (u.search || "");
+        } catch (e) {}
+    }
+
+    renderIcons(document);
+    renderBarcodes(document);
+    setCopies(1);
+
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("copies") === "2") {
+        document.getElementById("copiesSelect").value = "2";
+        setCopies(2);
     }
 })();
 </script>

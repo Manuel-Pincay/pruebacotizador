@@ -266,7 +266,7 @@ def build_fabrication_condensed_pdf(
     completed_note = (
         "Incluye ya realizadas"
         if filters and filters.get("show_completed")
-        else "Solo pendientes de fabricar"
+        else "Solo en producción"
     )
 
     header_text = (

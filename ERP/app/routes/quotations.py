@@ -758,6 +758,7 @@ async def quotation_detail(
             joinedload(Quotation.payments),
             joinedload(Quotation.designs),
             joinedload(Quotation.electronic_invoice),
+            joinedload(Quotation.production_order).joinedload(ProductionOrder.assignee),
         )
         .filter(Quotation.id == quotation_id)
         .first()
@@ -776,6 +777,17 @@ async def quotation_detail(
 
     transport = get_or_create_transport_service_product(db)
 
+    from app.services.design_service import list_designers
+    from app.services.production_order_service import DESIGN_PHASE_STATUSES, normalize_status
+
+    po = quotation.production_order if quotation else None
+    po_status = normalize_status(po.status) if po and po.status else ""
+    can_send_to_design = bool(
+        quotation
+        and (quotation.status or "").lower() in {"aprobada", "produccion"}
+        and (not po or po_status in DESIGN_PHASE_STATUSES)
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="quotations/detail.html",
@@ -786,8 +798,77 @@ async def quotation_detail(
             "max_designs": MAX_QUOTATION_DESIGNS,
             "designs_count": len(quotation.designs) if quotation else 0,
             "shipping_display": quotation_shipping_amount(quotation, transport.id) if quotation else 0,
+            "designers": list_designers(db) if can_send_to_design else [],
+            "can_send_to_design": can_send_to_design,
+            "design_assignee_name": (
+                (po.assignee.full_name or po.assignee.username)
+                if po and po.assignee
+                else (po.designer if po else None)
+            ),
+            "design_assignee_id": po.assigned_to_user_id if po else None,
+            "flash_design_sent": request.query_params.get("design_sent") == "1",
+            "flash_design_error": request.query_params.get("design_error", ""),
         },
     )
+
+
+@router.post("/{quotation_id}/send-to-design")
+async def quotation_send_to_design(
+    quotation_id: int,
+    request: Request,
+    designer_user_id: str = Form(""),
+    note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Envía cotización aprobada a diseño y asigna un diseñador."""
+    from urllib.parse import quote
+
+    from app.services.design_service import send_quotation_to_design
+
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = (
+        db.query(Quotation)
+        .options(
+            joinedload(Quotation.items).joinedload(QuotationItem.product),
+            joinedload(Quotation.production_order),
+        )
+        .filter(Quotation.id == quotation_id)
+        .first()
+    )
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    try:
+        designer_id = int(designer_user_id) if str(designer_user_id).strip() else 0
+        if not designer_id:
+            raise ValueError("Seleccione un diseñador.")
+        send_quotation_to_design(
+            db,
+            quotation,
+            designer_user_id=designer_id,
+            actor=user,
+            note=note,
+        )
+        try:
+            log_activity(
+                db,
+                "Cotización enviada a diseño",
+                f"Cotización #{quotation.id} asignada a diseñador #{designer_id}",
+            )
+        except Exception:
+            pass
+        return RedirectResponse(
+            url=f"/quotations/{quotation_id}?design_sent=1",
+            status_code=302,
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/quotations/{quotation_id}?design_error={quote(str(exc))}",
+            status_code=302,
+        )
 
 
 @router.get("/{quotation_id}/approve")

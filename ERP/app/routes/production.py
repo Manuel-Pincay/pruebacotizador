@@ -846,6 +846,9 @@ async def save_fabrication(
     usb_reference: str = Form(""),
     detail: str = Form(""),
     copies: int = Form(1),
+    use_fabrication_materials: str = Form("0"),
+    raw_material_id: str = Form(""),
+    raw_material_qty: str = Form(""),
     action: str = Form("save"),
     db: Session = Depends(get_db),
 ):
@@ -860,6 +863,13 @@ async def save_fabrication(
     if user.role == "disenador" and not can_edit_design_order(user, order):
         return RedirectResponse(url=f"/production/{order_id}", status_code=302)
 
+    use_fab = str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
+    rm_id = int(raw_material_id) if str(raw_material_id or "").strip().isdigit() else None
+    try:
+        rm_qty = float(raw_material_qty) if str(raw_material_qty or "").strip() else None
+    except (TypeError, ValueError):
+        rm_qty = None
+
     try:
         update_design_fields(
             db,
@@ -871,10 +881,20 @@ async def save_fabrication(
             notes=detail,
             copies=copies,
             user=user,
+            use_fabrication_materials=use_fab,
+            raw_material_id=rm_id,
+            raw_material_qty=rm_qty,
         )
         if action == "approve":
             order = get_production_order(db, order_id) or order
-            approve_design(db, order, user=user)
+            approve_design(
+                db,
+                order,
+                user=user,
+                use_fabrication_materials=use_fab,
+                raw_material_id=rm_id,
+                raw_material_qty=rm_qty,
+            )
     except ValueError as exc:
         from urllib.parse import quote
         return RedirectResponse(

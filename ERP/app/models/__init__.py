@@ -7,6 +7,8 @@ from app.models.electronic_invoice import ElectronicInvoice
 from app.models.electronic_invoice_line import ElectronicInvoiceLine
 from app.models.inventory_movement import InventoryMovement
 from app.models.measurementunit import MeasurementUnit
+from app.models.raw_material import RawMaterial
+from app.models.raw_material_movement import RawMaterialMovement
 from app.models.product import Product
 from app.models.productcategory import ProductCategory
 from app.models.productcolor import ProductColor
@@ -37,6 +39,8 @@ __all__ = [
     "ElectronicInvoiceLine",
     "InventoryMovement",
     "MeasurementUnit",
+    "RawMaterial",
+    "RawMaterialMovement",
     "Product",
     "ProductCategory",
     "ProductColor",

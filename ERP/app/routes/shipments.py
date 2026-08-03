@@ -19,8 +19,11 @@ from app.models.client import Client
 from app.models.company_config import CompanyConfig
 from app.auth.security import verify_admin_password
 from app.services.shipment_service import (
+    DEFAULT_GUIDE_COLORS,
     SHIPMENT_ROLES,
+    _normalize_hex_color,
     build_label_context,
+    get_guide_colors,
     get_latest_shipment,
     list_quotations_for_guides,
     quotation_can_have_guide,
@@ -54,11 +57,53 @@ def _get_config(db: Session) -> CompanyConfig | None:
 
 def _render_label(request: Request, db: Session, label_data: dict, size: str = "a4"):
     label_data["print_size"] = "a5" if size.lower() == "a5" else "a4"
+    if "colors" not in label_data:
+        label_data["colors"] = get_guide_colors(_get_config(db))
     return templates.TemplateResponse(
         request=request,
         name="shipments/label.html",
-        context={"label": label_data},
+        context={
+            "label": label_data,
+            "colors_saved": request.query_params.get("colors_saved", ""),
+            "colors_error": request.query_params.get("colors_error", ""),
+        },
     )
+
+
+@router.post("/label-colors")
+async def save_guide_label_colors(
+    request: Request,
+    accent: str = Form(""),
+    border: str = Form(""),
+    muted: str = Form(""),
+    return_url: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Guarda colores de la etiqueta de guía (configuración empresa)."""
+    from urllib.parse import urlparse
+
+    user = _require_shipment_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    config = _get_config(db)
+    if not config:
+        config = CompanyConfig()
+        db.add(config)
+        db.flush()
+
+    config.guide_accent_color = _normalize_hex_color(accent, DEFAULT_GUIDE_COLORS["accent"])
+    config.guide_border_color = _normalize_hex_color(border, DEFAULT_GUIDE_COLORS["border"])
+    config.guide_muted_color = _normalize_hex_color(muted, DEFAULT_GUIDE_COLORS["muted"])
+    db.commit()
+
+    # Volver a la etiqueta si el return_url es local y seguro
+    target = (return_url or "").strip()
+    parsed = urlparse(target)
+    if target.startswith("/shipments/") and not parsed.scheme and not parsed.netloc:
+        sep = "&" if "?" in target else "?"
+        return RedirectResponse(url=f"{target}{sep}colors_saved=1", status_code=302)
+    return RedirectResponse(url="/shipments/?colors_saved=1", status_code=302)
 
 
 # =========================================

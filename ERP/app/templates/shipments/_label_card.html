@@ -1,0 +1,102 @@
+{# Fragmento reutilizable de la etiqueta de guía #}
+{% macro label_card(label, logo_src, barcode_value, priority_label, barcode_id='guideBarcode') %}
+<article class="label-sheet size-{{ label.print_size }}" data-barcode="{{ barcode_value }}">
+    <header class="label-header">
+        <div class="logo-box">
+            {% if logo_src %}
+            <img src="{{ logo_src }}" alt="Logo" />
+            {% else %}
+            <div class="logo-fallback">{{ label.company_name[:18] if label.company_name else 'Logo' }}</div>
+            {% endif %}
+        </div>
+        <div class="company-name">
+            {{ label.company_name or label.sender.name or 'EMPRESA' }}
+        </div>
+    </header>
+
+    <section class="label-body">
+        <div class="col-to">
+            <div class="field-label">PARA:</div>
+            <div class="to-name">{{ label.customer_name }}</div>
+            {% if label.destination_address %}
+            <div class="to-line">{{ label.destination_address }}</div>
+            {% endif %}
+            {% if label.destination_city %}
+            <div class="to-line">{{ label.destination_city }}</div>
+            {% endif %}
+            {% if label.customer_id_number %}
+            <div class="to-line">C.I. / RUC: {{ label.customer_id_number }}</div>
+            {% endif %}
+            {% if label.customer_phone %}
+            <div class="to-line">Tel: {{ label.customer_phone }}</div>
+            {% endif %}
+
+            <div class="envelope-icon" aria-hidden="true">
+                <svg width="48" height="36" viewBox="0 0 48 36" fill="none">
+                    <rect x="2" y="6" width="44" height="28" rx="3" stroke="currentColor" stroke-width="2.5"/>
+                    <path d="M3 8 L24 22 L45 8" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="col-from">
+            <div class="priority-title">{{ priority_label }}</div>
+
+            <div class="from-block">
+                <strong>DE:</strong>
+                {% if label.sender.show_name %}{{ label.sender.name }}{% elif label.company_name %}{{ label.company_name }}{% else %}—{% endif %}{% if label.sender.address %}, {{ label.sender.address }}{% endif %}{% if label.sender.city %}, {{ label.sender.city }}{% endif %}{% if label.sender.region %}, {{ label.sender.region }}{% endif %}{% if label.sender.phone %} · Tel: {{ label.sender.phone }}{% endif %}
+            </div>
+
+            <div class="meta-list">
+                <div class="meta-row">
+                    <span class="meta-key">Núm. lote:</span>
+                    <span class="meta-val">COT-{{ '%05d'|format(label.quotation_id) }}</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-key">Núm. ref:</span>
+                    <span class="meta-val">{{ label.guide_number }}</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-key">Fecha envío:</span>
+                    <span class="meta-val">{% if label.created_at %}{{ label.created_at.strftime('%d/%m/%Y') }}{% else %}—{% endif %}</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-key">Bultos:</span>
+                    <span class="meta-val">{{ label.boxes }}</span>
+                </div>
+            </div>
+
+            {% if label.notes %}
+            <div class="notes-line"><strong>Obs:</strong> {{ label.notes }}</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="label-footer-grid">
+        <div class="handling">
+            <div class="handling-title">Manipular con cuidado</div>
+            <div class="handling-icons">
+                <div class="handle-item">
+                    <i data-lucide="wine" aria-hidden="true"></i>
+                    <span>Frágil</span>
+                </div>
+                <div class="handle-item">
+                    <i data-lucide="chevrons-up" aria-hidden="true"></i>
+                    <span>Arriba</span>
+                </div>
+                <div class="handle-item">
+                    <i data-lucide="umbrella" aria-hidden="true"></i>
+                    <span>Seco</span>
+                </div>
+            </div>
+        </div>
+        <div class="barcode-panel">
+            <svg class="guide-barcode" id="{{ barcode_id }}"></svg>
+        </div>
+    </section>
+
+    <footer class="tracking-bar">
+        Seguimiento: <strong>{{ barcode_value }}</strong>
+    </footer>
+</article>
+{% endmacro %}

@@ -7,14 +7,22 @@
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
     <div>
         <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Diseños</h1>
-        <p class="text-gray-500 mt-1">Productos personalizados — flujo lineal con producción</p>
+        <p class="text-gray-500 mt-1">Cotizaciones aprobadas — toma las disponibles o trabaja las tuyas</p>
     </div>
     <a href="/design/orders" class="px-4 py-2 rounded-xl bg-purple-700 text-white text-sm font-medium hover:bg-purple-800">
         Datos de fabricación
     </a>
 </div>
 
+{% if claim_success %}
+<div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Cotización asignada a ti.</div>
+{% endif %}
+{% if claim_error %}
+<div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ claim_error }}</div>
+{% endif %}
+
 <div class="flex flex-wrap gap-2 mb-4">
+    <a href="/design/pending?filter=available" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'available' %}bg-amber-500 text-white{% else %}bg-white border border-amber-200 text-amber-900 hover:bg-amber-50{% endif %}">Disponibles</a>
     <a href="/design/pending?filter=mine" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'mine' %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">Mis diseños</a>
     <a href="/design/pending?filter=pending" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'pending' %}bg-purple-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">Pendiente / Diseño</a>
     <a href="/design/pending?filter=diseno" class="px-4 py-2 rounded-xl text-sm font-medium {% if active_filter == 'diseno' %}bg-indigo-700 text-white{% else %}bg-white border border-gray-200 hover:bg-gray-50{% endif %}">En diseño</a>
@@ -51,8 +59,21 @@
                         {{ design_carousel(row.design_urls, 'carousel-pending-' ~ row.item_id, compact=true) }}
                     </td>
                     <td class="p-3">{{ design_status_badge(row.design_status, row.design_status_label) }}</td>
-                    <td class="p-3">{{ row.assigned_to }}</td>
+                    <td class="p-3">
+                        {% if row.assigned_to_user_id %}
+                        {{ row.assigned_to }}
+                        {% else %}
+                        <span class="text-amber-700 text-xs font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Sin asignar</span>
+                        {% endif %}
+                    </td>
                     <td class="p-3 whitespace-nowrap">
+                        {% if user.role == 'disenador' and row.can_claim %}
+                        <form method="post" action="/design/items/{{ row.item_id }}/claim" class="inline">
+                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold mr-1">
+                                Asignarme
+                            </button>
+                        </form>
+                        {% endif %}
                         <a href="/design/items/{{ row.item_id }}" class="text-purple-700 hover:underline font-medium">Revisar</a>
                         <span class="text-gray-300 mx-1">|</span>
                         {% if row.production_order_id %}

@@ -13,7 +13,6 @@ from app.models.production_order import ProductionOrder
 from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.models.user import User
-from app.services.condensed_service import CONDENSED_QUOTATION_STATUSES
 from app.services.production_order_service import (
     DESIGN_PHASE_STATUSES,
     PRODUCTION_STATUS_COLORS,
@@ -24,7 +23,24 @@ from app.services.production_order_service import (
     normalize_status,
     transition_status,
 )
-from app.services.quotation_design_service import get_design_urls
+from app.services.quotation_design_service import (
+    MAX_QUOTATION_DESIGNS,
+    get_design_urls,
+    sync_legacy_design_file,
+)
+from app.services.transport_product_service import TRANSPORT_PRODUCT_CODE, TRANSPORT_PRODUCT_NAME
+from app.utils.image_storage import design_image_url
+
+# Cotizaciones visibles en diseño (incluye seguimiento post-producción)
+DESIGN_QUOTATION_STATUSES = frozenset({
+    "aprobada",
+    "produccion",
+    "en_produccion",
+    "enviada",
+    "enviado",
+    "entregada",
+    "entregado",
+})
 
 # Mismo flujo lineal que producción (fase diseño + seguimiento posterior)
 DESIGN_STATUSES: list[tuple[str, str]] = [
@@ -42,6 +58,25 @@ def item_is_custom(item: QuotationItem) -> bool:
         return True
     product = item.product
     return bool(product and product.custom)
+
+
+def item_is_transport(item: QuotationItem) -> bool:
+    """Costo de envío: no entra al flujo de diseño."""
+    product = item.product
+    if product:
+        code = (product.code or "").strip().upper()
+        name = (product.name or "").strip().lower()
+        if code == TRANSPORT_PRODUCT_CODE.upper():
+            return True
+        if name == TRANSPORT_PRODUCT_NAME.lower():
+            return True
+    detail = (item.detail or "").strip().lower()
+    return detail == TRANSPORT_PRODUCT_NAME.lower()
+
+
+def item_needs_design(item: QuotationItem) -> bool:
+    """Ítems que el módulo de diseño debe listar y trabajar (catálogo o personalizados)."""
+    return not item_is_transport(item)
 
 
 def _product_name(item: QuotationItem) -> str:
@@ -105,16 +140,21 @@ def get_or_create_design_tracking(db: Session, item_id: int) -> DesignTracking:
     return tracking
 
 
-def _base_custom_items_query(db: Session):
+def _base_design_items_query(db: Session):
+    """Ítems de cotizaciones en flujo operativo, excluyendo servicio de transporte."""
     return (
         db.query(QuotationItem)
         .join(Quotation, QuotationItem.quotation_id == Quotation.id)
         .join(Client, Quotation.client_id == Client.id)
         .outerjoin(Product, QuotationItem.product_id == Product.id)
         .outerjoin(DesignTracking, DesignTracking.quotation_item_id == QuotationItem.id)
-        .filter(Quotation.status.in_(CONDENSED_QUOTATION_STATUSES))
+        .filter(Quotation.status.in_(list(DESIGN_QUOTATION_STATUSES)))
         .filter(
-            (QuotationItem.product_id.is_(None)) | (Product.custom.is_(True))
+            (Product.id.is_(None))
+            | (
+                (Product.code.is_(None) | (Product.code != TRANSPORT_PRODUCT_CODE))
+                & (Product.name.is_(None) | (Product.name != TRANSPORT_PRODUCT_NAME))
+            )
         )
         .options(
             joinedload(QuotationItem.quotation).joinedload(Quotation.client),
@@ -127,6 +167,10 @@ def _base_custom_items_query(db: Session):
         )
         .order_by(Quotation.delivery_date.asc(), Quotation.id.asc(), QuotationItem.id.asc())
     )
+
+
+# Alias por compatibilidad
+_base_custom_items_query = _base_design_items_query
 
 
 def _matches_design_filter(
@@ -150,6 +194,12 @@ def _matches_design_filter(
         if not assigned_user_id:
             return False
         if assigned_id != assigned_user_id:
+            return False
+    elif design_filter in {"available", "disponibles", "unassigned"}:
+        # Cotizaciones/ítems aprobados sin diseñador, listos para tomar
+        if production_status not in DESIGN_PHASE_FILTER:
+            return False
+        if assigned_id is not None:
             return False
     elif design_filter == "pending":
         if production_status not in DESIGN_PHASE_FILTER:
@@ -192,6 +242,8 @@ def build_design_row(item: QuotationItem) -> dict[str, Any]:
         "design_status_label": PRODUCTION_STATUS_LABELS.get(production_status, production_status),
         "assigned_to": _assigned_label_from_po(po, tracking),
         "assigned_to_user_id": _assigned_user_id(po, tracking),
+        "can_claim": _assigned_user_id(po, tracking) is None
+        and production_status in DESIGN_PHASE_FILTER,
         "design_urls": get_design_urls(quotation) if quotation else [],
         "production_status": production_status,
     }
@@ -209,7 +261,7 @@ def list_design_items(
     rows: list[dict[str, Any]] = []
 
     for item in items:
-        if not item_is_custom(item):
+        if not item_needs_design(item):
             continue
         if not _matches_design_filter(
             item,
@@ -226,24 +278,27 @@ def list_design_items(
 
 
 def compute_design_kpis(db: Session, designer_scope_user_id: int | None = None) -> dict[str, int]:
-    items = _base_custom_items_query(db).all()
+    items = _base_design_items_query(db).all()
     kpis = {code: 0 for code in PRODUCTION_STATUS_SEQUENCE}
+    kpis["available"] = 0
 
     for item in items:
-        if not item_is_custom(item):
+        if not item_needs_design(item):
             continue
         quotation = item.quotation
         po = quotation.production_order if quotation else None
         tracking = item.design_tracking
         production_status = _order_production_status(quotation)
 
+        assigned_id = _assigned_user_id(po, tracking)
         if designer_scope_user_id is not None:
-            assigned_id = _assigned_user_id(po, tracking)
             if assigned_id and assigned_id != designer_scope_user_id:
                 continue
 
         if production_status in kpis:
             kpis[production_status] += 1
+        if production_status in DESIGN_PHASE_FILTER and assigned_id is None:
+            kpis["available"] += 1
 
     return kpis
 
@@ -294,8 +349,8 @@ def update_design_status(
         .filter(QuotationItem.id == item_id)
         .first()
     )
-    if not item or not item_is_custom(item):
-        raise ValueError("Producto personalizado no encontrado.")
+    if not item or not item_needs_design(item):
+        raise ValueError("Producto no encontrado para diseño.")
 
     action = (status or "").lower()
     if action not in {"start", "diseno"}:
@@ -351,8 +406,8 @@ def add_design_observation(
         raise ValueError("La observación no puede estar vacía.")
 
     item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
-    if not item or not item_is_custom(item):
-        raise ValueError("Producto personalizado no encontrado.")
+    if not item or not item_needs_design(item):
+        raise ValueError("Producto no encontrado para diseño.")
 
     tracking = item.design_tracking or get_or_create_design_tracking(db, item_id)
     observation = DesignObservation(
@@ -365,6 +420,51 @@ def add_design_observation(
     db.commit()
     db.refresh(observation)
     return observation
+
+
+def claim_design_item(
+    db: Session,
+    item_id: int,
+    *,
+    user: User,
+) -> ProductionOrder:
+    """Diseñador se autoasigna un ítem/cotización sin diseñador."""
+    if not user or user.role != "disenador":
+        raise ValueError("Solo un diseñador puede tomarse esta cotización.")
+
+    item = (
+        db.query(QuotationItem)
+        .options(
+            joinedload(QuotationItem.quotation).joinedload(Quotation.production_order),
+            joinedload(QuotationItem.design_tracking),
+        )
+        .filter(QuotationItem.id == item_id)
+        .first()
+    )
+    if not item or not item_needs_design(item):
+        raise ValueError("Producto no encontrado para diseño.")
+
+    order = _ensure_po_for_item(db, item, user)
+    if order.assigned_to_user_id and order.assigned_to_user_id != user.id:
+        raise ValueError("Esta cotización ya fue tomada por otro diseñador.")
+
+    from app.services.production_order_service import assign_designer as assign_po_designer
+
+    if not order.assigned_to_user_id:
+        assign_po_designer(db, order, user.id)
+
+    tracking = item.design_tracking or get_or_create_design_tracking(db, item_id)
+    tracking.assigned_to_user_id = user.id
+    tracking.assigned_to = user.full_name or user.username
+    tracking.updated_at = datetime.utcnow()
+    _add_observation(
+        db,
+        tracking,
+        user=user,
+        note=f"Diseñador se autoasignó: {tracking.assigned_to}",
+    )
+    db.commit()
+    return get_production_order_by_quotation(db, item.quotation_id) or order
 
 
 def assign_designer(
@@ -381,8 +481,8 @@ def assign_designer(
         .filter(QuotationItem.id == item_id)
         .first()
     )
-    if not item or not item_is_custom(item):
-        raise ValueError("Producto personalizado no encontrado.")
+    if not item or not item_needs_design(item):
+        raise ValueError("Producto no encontrado para diseño.")
 
     from app.services.production_order_service import assign_designer as assign_po_designer
 
@@ -428,16 +528,29 @@ def get_design_detail(db: Session, item_id: int) -> dict[str, Any] | None:
         .filter(QuotationItem.id == item_id)
         .first()
     )
-    if not item or not item_is_custom(item):
+    if not item or not item_needs_design(item):
         return None
 
     tracking = item.design_tracking or get_or_create_design_tracking(db, item.id)
+    quotation = item.quotation
+    if quotation:
+        sync_legacy_design_file(db, quotation)
     db.commit()
 
-    quotation = item.quotation
     client = quotation.client if quotation else None
     po = quotation.production_order if quotation else None
     production_status = _order_production_status(quotation)
+    designs = []
+    if quotation:
+        for design in sorted(quotation.designs or [], key=lambda d: d.sort_order or 0):
+            url = design_image_url(design.filename)
+            if not url:
+                continue
+            designs.append({
+                "id": design.id,
+                "filename": design.filename,
+                "url": url,
+            })
 
     return {
         "item_id": item.id,
@@ -458,8 +571,13 @@ def get_design_detail(db: Session, item_id: int) -> dict[str, Any] | None:
         "design_status_label": PRODUCTION_STATUS_LABELS.get(production_status, production_status),
         "assigned_to": _assigned_label_from_po(po, tracking),
         "assigned_to_user_id": _assigned_user_id(po, tracking),
+        "can_claim": _assigned_user_id(po, tracking) is None
+        and production_status in DESIGN_PHASE_FILTER,
         "production_status": production_status,
-        "design_urls": get_design_urls(quotation) if quotation else [],
+        "design_urls": [d["url"] for d in designs] or (get_design_urls(quotation) if quotation else []),
+        "designs": designs,
+        "designs_count": len(designs),
+        "max_designs": MAX_QUOTATION_DESIGNS,
         "observations": [
             {
                 "id": obs.id,
@@ -483,3 +601,99 @@ def list_designers(db: Session) -> list[User]:
         .order_by(User.full_name.asc())
         .all()
     )
+
+
+def send_quotation_to_design(
+    db: Session,
+    quotation: Quotation,
+    *,
+    designer_user_id: int,
+    actor: User | None = None,
+    note: str = "",
+) -> ProductionOrder:
+    """Desde cotización aprobada: crea/asegura OP, asigna diseñador y pasa a fase diseño."""
+    q_status = (quotation.status or "").lower().strip()
+    if q_status not in {"aprobada", "produccion"}:
+        raise ValueError("Solo cotizaciones aprobadas pueden enviarse a diseño.")
+
+    designer = (
+        db.query(User)
+        .filter(
+            User.id == designer_user_id,
+            User.role == "disenador",
+            User.active.is_(True),
+        )
+        .first()
+    )
+    if not designer:
+        raise ValueError("Seleccione un diseñador válido.")
+
+    order = get_production_order_by_quotation(db, quotation.id)
+    if not order:
+        order = ensure_production_order(
+            db,
+            quotation,
+            user_id=actor.id if actor else None,
+        )
+        db.flush()
+    if not order:
+        raise ValueError("No se pudo crear la orden de producción.")
+
+    current = normalize_status(order.status)
+    if current not in DESIGN_PHASE_FILTER:
+        raise ValueError(
+            "La orden ya avanzó de diseño. No se puede reasignar desde cotización."
+        )
+
+    designer_label = designer.full_name or designer.username
+    order.assigned_to_user_id = designer.id
+    order.designer = designer_label
+    order.updated_at = datetime.utcnow()
+
+    history_note = (note or "").strip() or f"Enviado a diseño — asignado a {designer_label}"
+
+    if current == "pendiente":
+        transition_status(
+            db,
+            order,
+            "diseno",
+            user=actor,
+            notes=history_note,
+        )
+    else:
+        from app.services.production_order_service import log_history
+
+        log_history(
+            db,
+            order,
+            status=current,
+            notes=history_note,
+            user_id=actor.id if actor else None,
+        )
+        db.commit()
+        db.refresh(order)
+
+    # Sincronizar tracking de ítems de diseño (excluye transporte)
+    items = (
+        db.query(QuotationItem)
+        .options(joinedload(QuotationItem.product), joinedload(QuotationItem.design_tracking))
+        .filter(QuotationItem.quotation_id == quotation.id)
+        .all()
+    )
+    for item in items:
+        if not item_needs_design(item):
+            continue
+        tracking = item.design_tracking or get_or_create_design_tracking(db, item.id)
+        tracking.assigned_to_user_id = designer.id
+        tracking.assigned_to = designer_label
+        tracking.status = "en_diseno"
+        tracking.updated_at = datetime.utcnow()
+        _add_observation(
+            db,
+            tracking,
+            user=actor,
+            note=history_note,
+        )
+
+    db.commit()
+    return get_production_order_by_quotation(db, quotation.id) or order

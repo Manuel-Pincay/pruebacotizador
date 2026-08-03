@@ -204,6 +204,7 @@ def get_production_order(db: Session, order_id: int) -> ProductionOrder | None:
             joinedload(ProductionOrder.history).joinedload(ProductionOrderHistory.author),
             joinedload(ProductionOrder.assignee),
             joinedload(ProductionOrder.design_completer),
+            joinedload(ProductionOrder.raw_material),
         )
         .filter(ProductionOrder.id == order_id)
         .first()
@@ -253,8 +254,13 @@ def transition_status(
         order.design_completed_by = user.id if user else None
 
     quotation = order.quotation
-    if target == "produccion" and quotation:
-        _deduct_inventory_for_quotation(db, quotation)
+    if target == "produccion":
+        if order.use_fabrication_materials:
+            from app.services.raw_material_service import consume_for_production
+
+            consume_for_production(db, order, user_id=user.id if user else None)
+        elif quotation:
+            _deduct_inventory_for_quotation(db, quotation)
 
     order.status = target
     order.updated_at = now
@@ -286,6 +292,9 @@ def update_design_fields(
     notes: str = "",
     copies: int = 1,
     user: User | None = None,
+    use_fabrication_materials: bool | None = None,
+    raw_material_id: int | None = None,
+    raw_material_qty: float | None = None,
 ) -> ProductionOrder:
     if material and material not in DESIGN_MATERIALS:
         raise ValueError("Material no válido.")
@@ -301,6 +310,17 @@ def update_design_fields(
     order.design_copies = max(1, int(copies or 1))
     order.updated_at = datetime.utcnow()
 
+    if use_fabrication_materials is not None:
+        from app.services.raw_material_service import set_fabrication_source
+
+        set_fabrication_source(
+            db,
+            order,
+            use_fabrication_materials=use_fabrication_materials,
+            raw_material_id=raw_material_id,
+            raw_material_qty=raw_material_qty,
+        )
+
     current = normalize_status(order.status)
     if current == "pendiente":
         transition_status(db, order, "diseno", user=user, notes="Inicio de diseño.")
@@ -310,22 +330,53 @@ def update_design_fields(
     return order
 
 
-def approve_design(db: Session, order: ProductionOrder, *, user: User | None = None, notes: str = "") -> ProductionOrder:
+def approve_design(
+    db: Session,
+    order: ProductionOrder,
+    *,
+    user: User | None = None,
+    notes: str = "",
+    use_fabrication_materials: bool | None = None,
+    raw_material_id: int | None = None,
+    raw_material_qty: float | None = None,
+) -> ProductionOrder:
     current = normalize_status(order.status)
     if current not in DESIGN_EDIT_STATUSES:
         raise ValueError("La orden no está en fase de diseño.")
     validate_fabrication_data(order)
 
+    if use_fabrication_materials is not None:
+        from app.services.raw_material_service import set_fabrication_source
+
+        set_fabrication_source(
+            db,
+            order,
+            use_fabrication_materials=use_fabrication_materials,
+            raw_material_id=raw_material_id,
+            raw_material_qty=raw_material_qty,
+        )
+
     if current == "pendiente":
         transition_status(db, order, "diseno", user=user, notes="Inicio de diseño.")
         order = get_production_order(db, order.id) or order
+
+    fab_note = ""
+    if order.use_fabrication_materials and order.raw_material_id:
+        from app.services.raw_material_service import get_raw_material
+
+        rm = get_raw_material(db, order.raw_material_id)
+        if rm:
+            fab_note = (
+                f" Material de fabricación: {rm.label} "
+                f"({float(order.raw_material_qty or 0):g} {rm.unit})."
+            )
 
     transition_status(
         db,
         order,
         "produccion",
         user=user,
-        notes=notes or "Datos de fabricación listos — pasa a producción.",
+        notes=(notes or "Datos de fabricación listos — pasa a producción.") + fab_note,
     )
     return get_production_order(db, order.id) or order
 
@@ -337,6 +388,28 @@ def assign_designer(db: Session, order: ProductionOrder, designer_user_id: int |
     order.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(order)
+    return order
+
+
+def claim_design_order(db: Session, order: ProductionOrder, *, user: User) -> ProductionOrder:
+    """Diseñador toma una orden de producción sin asignar."""
+    if not user or user.role != "disenador":
+        raise ValueError("Solo un diseñador puede tomarse esta orden.")
+    if order.assigned_to_user_id and order.assigned_to_user_id != user.id:
+        raise ValueError("Esta orden ya fue tomada por otro diseñador.")
+    if normalize_status(order.status) not in DESIGN_EDIT_STATUSES:
+        raise ValueError("Solo se pueden tomar órdenes en fase de diseño.")
+    if not order.assigned_to_user_id:
+        assign_designer(db, order, user.id)
+        log_history(
+            db,
+            order,
+            status=normalize_status(order.status),
+            notes=f"Diseñador se autoasignó: {_user_label(user)}",
+            user_id=user.id,
+        )
+        db.commit()
+        db.refresh(order)
     return order
 
 
@@ -470,6 +543,10 @@ def build_order_dict(order: ProductionOrder, *, client_name: str = "—") -> dic
         "assigned_to": order.assigned_to_user_id,
         "assigned_to_name": _user_label(order.assignee),
         "created_at": order.created_at,
+        "use_fabrication_materials": bool(order.use_fabrication_materials),
+        "raw_material_id": order.raw_material_id,
+        "raw_material_qty": float(order.raw_material_qty) if order.raw_material_qty is not None else None,
+        "raw_material_label": order.raw_material.label if order.raw_material else "",
     }
 
 

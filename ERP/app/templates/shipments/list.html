@@ -72,15 +72,9 @@
                                 class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-lg text-xs font-medium">
                                 Editar
                             </a>
-                            <a href="/shipments/{{ shipment.id }}/label?size=a4&print=1"
-                                target="_blank" rel="noopener noreferrer"
+                            <a href="/shipments/{{ shipment.id }}/label?size=a4"
                                 class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
-                                A4
-                            </a>
-                            <a href="/shipments/{{ shipment.id }}/label?size=a5&print=1"
-                                target="_blank" rel="noopener noreferrer"
-                                class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
-                                A5
+                                Etiqueta
                             </a>
                             <button type="button"
                                 class="bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-medium"
@@ -148,10 +142,8 @@ document.getElementById('delete-modal').addEventListener('click', function (e) {
 (function () {
     var id = {{ open_label | int }};
     var size = {{ open_size | tojson }};
-    window.open('/shipments/' + id + '/label?size=' + encodeURIComponent(size) + '&print=1', '_blank', 'noopener');
-    if (window.history.replaceState) {
-        history.replaceState({}, '', '/shipments/');
-    }
+    window.location.href = '/shipments/' + id + '/label?size=' + encodeURIComponent(size);
+
 })();
 </script>
 {% endif %}

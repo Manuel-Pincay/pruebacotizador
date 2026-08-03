@@ -103,10 +103,9 @@
 
             <div class="flex flex-wrap justify-end gap-3 mt-10">
                 {% if not edit_mode %}
-                <a href="/shipments/quotation/{{ quotation.id }}/label?size=a4&print=1"
-                    target="_blank" rel="noopener noreferrer"
+                <a href="/shipments/quotation/{{ quotation.id }}/label?size=a4"
                     class="px-6 py-3 rounded-xl border border-gray-300 hover:bg-gray-50 font-medium text-sm">
-                    Vista previa A4
+                    Vista previa etiqueta
                 </a>
                 {% endif %}
                 <button type="submit"

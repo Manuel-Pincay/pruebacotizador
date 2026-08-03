@@ -65,6 +65,36 @@ def can_reassign_design_order(user: User) -> bool:
     return is_design_admin(user)
 
 
+def can_self_assign_design_order(user: User, order: ProductionOrder | None) -> bool:
+    """Diseñador puede tomarse una orden sin asignar (fase pendiente/diseño)."""
+    if not is_designer(user) or not order:
+        return False
+    if order.assigned_to_user_id is not None:
+        return False
+    status = (order.status or "").strip().lower()
+    return status in {"pendiente", "diseno"}
+
+
+def can_self_assign_design_item(user: User, item: QuotationItem) -> bool:
+    """Diseñador puede tomarse un ítem aprobado sin diseñador."""
+    if not is_designer(user):
+        return False
+    quotation = item.quotation
+    if quotation and quotation.production_order:
+        return can_self_assign_design_order(user, quotation.production_order)
+    tracking = item.design_tracking
+    if tracking and tracking.assigned_to_user_id:
+        return False
+    return True
+
+
+def can_attach_design_images(user: User, item: QuotationItem) -> bool:
+    """Diseñador/admin con acceso al ítem puede adjuntar imágenes guardadas."""
+    if not can_view_design_item(user, item):
+        return False
+    return is_design_admin(user) or is_designer(user)
+
+
 def can_export_design_orders(user: User) -> bool:
     return is_design_admin(user)
 

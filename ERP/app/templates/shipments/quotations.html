@@ -48,19 +48,11 @@
                     <td class="p-4">
                         <div class="flex flex-wrap gap-2">
                             {% if row.shipment_id %}
-                            <a href="/shipments/{{ row.shipment_id }}/label?size=a4&print=1"
-                                target="_blank" rel="noopener noreferrer"
-                                class="text-purple-700 hover:underline font-medium text-xs">Imprimir A4</a>
-                            <a href="/shipments/{{ row.shipment_id }}/label?size=a5&print=1"
-                                target="_blank" rel="noopener noreferrer"
-                                class="text-purple-700 hover:underline font-medium text-xs">A5</a>
+                            <a href="/shipments/{{ row.shipment_id }}/label?size=a4"
+                                class="text-purple-700 hover:underline font-medium text-xs">Ver etiqueta</a>
                             {% else %}
-                            <a href="/shipments/quotation/{{ row.id }}/label?size=a4&print=1"
-                                target="_blank" rel="noopener noreferrer"
-                                class="text-purple-700 hover:underline font-medium text-xs">Imprimir A4</a>
-                            <a href="/shipments/quotation/{{ row.id }}/label?size=a5&print=1"
-                                target="_blank" rel="noopener noreferrer"
-                                class="text-purple-700 hover:underline font-medium text-xs">A5</a>
+                            <a href="/shipments/quotation/{{ row.id }}/label?size=a4"
+                                class="text-purple-700 hover:underline font-medium text-xs">Ver etiqueta</a>
                             {% endif %}
                             <a href="/shipments/new/{{ row.id }}"
                                 class="text-indigo-700 hover:underline font-medium text-xs">
@@ -84,10 +76,8 @@
 (function () {
     var id = {{ open_label | int }};
     var size = {{ open_size | tojson }};
-    window.open('/shipments/' + id + '/label?size=' + encodeURIComponent(size) + '&print=1', '_blank', 'noopener');
-    if (window.history.replaceState) {
-        history.replaceState({}, '', '/shipments/quotations');
-    }
+    window.location.href = '/shipments/' + id + '/label?size=' + encodeURIComponent(size);
+
 })();
 </script>
 {% endif %}

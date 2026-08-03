@@ -263,6 +263,15 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 
     chart_total = sum(chart_values)
 
+    raw_materials_low = 0
+    if role == "admin":
+        try:
+            from app.services.raw_material_service import count_low_stock
+            raw_materials_low = count_low_stock(db)
+        except Exception as e:
+            print("DASHBOARD ERROR raw_materials_low:", str(e))
+            raw_materials_low = 0
+
     return templates.TemplateResponse(
         request=request,
         name="dashboard/index.html",
@@ -287,5 +296,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             "quotation_status_summary": quotation_status_summary,
             "today": today,
             "fab_dash": fab_dash,
+            "raw_materials_low": raw_materials_low,
         },
     )

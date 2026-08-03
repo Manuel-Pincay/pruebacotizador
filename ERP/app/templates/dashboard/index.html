@@ -6,6 +6,17 @@
 
 {% block content %}
 
+{% if role == 'admin' and raw_materials_low %}
+<div class="mb-4 p-3 sm:p-4 rounded-xl border border-amber-200 bg-amber-50 flex flex-wrap items-center justify-between gap-3">
+  <div class="text-sm text-amber-900">
+    <strong>⚠️ Materia prima baja:</strong> {{ raw_materials_low }} ítem(s) en o bajo el stock mínimo.
+  </div>
+  <a href="/inventory/materials?low=1" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold">
+    Ver y reabastecer →
+  </a>
+</div>
+{% endif %}
+
 {% if role == 'produccion' %}
 
 <div class="mb-6 sm:mb-8">

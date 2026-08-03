@@ -40,7 +40,20 @@
 
     {% endif %}
 
-
+    {% if claimed %}
+    <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Orden asignada a ti. Ya puedes completar los datos de fabricación.</div>
+    {% endif %}
+    {% if claim_error %}
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ claim_error }}</div>
+    {% endif %}
+    {% if can_claim %}
+    <div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
+        <p class="text-sm text-amber-900 mb-3">Esta orden no tiene diseñador. Tómala para trabajarla de inmediato.</p>
+        <form method="post" action="/design/orders/{{ order.id }}/claim">
+            <button type="submit" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold">Asignarme esta orden</button>
+        </form>
+    </div>
+    {% endif %}
 
     <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6">
 
@@ -156,7 +169,93 @@
 
         </div>
 
-
+        {% if can_edit and not readonly %}
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+            <p class="text-sm font-semibold text-emerald-900">Origen del material</p>
+            <div class="flex flex-col sm:flex-row gap-3 text-sm">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="use_fabrication_materials" value="0" class="fab-source-radio"
+                        {% if not order.use_fabrication_materials %}checked{% endif %}>
+                    <span>Stock de producto terminado</span>
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="use_fabrication_materials" value="1" class="fab-source-radio"
+                        {% if order.use_fabrication_materials %}checked{% endif %}>
+                    <span>Usar material de fabricación</span>
+                </label>
+            </div>
+            <div id="fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Materia prima *</label>
+                    <select name="raw_material_id" id="raw_material_id"
+                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+                <div class="max-w-xs">
+                    <label class="block text-xs text-gray-600 mb-1">Cantidad a consumir *</label>
+                    <input type="number" name="raw_material_qty" id="raw_material_qty" step="0.01" min="0.01"
+                        value="{{ order.raw_material_qty or order.copies or 1 }}"
+                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                    <p id="raw_material_unit_hint" class="text-xs text-gray-400 mt-1">planchas o metros</p>
+                </div>
+            </div>
+        </div>
+        <script>
+        (function () {
+          const selectedId = {{ order.raw_material_id | tojson }};
+          const radios = document.querySelectorAll('.fab-source-radio');
+          const fields = document.getElementById('fab-raw-fields');
+          const sel = document.getElementById('raw_material_id');
+          const materialSelect = document.querySelector('select[name="material"]');
+          const unitHint = document.getElementById('raw_material_unit_hint');
+          function toggleFields() {
+            const useFab = document.querySelector('.fab-source-radio:checked')?.value === '1';
+            fields?.classList.toggle('hidden', !useFab);
+            if (useFab) loadMaterials();
+          }
+          async function loadMaterials() {
+            if (!sel) return;
+            const designMat = materialSelect?.value || '';
+            sel.innerHTML = '<option value="">Cargando...</option>';
+            try {
+              const res = await fetch(`/inventory/api/materials?design_material=${encodeURIComponent(designMat)}`, {
+                credentials: 'same-origin', headers: { Accept: 'application/json' },
+              });
+              const data = await res.json();
+              sel.innerHTML = '<option value="">Seleccionar materia prima...</option>';
+              (data || []).forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.dataset.unit = m.unit;
+                opt.textContent = `${m.label} — ${m.stock} ${m.unit}${m.is_low_stock ? ' ⚠ bajo' : ''}`;
+                if (selectedId && m.id == selectedId) opt.selected = true;
+                sel.appendChild(opt);
+              });
+              updateUnitHint();
+            } catch (_) {
+              sel.innerHTML = '<option value="">No se pudo cargar materia prima</option>';
+            }
+          }
+          function updateUnitHint() {
+            const opt = sel?.options[sel.selectedIndex];
+            if (unitHint && opt?.dataset?.unit) unitHint.textContent = opt.dataset.unit;
+          }
+          radios.forEach(r => r.addEventListener('change', toggleFields));
+          materialSelect?.addEventListener('change', () => {
+            if (document.querySelector('.fab-source-radio:checked')?.value === '1') loadMaterials();
+          });
+          sel?.addEventListener('change', updateUnitHint);
+          toggleFields();
+        })();
+        </script>
+        {% elif order.use_fabrication_materials %}
+        <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Material de fabricación
+            {% if order.raw_material_label %} — {{ order.raw_material_label }}{% endif %}
+            {% if order.raw_material_qty %} ({{ order.raw_material_qty }}){% endif %}
+        </div>
+        {% endif %}
 
         {% if can_reassign and designers %}
 

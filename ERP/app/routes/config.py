@@ -176,6 +176,9 @@ async def save_config(
     guide_sender_region: str = Form("Ecuador"),
     guide_sender_phone: str = Form(""),
     guide_sender_address: str = Form(""),
+    guide_accent_color: str = Form("#d6452a"),
+    guide_border_color: str = Form("#8a97a8"),
+    guide_muted_color: str = Form("#6b7785"),
     company_icon: UploadFile = File(None),
     logo: UploadFile = File(None),
     request: Request = Request,
@@ -188,6 +191,8 @@ async def save_config(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     config = get_or_create_config(db)
+
+    from app.services.shipment_service import DEFAULT_GUIDE_COLORS, _normalize_hex_color
 
     # Update configuration
     config.company_name = company_name
@@ -203,6 +208,15 @@ async def save_config(
     config.guide_sender_region = guide_sender_region.strip() or "Ecuador"
     config.guide_sender_phone = guide_sender_phone.strip() or None
     config.guide_sender_address = guide_sender_address.strip() or None
+    config.guide_accent_color = _normalize_hex_color(
+        guide_accent_color, DEFAULT_GUIDE_COLORS["accent"]
+    )
+    config.guide_border_color = _normalize_hex_color(
+        guide_border_color, DEFAULT_GUIDE_COLORS["border"]
+    )
+    config.guide_muted_color = _normalize_hex_color(
+        guide_muted_color, DEFAULT_GUIDE_COLORS["muted"]
+    )
 
     # Icono (sidebar / favicon)
     if company_icon and company_icon.filename:
