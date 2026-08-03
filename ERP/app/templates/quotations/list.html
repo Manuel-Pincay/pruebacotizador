@@ -205,6 +205,7 @@
                         </span>
                     </td>
                     <td class="p-5">
+                        <div class="flex flex-col items-start gap-1.5">
                         {% set st = (quotation.status or "")|lower|trim %}
                         {% if st == "pendiente" %}
 
@@ -243,6 +244,15 @@
                         </span>
 
                         {% endif %}
+
+                        {% if quotation.electronic_invoice %}
+                        <a href="/billing/{{ quotation.electronic_invoice.id }}"
+                           class="inline-flex items-center gap-1 bg-emerald-600 text-white px-2.5 py-0.5 rounded-full text-[11px] font-semibold shadow-sm hover:bg-emerald-700"
+                           title="Ver factura electrónica">
+                            🧾 Facturada
+                        </a>
+                        {% endif %}
+                        </div>
                     </td>
                     <td class="p-5">
                         {% if quotation.payment_status == 'sin_abono' %}

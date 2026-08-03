@@ -82,7 +82,7 @@ def _para(text: str, style, align=TA_LEFT):
     return Paragraph(safe, ParagraphStyle(name="", parent=style, alignment=align))
 
 
-def _border_style(*, header_rows=None, zebra_from=1, total_row=None, label_col_gray=False):
+def _border_style(*, header_rows=None, total_row=None, label_col_gray=False):
     """Estilos comunes: bordes grises, cabeceras y filas alternas."""
     style = [
         ("BOX", (0, 0), (-1, -1), 0.8, GRAY_BORDER),
@@ -116,6 +116,42 @@ def _apply_zebra(table: Table, start_row: int, end_row: int | None = None):
         table.setStyle(TableStyle(commands))
 
 
+def _fit_barcode(clave: str, max_width: float, bar_height: float = 10 * mm):
+    """Código de barras Code128 dimensionado para no desbordar el ancho disponible."""
+    clave = (clave or "").strip() or "0"
+    # Code128 ≈ 11 módulos por carácter + quiet zones / start-stop
+    modules = max(len(clave) * 11 + 55, 80)
+    bar_width = max(0.11 * mm, min(0.28 * mm, max_width / modules))
+    drawing = createBarcodeDrawing(
+        "Code128",
+        value=clave,
+        barHeight=bar_height,
+        barWidth=bar_width,
+        humanReadable=0,
+    )
+    # Ajuste fino si aún se pasa (fuentes/quiet zones reales)
+    if getattr(drawing, "width", 0) and drawing.width > max_width:
+        factor = max_width / float(drawing.width)
+        bar_width = max(0.10 * mm, bar_width * factor * 0.98)
+        drawing = createBarcodeDrawing(
+            "Code128",
+            value=clave,
+            barHeight=bar_height,
+            barWidth=bar_width,
+            humanReadable=0,
+        )
+    return drawing
+
+
+def _col_widths(total: float, fractions: list[float]) -> list[float]:
+    """Fracciones que suman 1 → anchos exactos que suman `total`."""
+    s = sum(fractions) or 1.0
+    widths = [total * (f / s) for f in fractions]
+    # Corregir redondeo en la última columna
+    widths[-1] = total - sum(widths[:-1])
+    return widths
+
+
 def generate_ride_pdf(
     invoice: ElectronicInvoice,
     config: CompanyConfig | None,
@@ -133,8 +169,12 @@ def generate_ride_pdf(
         bottomMargin=8 * mm,
     )
     story = []
-    page_width = A4[0] - 20 * mm
-    half = page_width / 2 - 2
+    # Ancho único para TODAS las secciones (alineación vertical de bordes)
+    content_w = A4[0] - 20 * mm
+    half = content_w / 2
+    gap = 2 * mm
+    left_w = (content_w - gap) / 2
+    right_w = content_w - gap - left_w
 
     company = (config.sri_razon_social if config else None) or (config.company_name if config else "Empresa")
     nombre_comercial = (config.sri_nombre_comercial if config else None) or company
@@ -163,25 +203,48 @@ def generate_ride_pdf(
     if rimpe:
         company_lines.append([_para(rimpe, ride_styles["RideSmall"])])
 
-    logo_img = _logo_flowable(logo_file, 38 * mm, 22 * mm) if logo_file else None
+    logo_col_w = 36 * mm
+    text_col_w = left_w - logo_col_w - 2 * mm
+    logo_img = _logo_flowable(logo_file, logo_col_w - 4 * mm, 20 * mm) if logo_file else None
     if logo_img:
-        logo_block = Table([[logo_img]], colWidths=[40 * mm])
+        logo_block = Table([[logo_img]], colWidths=[logo_col_w])
         logo_block.setStyle(
             TableStyle(
                 [
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 2),
                     ("BACKGROUND", (0, 0), (-1, -1), GRAY_ZEBRA),
                 ]
             )
         )
-        text_block = Table(company_lines, colWidths=[half - 42 * mm])
-        header_left_inner = Table([[logo_block, text_block]], colWidths=[42 * mm, half - 42 * mm])
-        header_left_inner.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
-        left_box = Table([[header_left_inner]], colWidths=[half])
+        text_block = Table(company_lines, colWidths=[text_col_w])
+        text_block.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        header_left_inner = Table(
+            [[logo_block, text_block]],
+            colWidths=[logo_col_w, text_col_w],
+        )
+        header_left_inner.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        left_box = Table([[header_left_inner]], colWidths=[left_w])
     else:
-        left_box = Table(company_lines, colWidths=[half])
+        left_box = Table(company_lines, colWidths=[left_w])
 
     auth_num = invoice.numero_autorizacion or invoice.clave_acceso or ""
     auth_dt = ""
@@ -191,15 +254,7 @@ def generate_ride_pdf(
         auth_dt = invoice.fecha_emision.strftime("%Y-%m-%d %H:%M:%S-05:00")
 
     clave = invoice.clave_acceso or ""
-    barcode = createBarcodeDrawing(
-        "Code128",
-        value=clave,
-        barHeight=10 * mm,
-        barWidth=0.28 * mm,
-        humanReadable=0,
-    )
-    barcode.width = half - 8 * mm
-    barcode.height = 12 * mm
+    barcode = _fit_barcode(clave, max_width=right_w - 8 * mm, bar_height=10 * mm)
 
     right_rows = [
         [_para(f"<b>R.U.C.:</b> {ruc}", ride_styles["RideSmall"])],
@@ -214,7 +269,7 @@ def generate_ride_pdf(
         [_para(clave, ride_styles["RideSmall"], TA_CENTER)],
         [barcode],
     ]
-    right_box = Table(right_rows, colWidths=[half])
+    right_box = Table(right_rows, colWidths=[right_w])
     right_style = _border_style()
     right_style.extend(
         [
@@ -222,6 +277,10 @@ def generate_ride_pdf(
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("BACKGROUND", (0, 0), (-1, 0), GRAY_SECTION),
             ("BACKGROUND", (0, 1), (-1, 1), GRAY_HEADER_DARK),
+            # Celda del barcode centrada y sin exceder
+            ("ALIGN", (0, -1), (0, -1), "CENTER"),
+            ("LEFTPADDING", (0, -1), (0, -1), 2),
+            ("RIGHTPADDING", (0, -1), (0, -1), 2),
         ]
     )
     right_box.setStyle(TableStyle(right_style))
@@ -230,8 +289,22 @@ def generate_ride_pdf(
     left_style.append(("BACKGROUND", (0, 0), (-1, -1), colors.white))
     left_box.setStyle(TableStyle(left_style))
 
-    header = Table([[left_box, right_box]], colWidths=[half, half])
-    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    # Gap visual entre cajas sin romper el ancho total
+    header = Table(
+        [[left_box, "", right_box]],
+        colWidths=[left_w, gap, right_w],
+    )
+    header.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
     story.append(header)
     story.append(Spacer(1, 3 * mm))
 
@@ -242,6 +315,7 @@ def generate_ride_pdf(
         client_id = (invoice.client.ruc_ci or "").strip()
     fecha_emision = invoice.fecha_emision.strftime("%d/%m/%Y") if invoice.fecha_emision else ""
 
+    cust_cols = _col_widths(content_w, [0.62, 0.38])
     customer_rows = [
         [
             _para(f"<b>Razón Social / Nombres y Apellidos:</b> {client_name}", ride_styles["RideSmall"]),
@@ -252,7 +326,7 @@ def generate_ride_pdf(
             _para("<b>Guía Remisión:</b>", ride_styles["RideSmall"]),
         ],
     ]
-    customer = Table(customer_rows, colWidths=[page_width / 2, page_width / 2])
+    customer = Table(customer_rows, colWidths=cust_cols)
     cust_style = _border_style()
     cust_style.append(("BACKGROUND", (0, 0), (-1, 0), GRAY_SECTION))
     customer.setStyle(TableStyle(cust_style))
@@ -274,7 +348,7 @@ def generate_ride_pdf(
         line_total = float(line.precio_total_sin_impuesto or 0) + float(line.valor_iva or 0)
         detail_rows.append(
             [
-                _para(line.codigo_principal or "", ride_styles["RideSmall"]),
+                _para(line.codigo_principal or "", ride_styles["RideSmall"], TA_CENTER),
                 _para(f"{float(line.cantidad or 0):.2f}", ride_styles["RideSmall"], TA_CENTER),
                 _para(line.descripcion or "", ride_styles["RideSmall"]),
                 _para("", ride_styles["RideSmall"]),
@@ -284,21 +358,16 @@ def generate_ride_pdf(
                 _para(_money(line_total), ride_styles["RideSmall"], TA_RIGHT),
             ]
         )
-    detail_table = Table(
-        detail_rows,
-        colWidths=[
-            page_width * 0.11,
-            page_width * 0.07,
-            page_width * 0.28,
-            page_width * 0.12,
-            page_width * 0.08,
-            page_width * 0.11,
-            page_width * 0.10,
-            page_width * 0.13,
-        ],
-        repeatRows=1,
-    )
+    detail_cols = _col_widths(content_w, [0.11, 0.07, 0.28, 0.12, 0.08, 0.11, 0.10, 0.13])
+    detail_table = Table(detail_rows, colWidths=detail_cols, repeatRows=1)
     det_style = _border_style(header_rows=[0])
+    det_style.extend(
+        [
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+            ("ALIGN", (5, 1), (-1, -1), "RIGHT"),
+        ]
+    )
     detail_table.setStyle(TableStyle(det_style))
     if len(detail_rows) > 2:
         _apply_zebra(detail_table, 1, len(detail_rows) - 1)
@@ -370,22 +439,59 @@ def generate_ride_pdf(
             )
         ]
     )
-    info_box = Table(info_lines, colWidths=[page_width * 0.58])
-    info_style = _border_style(header_rows=[0])
-    info_style.append(("BACKGROUND", (0, 0), (-1, 0), GRAY_HEADER))
-    info_box.setStyle(TableStyle(info_style))
+
+    # Bloque inferior: un solo marco externo para igualar alturas y bordes
+    info_w, totals_w = _col_widths(content_w, [0.58, 0.42])
+    label_w, value_w = _col_widths(totals_w, [0.55, 0.45])
+
+    info_inner = Table(info_lines, colWidths=[info_w])
+    info_inner.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), GRAY_HEADER),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]
+        )
+    )
 
     totals_data = [
         [_para(f"<b>{label}</b>", ride_styles["RideSmall"]), _para(str(val), ride_styles["RideSmall"], TA_RIGHT)]
         for label, val in totals_rows
     ]
-    totals_box = Table(totals_data, colWidths=[page_width * 0.22, page_width * 0.20])
+    totals_inner = Table(totals_data, colWidths=[label_w, value_w])
     total_row_idx = len(totals_data) - 1
-    tot_style = _border_style(total_row=total_row_idx, label_col_gray=True)
-    totals_box.setStyle(TableStyle(tot_style))
+    tot_style = [
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, GRAY_LINE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("BACKGROUND", (0, 0), (0, -1), GRAY_ZEBRA),
+        ("BACKGROUND", (0, total_row_idx), (-1, total_row_idx), GRAY_TOTAL),
+        ("FONTNAME", (0, total_row_idx), (-1, total_row_idx), "Helvetica-Bold"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+    ]
+    totals_inner.setStyle(TableStyle(tot_style))
 
-    bottom = Table([[info_box, totals_box]], colWidths=[page_width * 0.58, page_width * 0.42])
-    bottom.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    bottom = Table([[info_inner, totals_inner]], colWidths=[info_w, totals_w])
+    bottom.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.8, GRAY_BORDER),
+                ("LINEBEFORE", (1, 0), (1, -1), 0.8, GRAY_BORDER),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
     story.append(bottom)
     story.append(Spacer(1, 2 * mm))
 
@@ -420,7 +526,8 @@ def generate_ride_pdf(
                 _para("Dias", ride_styles["RideSmall"], TA_CENTER),
             ]
         )
-    pay_table = Table(pay_rows, colWidths=[page_width * 0.45, page_width * 0.15, page_width * 0.10, page_width * 0.10])
+    pay_cols = _col_widths(content_w, [0.50, 0.20, 0.15, 0.15])
+    pay_table = Table(pay_rows, colWidths=pay_cols)
     pay_style = _border_style(header_rows=[0])
     pay_table.setStyle(TableStyle(pay_style))
     if len(pay_rows) > 2:
@@ -435,7 +542,7 @@ def generate_ride_pdf(
                 ride_styles["RideSmallBold"],
                 TA_CENTER,
             )]],
-            colWidths=[page_width],
+            colWidths=[content_w],
         )
         auth_banner.setStyle(
             TableStyle(
