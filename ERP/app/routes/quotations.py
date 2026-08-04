@@ -37,7 +37,12 @@ from app.services.product_service import (
     resolve_custom_product_id,
     sync_product_image,
 )
-from app.services.quotation_service import compute_item_total, recalculate_quotation
+from app.services.quotation_service import (
+    compute_item_total,
+    recalculate_quotation,
+    quotation_can_edit_content,
+    quotation_edit_lock_reason,
+)
 from app.services.transport_product_service import (
     TRANSPORT_PRODUCT_NAME,
     get_or_create_transport_service_product,
@@ -54,7 +59,11 @@ from app.services.quotation_design_service import (
     sync_legacy_design_file,
 )
 from app.utils.activity import log_activity
+from app.utils.quotation_events import log_quotation_event
+from app.utils.notifications import notify_roles
+from app.utils.whatsapp import build_whatsapp_url, quotation_whatsapp_message
 from app.utils.context import get_global_config
+from app.models.quotation_event import QuotationEvent
 from app.utils.pdf import generate_quotation_pdf
 from app.utils.status_helpers import COMPLETED_STATUSES, expand_status_filter
 from app.config.settings import settings
@@ -280,6 +289,34 @@ def _require_quotation_access(request: Request):
     return user
 
 
+def _load_quotation_for_edit_guard(db: Session, quotation_id: int):
+    return (
+        db.query(Quotation)
+        .options(
+            joinedload(Quotation.electronic_invoice),
+            joinedload(Quotation.production_order),
+        )
+        .filter(Quotation.id == quotation_id)
+        .first()
+    )
+
+
+def _reject_if_locked(quotation, *, as_json: bool = False):
+    reason = quotation_edit_lock_reason(quotation)
+    if not reason:
+        return None
+    if as_json:
+        return JSONResponse(
+            status_code=403,
+            content={"success": False, "message": reason},
+        )
+    qid = quotation.id if quotation else ""
+    return RedirectResponse(
+        url=f"/quotations/{qid}?edit_locked=1",
+        status_code=302,
+    )
+
+
 def _quotation_counts(db: Session) -> dict:
     return {
         "total_quotations": db.query(Quotation).count(),
@@ -293,6 +330,7 @@ def _quotation_counts(db: Session) -> dict:
             Quotation.status.in_(["entregada", "entregado"])
         ).count(),
         "cancelled_quotations": db.query(Quotation).filter(Quotation.status == "cancelada").count(),
+        "expired_quotations": db.query(Quotation).filter(Quotation.status == "vencida").count(),
     }
 
 
@@ -438,12 +476,13 @@ async def sales_tracking_page(request: Request, db: Session = Depends(get_db)):
         {"key": "enviada,enviado", "label": "Enviadas", "count": db.query(Quotation).filter(Quotation.status.in_(["enviada", "enviado"])).count()},
         {"key": "entregada,entregado", "label": "Entregadas", "count": db.query(Quotation).filter(Quotation.status.in_(["entregada", "entregado"])).count()},
         {"key": "cancelada", "label": "Canceladas", "count": db.query(Quotation).filter(Quotation.status == "cancelada").count()},
+        {"key": "vencida", "label": "Vencidas", "count": db.query(Quotation).filter(Quotation.status == "vencida").count()},
     ]
 
     active_quotations = (
         db.query(Quotation)
         .options(joinedload(Quotation.client))
-        .filter(~Quotation.status.in_(["cancelada", "entregada", "entregado"]))
+        .filter(~Quotation.status.in_(["cancelada", "vencida", "entregada", "entregado"]))
         .order_by(Quotation.created_at.desc(), Quotation.id.desc())
         .limit(50)
         .all()
@@ -580,6 +619,13 @@ async def create_quotation(
             log_activity(db, "Cotización creada", f"Cotización #{quotation.id}")
         except Exception:
             pass
+        log_quotation_event(
+            db,
+            quotation.id,
+            "creada",
+            "Cotización creada",
+            getattr(user, "id", None),
+        )
 
         return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
 
@@ -619,6 +665,11 @@ async def edit_quotation_item(
     if not item:
         return RedirectResponse("/quotations", status_code=302)
 
+    quotation = _load_quotation_for_edit_guard(db, item.quotation_id)
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
+
     return templates.TemplateResponse(
         request=request,
         name="partials/quotations/item_modal.html",
@@ -647,6 +698,11 @@ async def update_item(
     item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
     if not item:
         return RedirectResponse("/quotations", status_code=302)
+
+    quotation = _load_quotation_for_edit_guard(db, item.quotation_id)
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
 
     if quantity < 1:
         return RedirectResponse(url=f"/quotations/{item.quotation_id}", status_code=302)
@@ -689,6 +745,11 @@ async def delete_item(
     if not item:
         return RedirectResponse("/quotations", status_code=302)
 
+    quotation = _load_quotation_for_edit_guard(db, item.quotation_id)
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
+
     quotation = item.quotation
     db.delete(item)
     db.commit()
@@ -707,6 +768,11 @@ async def quotation_item_modal(
     item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
     if not item:
         return HTMLResponse("Item no encontrado", status_code=404)
+
+    quotation = _load_quotation_for_edit_guard(db, item.quotation_id)
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
 
     return templates.TemplateResponse(
         request=request, name="partials/quotations/item_modal.html", context={"item": item}
@@ -727,6 +793,11 @@ async def update_quantity(
     item = db.query(QuotationItem).filter(QuotationItem.id == item_id).first()
     if not item:
         return {"success": False}
+
+    quotation = _load_quotation_for_edit_guard(db, item.quotation_id)
+    locked = _reject_if_locked(quotation, as_json=True)
+    if locked:
+        return locked
 
     if quantity < 1:
         return {"success": False}
@@ -788,6 +859,27 @@ async def quotation_detail(
         and (not po or po_status in DESIGN_PHASE_STATUSES)
     )
 
+    events = []
+    whatsapp_url = None
+    if quotation:
+        events = (
+            db.query(QuotationEvent)
+            .options(joinedload(QuotationEvent.user))
+            .filter(QuotationEvent.quotation_id == quotation.id)
+            .order_by(QuotationEvent.created_at.desc(), QuotationEvent.id.desc())
+            .limit(40)
+            .all()
+        )
+        config = db.query(CompanyConfig).first()
+        company_name = (
+            config.company_name if config and config.company_name else "nuestro negocio"
+        )
+        phone = quotation.client.phone if quotation.client else None
+        whatsapp_url = build_whatsapp_url(
+            phone,
+            quotation_whatsapp_message(quotation, company_name),
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="quotations/detail.html",
@@ -808,6 +900,13 @@ async def quotation_detail(
             "design_assignee_id": po.assigned_to_user_id if po else None,
             "flash_design_sent": request.query_params.get("design_sent") == "1",
             "flash_design_error": request.query_params.get("design_error", ""),
+            "flash_cancelled": request.query_params.get("cancelled") == "1",
+            "flash_cancel_error": request.query_params.get("cancel_error", ""),
+            "can_edit_quotation": quotation_can_edit_content(quotation) if quotation else False,
+            "edit_lock_reason": quotation_edit_lock_reason(quotation) if quotation else "",
+            "flash_edit_locked": request.query_params.get("edit_locked") == "1",
+            "events": events,
+            "whatsapp_url": whatsapp_url,
         },
     )
 
@@ -894,6 +993,21 @@ async def approve_quotation(
         log_activity(db, "Cotización aprobada", f"Cotización #{quotation.id}")
     except Exception:
         pass
+    log_quotation_event(
+        db,
+        quotation.id,
+        "aprobada",
+        f"Cotización aprobada",
+        getattr(user, "id", None),
+    )
+    notify_roles(
+        db,
+        ["admin", "produccion", "disenador"],
+        "Cotización aprobada",
+        f"#{quotation.id} lista para producción/diseño",
+        f"/quotations/{quotation.id}",
+        exclude_user_id=getattr(user, "id", None),
+    )
 
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
@@ -902,23 +1016,91 @@ async def approve_quotation(
 async def cancel_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
+    """Cancela cotización pendiente o en curso. No permite si ya está facturada o entregada."""
+    from urllib.parse import quote
+
+    from app.services.production_order_service import (
+        get_production_order_by_quotation,
+        log_history,
+        normalize_status,
+    )
+
     user = _require_quotation_access(request)
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = (
+        db.query(Quotation)
+        .options(joinedload(Quotation.electronic_invoice))
+        .filter(Quotation.id == quotation_id)
+        .first()
+    )
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
-    if quotation.status != "pendiente":
-        return RedirectResponse(url="/quotations", status_code=302)
+    st = (quotation.status or "").lower().strip()
+    detail_url = f"/quotations/{quotation_id}"
 
+    if st in {"cancelada", "cancelado", "vencida"}:
+        return RedirectResponse(url=f"{detail_url}?cancel_error={quote('Ya está cancelada o vencida.')}", status_code=302)
+
+    if quotation.electronic_invoice:
+        return RedirectResponse(
+            url=f"{detail_url}?cancel_error={quote('No se puede cancelar: ya tiene factura electrónica.')}",
+            status_code=302,
+        )
+
+    if st in {"entregada", "entregado"}:
+        return RedirectResponse(
+            url=f"{detail_url}?cancel_error={quote('No se puede cancelar una cotización entregada.')}",
+            status_code=302,
+        )
+
+    # Permitir cancelar en pendiente / aprobada / producción / enviada
+    if st not in {"pendiente", "aprobada", "produccion", "enviada", "enviado"}:
+        estado = st or "desconocido"
+        return RedirectResponse(
+            url=f"{detail_url}?cancel_error={quote(f'No se puede cancelar en estado «{estado}».')}",
+            status_code=302,
+        )
+
+    previous = st
     quotation.status = "cancelada"
-    db.query(ProductionOrder).filter(
-        ProductionOrder.quotation_id == quotation.id
-    ).delete(synchronize_session=False)
+
+    order = get_production_order_by_quotation(db, quotation.id)
+    if order and normalize_status(order.status) != "cancelado":
+        order.status = "cancelado"
+        log_history(
+            db,
+            order,
+            status="cancelado",
+            notes=f"Cotización cancelada (antes: {previous}).",
+            user_id=getattr(user, "id", None),
+        )
+
     db.commit()
-    return RedirectResponse(url="/quotations", status_code=302)
+    log_quotation_event(
+        db,
+        quotation.id,
+        "cancelada",
+        f"Cotización cancelada (estado anterior: {previous})",
+        getattr(user, "id", None),
+    )
+    try:
+        log_activity(db, "Cotización cancelada", f"Cotización #{quotation.id} ({previous} → cancelada)")
+    except Exception:
+        pass
+
+    notify_roles(
+        db,
+        ["admin", "produccion", "disenador", "ventas"],
+        "Cotización cancelada",
+        f"#{quotation.id} fue cancelada (antes: {previous})",
+        f"/quotations/{quotation.id}",
+        exclude_user_id=getattr(user, "id", None),
+    )
+
+    return RedirectResponse(url=f"{detail_url}?cancelled=1", status_code=302)
 
 
 @router.get("/{quotation_id}/delete")
@@ -976,15 +1158,99 @@ async def reactivate_quotation(
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
-    if quotation.status != "cancelada":
+    if quotation.status not in {"cancelada", "vencida"}:
         return RedirectResponse(url="/quotations", status_code=302)
 
+    previous = (quotation.status or "").lower()
     quotation.status = "pendiente"
     db.query(ProductionOrder).filter(
         ProductionOrder.quotation_id == quotation.id
     ).delete(synchronize_session=False)
     db.commit()
-    return RedirectResponse(url="/quotations", status_code=302)
+    log_quotation_event(
+        db,
+        quotation.id,
+        "reactivada",
+        f"Cotización reactivada (antes: {previous})",
+        getattr(user, "id", None),
+    )
+    return RedirectResponse(url=f"/quotations/{quotation.id}?reactivated=1", status_code=302)
+
+
+@router.post("/{quotation_id}/duplicate")
+async def duplicate_quotation(
+    request: Request, quotation_id: int, db: Session = Depends(get_db)
+):
+    """Clona cliente, totales e ítems. Sin pagos, diseños ni producción."""
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    source = (
+        db.query(Quotation)
+        .options(joinedload(Quotation.items))
+        .filter(Quotation.id == quotation_id)
+        .first()
+    )
+    if not source:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    clone = Quotation(
+        client_id=source.client_id,
+        subtotal=source.subtotal,
+        discount=source.discount,
+        iva=source.iva,
+        total=source.total,
+        shipping_cost=source.shipping_cost or 0,
+        status="pendiente",
+        delivery_date=None,
+        design_file=None,
+    )
+    db.add(clone)
+    db.flush()
+
+    for item in source.items:
+        db.add(
+            QuotationItem(
+                quotation_id=clone.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                detail=item.detail,
+                measure=item.measure,
+                theme=item.theme,
+                color=item.color,
+                logo=item.logo,
+                logo_type=getattr(item, "logo_type", None) or "sin_logo",
+                item_discount=getattr(item, "item_discount", 0) or 0,
+                unit_price=item.unit_price,
+                total=item.total,
+                product_image=item.product_image,
+            )
+        )
+
+    db.commit()
+    recalculate_quotation(clone, db)
+
+    log_quotation_event(
+        db,
+        clone.id,
+        "duplicada",
+        f"Duplicada desde cotización #{source.id}",
+        getattr(user, "id", None),
+    )
+    log_quotation_event(
+        db,
+        source.id,
+        "clonada",
+        f"Se creó la cotización #{clone.id} como copia",
+        getattr(user, "id", None),
+    )
+    try:
+        log_activity(db, "Cotización duplicada", f"#{source.id} → #{clone.id}")
+    except Exception:
+        pass
+
+    return RedirectResponse(url=f"/quotations/{clone.id}", status_code=302)
 
 
 @router.get("/{quotation_id}/edit", response_class=HTMLResponse)
@@ -995,12 +1261,16 @@ async def edit_quotation_page(
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = _load_quotation_for_edit_guard(db, quotation_id)
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
-    if quotation.status != "pendiente":
-        return RedirectResponse(url="/quotations", status_code=302)
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
+
+    if (quotation.status or "").lower() != "pendiente":
+        return RedirectResponse(url=f"/quotations/{quotation_id}?edit_locked=1", status_code=302)
 
     clients = db.query(Client).all()
     products = db.query(Product).all()
@@ -1069,12 +1339,16 @@ async def update_quotation(
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = _load_quotation_for_edit_guard(db, quotation_id)
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
-    if quotation.status != "pendiente":
-        return RedirectResponse(url="/quotations", status_code=302)
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
+
+    if (quotation.status or "").lower() != "pendiente":
+        return RedirectResponse(url=f"/quotations/{quotation_id}?edit_locked=1", status_code=302)
 
     quotation.client_id = client_id
     quotation.subtotal = subtotal
@@ -1108,9 +1382,13 @@ async def update_shipping_cost(
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = _load_quotation_for_edit_guard(db, quotation_id)
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
+
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
 
     sync_quotation_shipping_item(db, quotation, shipping_cost)
     db.commit()
@@ -1236,6 +1514,14 @@ async def add_product_modal(
     if isinstance(user, RedirectResponse):
         return user
 
+    quotation = _load_quotation_for_edit_guard(db, quotation_id)
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
+
     products = db.query(Product).order_by(Product.name).all()
     return templates.TemplateResponse(
         request=request,
@@ -1265,9 +1551,13 @@ async def add_product_to_quotation(
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = _load_quotation_for_edit_guard(db, quotation_id)
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
+
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
 
     if quantity < 1:
         return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
@@ -1348,9 +1638,13 @@ async def upload_quotation_design(
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = _load_quotation_for_edit_guard(db, quotation_id)
     if not quotation:
         return JSONResponse(status_code=404, content={"message": "Cotización no encontrada."})
+
+    locked = _reject_if_locked(quotation, as_json=True)
+    if locked:
+        return locked
 
     try:
         sync_legacy_design_file(db, quotation)
@@ -1375,9 +1669,13 @@ async def remove_quotation_design(
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = _load_quotation_for_edit_guard(db, quotation_id)
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
+
+    locked = _reject_if_locked(quotation)
+    if locked:
+        return locked
 
     try:
         delete_design_image(db, quotation, design_id)

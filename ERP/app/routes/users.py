@@ -90,7 +90,7 @@ async def new_user_page(
     return templates.TemplateResponse(
         request=request,
         name="users/form.html",
-        context={}
+        context={"user": user},
     )
 
 
@@ -135,8 +135,9 @@ async def create_user(
                 request=request,
                 name="users/form.html",
                 context={
-                    "error": "Usuario ya existe"
-                }
+                    "error": "Usuario ya existe",
+                    "user": user,
+                },
             )
 
         new_user = User(

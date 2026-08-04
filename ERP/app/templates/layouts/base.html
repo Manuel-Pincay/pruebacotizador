@@ -618,6 +618,14 @@ lucide.createIcons();
             <span>📄</span>
             <span>Cotizaciones</span>
           </a>
+          <a href="/reports/receivables" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/reports/receivables') }}">
+            <span>💵</span>
+            <span>Saldos por cobrar</span>
+          </a>
+          <a href="/reports/sales" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/reports/sales') }}">
+            <span>📊</span>
+            <span>Reporte de ventas</span>
+          </a>
           {{ billing_submenu('billingMenuVentas') }}
           <a href="/quotations/tracking" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations/tracking') }}">
             <span>📈</span>
@@ -703,6 +711,14 @@ lucide.createIcons();
           <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
             <span>📄</span>
             <span>Cotizaciones</span>
+          </a>
+          <a href="/reports/receivables" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/reports/receivables') }}">
+            <span>💵</span>
+            <span>Saldos por cobrar</span>
+          </a>
+          <a href="/reports/sales" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/reports/sales') }}">
+            <span>📊</span>
+            <span>Reporte de ventas</span>
           </a>
           {{ billing_submenu('billingMenuAdmin', show_sri_config=true) }}
           <a href="/quotations/tracking" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations/tracking') }}">
@@ -794,7 +810,16 @@ lucide.createIcons();
         <!-- FOOTER -->
         <!-- FOOTER -->
 
-        <div class="p-4 border-t border-purple-700">
+        <div class="p-4 border-t border-purple-700 space-y-2">
+          {% if user is defined and user %}
+          <a
+            href="/notifications/"
+            class="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl transition text-sm"
+          >
+            <span>🔔</span>
+            <span>Notificaciones</span>
+          </a>
+          {% endif %}
           <a
             href="/logout"
             class="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl transition"

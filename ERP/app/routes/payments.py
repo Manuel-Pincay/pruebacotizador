@@ -184,6 +184,17 @@ async def create_quotation_payment(
             "Abono registrado",
             f"Abono ${parsed_amount:.2f} en cotización #{quotation.id}",
         )
+        try:
+            from app.utils.quotation_events import log_quotation_event
+            log_quotation_event(
+                db,
+                quotation.id,
+                "abono",
+                f"Abono ${parsed_amount:.2f}",
+                getattr(user, "id", None),
+            )
+        except Exception:
+            pass
 
         return {
             "success": True,

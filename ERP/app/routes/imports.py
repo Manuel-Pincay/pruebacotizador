@@ -79,7 +79,7 @@ async def imports_page(
     return templates.TemplateResponse(
         request=request,
         name="imports/index.html",
-        context={}
+        context={"user": user},
     )
 
 

@@ -4,11 +4,12 @@ from app.utils.dialog_response import dialog_message_response
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.company_config import CompanyConfig
 from app.models.production_order import ProductionOrder
 from app.models.quotation import Quotation
 from app.models.shipment import Shipment
 
-PENDING_QUOTATION_EXPIRE_DAYS = 10
+PENDING_QUOTATION_EXPIRE_DAYS_DEFAULT = 15
 
 PRODUCTION_VISIBLE_QUOTATION_STATUSES = (
     "aprobada",
@@ -20,27 +21,70 @@ PRODUCTION_VISIBLE_QUOTATION_STATUSES = (
 )
 
 
-def cancel_stale_pending_quotations(db: Session) -> int:
-    """Cancela cotizaciones en pendiente con más de N días sin aprobar."""
-    cutoff = datetime.utcnow() - timedelta(days=PENDING_QUOTATION_EXPIRE_DAYS)
-    updated = (
+def _quotation_validity_days(db: Session) -> int:
+    """Días de vigencia desde company_config (mínimo 1)."""
+    try:
+        config = db.query(CompanyConfig).first()
+        days = int(getattr(config, "quotation_validity_days", None) or PENDING_QUOTATION_EXPIRE_DAYS_DEFAULT)
+    except Exception:
+        days = PENDING_QUOTATION_EXPIRE_DAYS_DEFAULT
+    return max(1, days)
+
+
+def expire_stale_pending_quotations(db: Session) -> int:
+    """Marca como vencidas las cotizaciones pendientes fuera de vigencia."""
+    days = _quotation_validity_days(db)
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    candidates = (
         db.query(Quotation)
         .filter(
             Quotation.status == "pendiente",
             Quotation.created_at.isnot(None),
             Quotation.created_at < cutoff,
         )
-        .update({Quotation.status: "cancelada"}, synchronize_session=False)
+        .all()
     )
-    if updated:
-        db.commit()
-    return updated
+    if not candidates:
+        return 0
+
+    for q in candidates:
+        q.status = "vencida"
+
+    db.commit()
+
+    try:
+        from app.utils.activity import log_activity
+        from app.utils.quotation_events import log_quotation_event
+
+        log_activity(
+            db,
+            "Cotizaciones vencidas",
+            f"{len(candidates)} cotización(es) marcada(s) como vencida(s) (vigencia {days} días)",
+        )
+        for q in candidates:
+            log_quotation_event(
+                db,
+                q.id,
+                "vencida",
+                f"Vencida automáticamente por vigencia de {days} días",
+                None,
+            )
+    except Exception:
+        pass
+
+    return len(candidates)
+
+
+def cancel_stale_pending_quotations(db: Session) -> int:
+    """Alias histórico: ahora marca vencidas (no canceladas)."""
+    return expire_stale_pending_quotations(db)
 
 
 INACTIVE_PRODUCTION_QUOTATION_STATUSES = (
     "pendiente",
     "cancelada",
     "cancelado",
+    "vencida",
 )
 
 
@@ -65,7 +109,7 @@ def cleanup_inactive_production_orders(db: Session) -> int:
 
 
 def prepare_production_module(db: Session) -> None:
-    cancel_stale_pending_quotations(db)
+    expire_stale_pending_quotations(db)
     cleanup_inactive_production_orders(db)
 
 

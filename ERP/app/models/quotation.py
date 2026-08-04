@@ -75,6 +75,12 @@ class Quotation(Base):
         back_populates="quotation",
         uselist=False,
     )
+    events = relationship(
+        "QuotationEvent",
+        back_populates="quotation",
+        cascade="all, delete-orphan",
+        order_by="QuotationEvent.created_at.desc()",
+    )
 
     @property
     def total_paid(self) -> float:

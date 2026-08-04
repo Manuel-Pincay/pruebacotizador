@@ -1,0 +1,160 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="erp-container space-y-5 pb-10">
+  <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900">Reporte de ventas</h1>
+      <p class="text-sm text-gray-500 mt-1">Cotizaciones del período (excluye canceladas) · clasificado por mes</p>
+    </div>
+    <form method="get" class="flex flex-wrap items-end gap-2">
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-500 mb-1">Desde</label>
+        <input type="date" name="start_date" value="{{ start_date }}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-500 mb-1">Hasta</label>
+        <input type="date" name="end_date" value="{{ end_date }}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">Filtrar</button>
+    </form>
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="bg-white rounded-xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-500">Cotizaciones</p>
+      <p class="text-2xl font-black text-slate-800">{{ count }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-500">Ventas (total cotizado)</p>
+      <p class="text-2xl font-black text-purple-700">${{ "%.2f"|format(total_sales) }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-500">Cobrado en cotizaciones</p>
+      <p class="text-2xl font-black text-emerald-700">${{ "%.2f"|format(total_collected) }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-500">Abonos en el período</p>
+      <p class="text-2xl font-black text-blue-700">${{ "%.2f"|format(payments_in_range) }}</p>
+    </div>
+  </div>
+
+  <!-- Por mes -->
+  <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="font-bold text-slate-800">Por mes</h2>
+      <p class="text-xs text-gray-400 mt-0.5">Resumen mensual del rango filtrado</p>
+    </div>
+    {% if month_rows %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+          <tr>
+            <th class="text-left p-3">Mes</th>
+            <th class="text-right p-3">Cotizaciones</th>
+            <th class="text-right p-3">Total cotizado</th>
+            <th class="text-right p-3">Cobrado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in month_rows %}
+          <tr class="border-t hover:bg-gray-50">
+            <td class="p-3 font-semibold text-slate-800">{{ m.label }}</td>
+            <td class="p-3 text-right">{{ m.count }}</td>
+            <td class="p-3 text-right font-semibold text-purple-700">${{ "%.2f"|format(m.total) }}</td>
+            <td class="p-3 text-right text-emerald-700">${{ "%.2f"|format(m.collected) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="bg-slate-50 border-t">
+          <tr>
+            <td class="p-3 font-bold">Total período</td>
+            <td class="p-3 text-right font-bold">{{ count }}</td>
+            <td class="p-3 text-right font-bold text-purple-800">${{ "%.2f"|format(total_sales) }}</td>
+            <td class="p-3 text-right font-bold text-emerald-800">${{ "%.2f"|format(total_collected) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+    <p class="p-6 text-sm text-gray-500">Sin datos mensuales en este rango.</p>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-2xl border border-gray-100 p-5">
+      <h2 class="font-bold text-slate-800 mb-3">Por estado</h2>
+      {% if status_rows %}
+      <ul class="space-y-2 text-sm">
+        {% for key, data in status_rows %}
+        <li class="flex justify-between gap-3 border-b border-gray-50 pb-2">
+          <span class="capitalize text-gray-700">{{ key }} <span class="text-gray-400">({{ data.count }})</span></span>
+          <span class="font-semibold">${{ "%.2f"|format(data.total) }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-gray-500">Sin datos</p>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-100 p-5">
+      <h2 class="font-bold text-slate-800 mb-3">Top clientes</h2>
+      {% if top_clients %}
+      <ul class="space-y-2 text-sm">
+        {% for name, data in top_clients %}
+        <li class="flex justify-between gap-3 border-b border-gray-50 pb-2">
+          <span class="truncate text-gray-700">{{ name }} <span class="text-gray-400">({{ data.count }})</span></span>
+          <span class="font-semibold shrink-0">${{ "%.2f"|format(data.total) }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-gray-500">Sin datos</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div class="px-5 py-4 border-b">
+      <h2 class="font-bold text-slate-800">Detalle por mes</h2>
+    </div>
+    {% if quotations_by_month %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[700px]">
+        <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+          <tr>
+            <th class="text-left p-3">#</th>
+            <th class="text-left p-3">Fecha</th>
+            <th class="text-left p-3">Cliente</th>
+            <th class="text-left p-3">Estado</th>
+            <th class="text-right p-3">Total</th>
+            <th class="text-right p-3">Pagado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in quotations_by_month %}
+          <tr class="bg-purple-50/70 border-t">
+            <td colspan="4" class="px-3 py-2.5 font-bold text-purple-900">{{ group.label }}</td>
+            <td class="px-3 py-2.5 text-right font-bold text-purple-800">${{ "%.2f"|format(group.total) }}</td>
+            <td class="px-3 py-2.5 text-right text-xs text-purple-600">{{ group.items|length }} ítem(s)</td>
+          </tr>
+          {% for q in group.items %}
+          <tr class="border-t hover:bg-purple-50/40 cursor-pointer" onclick="location.href='/quotations/{{ q.id }}'">
+            <td class="p-3 font-bold">#{{ q.id }}</td>
+            <td class="p-3">{{ q.created_at.strftime('%d/%m/%Y') if q.created_at else '—' }}</td>
+            <td class="p-3">{{ q.client.name if q.client else '—' }}</td>
+            <td class="p-3 capitalize">{{ q.status or '—' }}</td>
+            <td class="p-3 text-right font-semibold text-purple-700">${{ "%.2f"|format(q.total or 0) }}</td>
+            <td class="p-3 text-right">${{ "%.2f"|format(q.total_paid) }}</td>
+          </tr>
+          {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="p-8 text-center text-gray-500 text-sm">Sin cotizaciones en el rango</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

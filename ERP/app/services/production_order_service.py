@@ -173,7 +173,7 @@ def ensure_production_order(
     user_id: int | None = None,
 ) -> ProductionOrder | None:
     q_status = (quotation.status or "").lower().strip()
-    if q_status in ("pendiente", "cancelada", "cancelado", "borrador"):
+    if q_status in ("pendiente", "cancelada", "cancelado", "borrador", "vencida"):
         return None
 
     existing = db.query(ProductionOrder).filter(ProductionOrder.quotation_id == quotation.id).first()

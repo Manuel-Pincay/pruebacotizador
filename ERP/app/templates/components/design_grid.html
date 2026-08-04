@@ -1,4 +1,4 @@
-{% macro design_grid(designs, quotation_id, max_designs=4) %}
+{% macro design_grid(designs, quotation_id, max_designs=4, can_edit=true) %}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3" id="design-grid-{{ quotation_id }}">
     {% for design in designs %}
     {% set url = design_image_url(design.filename) %}
@@ -18,6 +18,7 @@
         <span class="absolute top-2 left-2 text-[10px] font-medium bg-black/55 text-white px-1.5 py-0.5 rounded-md pointer-events-none">
             {{ loop.index }}
         </span>
+        {% if can_edit %}
         <form
             action="/quotations/{{ quotation_id }}/designs/{{ design.id }}/delete"
             method="POST"
@@ -32,14 +33,15 @@
                 ✕
             </button>
         </form>
+        {% endif %}
     </div>
     {% endfor %}
 
     {% set empty_slots = max_designs - (designs|length) %}
     {% for i in range(empty_slots) %}
     <div class="h-36 sm:h-40 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/80 flex flex-col items-center justify-center text-gray-300 text-xs gap-1">
-        <span class="text-lg">🖼</span>
-        <span>Sin imagen</span>
+        <span class="text-lg">＋</span>
+        <span>Vacío</span>
     </div>
     {% endfor %}
 </div>

@@ -143,6 +143,7 @@ async def new_product_page(request: Request, db: Session = Depends(get_db)):
             "thicknesses": thicknesses,
             "units": units,
             "tarifas_iva": TARIFAS_IVA_PRODUCTO,
+            "user": user,
         },
     )
 

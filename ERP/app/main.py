@@ -8,6 +8,8 @@ from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.models.quotation_payment import QuotationPayment
 from app.models.quotation_design import QuotationDesign
+from app.models.quotation_event import QuotationEvent
+from app.models.notification import Notification
 from app.models.design_tracking import DesignTracking
 from app.models.production_order import ProductionOrder
 from app.models.production_order_history import ProductionOrderHistory
@@ -43,6 +45,8 @@ from app.routes import config
 from app.routes import imports
 from app.routes import product_settings
 from app.routes import billing
+from app.routes import reports
+from app.routes import notifications
 
 from app.config.settings import settings
 from app.error_handlers import register_error_handlers
@@ -94,6 +98,8 @@ app.include_router(
     product_settings.router
 )
 app.include_router(billing.router)
+app.include_router(reports.router)
+app.include_router(notifications.router)
 
 
 def create_admin():

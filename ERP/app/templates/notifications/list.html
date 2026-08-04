@@ -1,0 +1,37 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="erp-container space-y-5 pb-10 max-w-3xl">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900">Notificaciones</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ unread }} sin leer</p>
+    </div>
+    {% if unread %}
+    <form method="post" action="/notifications/read-all">
+      <button type="submit" class="text-sm border border-gray-200 hover:bg-gray-50 px-3 py-2 rounded-lg">
+        Marcar todas leídas
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y">
+    {% for n in notifications %}
+    <form method="post" action="/notifications/{{ n.id }}/read" class="block">
+      <button type="submit" class="w-full text-left px-5 py-4 hover:bg-purple-50/50 transition {% if not n.is_read %}bg-purple-50/30{% endif %}">
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full shrink-0 {% if n.is_read %}bg-gray-300{% else %}bg-purple-600{% endif %}"></span>
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold text-slate-800">{{ n.title }}</p>
+            {% if n.message %}<p class="text-sm text-gray-600 mt-0.5">{{ n.message }}</p>{% endif %}
+            <p class="text-xs text-gray-400 mt-1">{{ n.created_at.strftime('%d/%m/%Y %H:%M') if n.created_at else '' }}</p>
+          </div>
+        </div>
+      </button>
+    </form>
+    {% else %}
+    <div class="p-10 text-center text-gray-500 text-sm">No tienes notificaciones todavía.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

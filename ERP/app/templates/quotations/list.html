@@ -27,7 +27,7 @@
         </a>
     </div>
 </div>
-<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 mb-3">
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-2 mb-3">
     <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-slate-400">
         <div class="text-[10px] text-gray-500 leading-tight">Total</div>
         <div class="text-xl font-bold text-slate-900">{{ total_quotations }}</div>
@@ -52,6 +52,10 @@
         <div class="text-[10px] text-emerald-700 leading-tight">Entregadas</div>
         <div class="text-xl font-bold text-emerald-700">{{ delivered_quotations }}</div>
     </div>
+    <a href="/quotations?status=vencida" class="rounded-lg bg-white border border-gray-200 px-3 py-2 shadow-sm border-l-4 border-orange-500 hover:bg-orange-50 transition block">
+        <div class="text-[10px] text-orange-600 leading-tight">Vencidas</div>
+        <div class="text-xl font-bold text-orange-700">{{ expired_quotations }}</div>
+    </a>
 </div>
 {% if error == 'clave_admin_incorrecta' %}
 <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
@@ -110,6 +114,7 @@
                     <option value="enviada" {% if status == "enviada" %}selected{% endif %}>Enviada</option>
                     <option value="entregada" {% if status == "entregada" %}selected{% endif %}>Entregada</option>
                     <option value="cancelada" {% if status == "cancelada" %}selected{% endif %}>Cancelada</option>
+                    <option value="vencida" {% if status == "vencida" %}selected{% endif %}>Vencida</option>
                 </select>
             </div>
 
@@ -181,7 +186,9 @@
             <tbody>
                 {% if quotations %} {% for quotation in quotations %}
 
-                <tr class="border-t hover:bg-gray-50 transition">
+                <tr class="border-t hover:bg-purple-50/60 transition cursor-pointer"
+                    onclick="window.location.href='/quotations/{{ quotation.id }}'"
+                    title="Abrir cotización #{{ quotation.id }}">
                     <!-- ID -->
 
                     <td class="p-5 font-bold text-slate-700">#{{ quotation.id }}</td>
@@ -243,10 +250,17 @@
                             Cancelada
                         </span>
 
+                        {% elif st == "vencida" %}
+
+                        <span class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs">
+                            Vencida
+                        </span>
+
                         {% endif %}
 
                         {% if quotation.electronic_invoice %}
                         <a href="/billing/{{ quotation.electronic_invoice.id }}"
+                           onclick="event.stopPropagation()"
                            class="inline-flex items-center gap-1 bg-emerald-600 text-white px-2.5 py-0.5 rounded-full text-[11px] font-semibold shadow-sm hover:bg-emerald-700"
                            title="Ver factura electrónica">
                             🧾 Facturada
@@ -279,7 +293,7 @@
                         quotation.delivery_date.strftime('%d/%m/%Y') }} {% else %} — {%
                         endif %}
                     </td>
-                    <td class="p-5">
+                    <td class="p-5" onclick="event.stopPropagation()">
                         <div class="flex justify-center gap-2">
                             <a href="/quotations/{{ quotation.id }}"
                                 class="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-xl"
@@ -308,28 +322,24 @@
                             {% endif %}
                             {% endif %}
                             {% if quotation.status == "pendiente" %}
-                            <a href="/quotations/{{ quotation.id }}/edit" title="Editar"
-                                class="w-10 h-10 flex items-center justify-center bg-blue-100 hover:bg-blue-200 rounded-xl">
-                                ✏️
-                            </a>
-                            <button onclick="approveQuotation('{{ quotation.id }}')" title="Aprobar"
+                            <button type="button" onclick="approveQuotation('{{ quotation.id }}')" title="Aprobar"
                                 class="w-10 h-10 bg-green-100 hover:bg-green-200 rounded-xl">
                                 ✅
                             </button>
-                            <button onclick="cancelQuotation('{{ quotation.id }}')"
+                            <button type="button" onclick="cancelQuotation('{{ quotation.id }}')"
                                 class="w-10 h-10 bg-yellow-100 hover:bg-yellow-200 rounded-xl" title="Cancelar">
                                 ❌
                             </button>
 
-                            {% elif quotation.status == "cancelada" %}
-                            <button onclick="reactivateQuotation('{{ quotation.id }}')"
+                            {% elif quotation.status == "cancelada" or quotation.status == "vencida" %}
+                            <button type="button" onclick="reactivateQuotation('{{ quotation.id }}')"
                                 class="w-10 h-10 bg-green-100 hover:bg-green-200 rounded-xl" title="Reactivar">
                                 ♻️
                             </button>
 
                             {% endif %}
 
-                            <button onclick="deleteQuotation('{{ quotation.id }}')"
+                            <button type="button" onclick="deleteQuotation('{{ quotation.id }}')"
                                 class="w-10 h-10 bg-red-100 hover:bg-red-200 rounded-xl" title="Eliminar">
                                 🗑️
                             </button>

@@ -231,6 +231,7 @@ async def new_shipment(quotation_id: int, request: Request, db: Session = Depend
             "existing": existing,
             "edit_mode": False,
             "status_info": quotation_internal_status(quotation),
+            "user": user,
         },
     )
 
@@ -262,6 +263,7 @@ async def edit_shipment(shipment_id: int, request: Request, db: Session = Depend
             "existing": shipment,
             "edit_mode": True,
             "status_info": quotation_internal_status(shipment.quotation),
+            "user": user,
         },
     )
 

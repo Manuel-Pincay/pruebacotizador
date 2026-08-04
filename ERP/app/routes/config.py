@@ -148,13 +148,40 @@ async def admin_storage(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/secretadmin/", status_code=302)
 
     from app.services.storage_stats import collect_storage_stats
+    from app.services.backup_service import list_backups
 
     stats = collect_storage_stats(db)
+    backups = list_backups(15)
     return templates.TemplateResponse(
         request=request,
         name="admin/storage.html",
-        context={"stats": stats},
+        context={
+            "stats": stats,
+            "backups": backups,
+            "backup_ok": request.query_params.get("backup") == "1",
+            "backup_error": request.query_params.get("backup_error", ""),
+        },
     )
+
+
+@router.post("/backup")
+async def admin_run_backup(request: Request):
+    if not is_admin_session_valid(request.cookies.get("admin_token")):
+        return RedirectResponse(url="/secretadmin/", status_code=302)
+
+    from app.services.backup_service import create_mysql_backup
+
+    try:
+        path = create_mysql_backup()
+        return RedirectResponse(
+            url=f"/secretadmin/storage?backup=1&file={quote(path.name)}",
+            status_code=302,
+        )
+    except Exception as exc:
+        return RedirectResponse(
+            url=f"/secretadmin/storage?backup_error={quote(str(exc)[:180])}",
+            status_code=302,
+        )
 
 
 # =====================================

@@ -24,6 +24,8 @@ from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.models.quotation_payment import QuotationPayment
 from app.models.quotation_design import QuotationDesign
+from app.models.quotation_event import QuotationEvent
+from app.models.notification import Notification
 from app.models.shipment import Shipment
 from app.models.sri_certificate import SriCertificate
 from app.models.sri_emission_point import SriEmissionPoint
@@ -56,6 +58,8 @@ __all__ = [
     "QuotationItem",
     "QuotationPayment",
     "QuotationDesign",
+    "QuotationEvent",
+    "Notification",
     "Shipment",
     "SriCertificate",
     "SriEmissionPoint",

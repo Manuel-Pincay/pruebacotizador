@@ -75,6 +75,36 @@
     </div>
     {% endif %}
 
+    <div class="bg-white rounded-xl border p-5 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="font-semibold text-gray-800">Backup de base de datos</h2>
+                <p class="text-sm text-gray-500">Genera un volcado MySQL en la carpeta <code class="text-xs bg-gray-100 px-1 rounded">backups/</code></p>
+            </div>
+            <form method="post" action="/secretadmin/backup">
+                <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                    Crear backup ahora
+                </button>
+            </form>
+        </div>
+        {% if backup_ok %}
+        <p class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">Backup creado correctamente.</p>
+        {% endif %}
+        {% if backup_error %}
+        <p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{{ backup_error }}</p>
+        {% endif %}
+        {% if backups %}
+        <ul class="text-sm text-gray-600 space-y-1 max-h-40 overflow-y-auto">
+            {% for b in backups %}
+            <li class="font-mono text-xs">{{ b.name }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-gray-400">Aún no hay backups.</p>
+        {% endif %}
+        <p class="text-xs text-gray-500">Para automático diario: programa <code class="bg-gray-100 px-1 rounded">scripts\\backup_mysql.bat</code> en el Programador de tareas de Windows.</p>
+    </div>
+
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
         <p class="font-semibold mb-1">Limpieza</p>
         <p>Ejecuta <code class="bg-white px-1 rounded">python scripts/cleanup_storage.py</code> para revisar huérfanos.</p>
