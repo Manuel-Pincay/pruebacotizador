@@ -689,7 +689,7 @@ async def production_calendar(
 # CAMBIO DE ESTADO
 # =========================================
 
-@router.get("/move/{order_id}/{status}")
+@router.post("/move/{order_id}/{status}")
 async def move_order(
     request: Request,
     order_id: int,
@@ -736,7 +736,7 @@ async def move_order(
     return RedirectResponse(url=redirect_url, status_code=302)
 
 
-@router.get("/{order_id}/advance")
+@router.post("/{order_id}/advance")
 async def advance_production_order(
     request: Request,
     order_id: int,

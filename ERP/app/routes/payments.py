@@ -137,13 +137,14 @@ async def create_quotation_payment(
     try:
         quotation = (
             db.query(Quotation)
-            .options(joinedload(Quotation.payments))
+            .options(joinedload(Quotation.payments), joinedload(Quotation.client))
             .filter(Quotation.id == quotation_id)
             .first()
         )
         if not quotation:
             raise PaymentValidationError("Cotización no encontrada.")
 
+        was_paid = quotation.payment_status == "pagada"
         parsed_amount = parse_amount(amount)
         validate_payment_amount(quotation, parsed_amount)
 
@@ -174,7 +175,7 @@ async def create_quotation_payment(
 
         quotation = (
             db.query(Quotation)
-            .options(joinedload(Quotation.payments))
+            .options(joinedload(Quotation.payments), joinedload(Quotation.client))
             .filter(Quotation.id == quotation_id)
             .first()
         )
@@ -195,6 +196,19 @@ async def create_quotation_payment(
             )
         except Exception:
             pass
+
+        if not was_paid and quotation and quotation.payment_status == "pagada":
+            try:
+                from app.services.notification_service import NotificationService
+
+                client_name = quotation.client.name if quotation.client else "—"
+                NotificationService.notify_invoice_paid(
+                    client=client_name,
+                    invoice_ref=f"Cotización #{quotation.id}",
+                    amount=quotation.total,
+                )
+            except Exception:
+                pass
 
         return {
             "success": True,

@@ -22,6 +22,10 @@ def _require_reports(request: Request):
     return role_required(request, ["admin", "ventas"])
 
 
+def _require_admin_reports(request: Request):
+    return role_required(request, ["admin"])
+
+
 @router.get("/receivables", response_class=HTMLResponse)
 async def receivables_report(request: Request, db: Session = Depends(get_db)):
     user = _require_reports(request)
@@ -83,7 +87,7 @@ async def sales_report(
     start_date: str = "",
     end_date: str = "",
 ):
-    user = _require_reports(request)
+    user = _require_admin_reports(request)
     if isinstance(user, RedirectResponse):
         return user
 

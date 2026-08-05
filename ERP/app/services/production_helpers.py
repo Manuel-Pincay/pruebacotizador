@@ -90,6 +90,8 @@ INACTIVE_PRODUCTION_QUOTATION_STATUSES = (
 
 def cleanup_inactive_production_orders(db: Session) -> int:
     """Elimina órdenes de producción ligadas a cotizaciones que no van a fábrica."""
+    from app.models.production_order_history import ProductionOrderHistory
+
     inactive_ids = [
         row[0]
         for row in db.query(Quotation.id)
@@ -98,9 +100,32 @@ def cleanup_inactive_production_orders(db: Session) -> int:
     ]
     if not inactive_ids:
         return 0
+
+    order_ids = [
+        row[0]
+        for row in db.query(ProductionOrder.id)
+        .filter(ProductionOrder.quotation_id.in_(inactive_ids))
+        .all()
+    ]
+    if not order_ids:
+        return 0
+
+    # Bulk delete no dispara cascade ORM: liberar/borrar hijos primero.
+    from app.models.raw_material_movement import RawMaterialMovement
+
+    db.query(RawMaterialMovement).filter(
+        RawMaterialMovement.production_order_id.in_(order_ids)
+    ).update(
+        {RawMaterialMovement.production_order_id: None},
+        synchronize_session=False,
+    )
+    db.query(ProductionOrderHistory).filter(
+        ProductionOrderHistory.production_order_id.in_(order_ids)
+    ).delete(synchronize_session=False)
+
     deleted = (
         db.query(ProductionOrder)
-        .filter(ProductionOrder.quotation_id.in_(inactive_ids))
+        .filter(ProductionOrder.id.in_(order_ids))
         .delete(synchronize_session=False)
     )
     if deleted:
@@ -111,6 +136,12 @@ def cleanup_inactive_production_orders(db: Session) -> int:
 def prepare_production_module(db: Session) -> None:
     expire_stale_pending_quotations(db)
     cleanup_inactive_production_orders(db)
+    try:
+        from app.services.notification_service import NotificationService
+
+        NotificationService.scan_delayed_orders(db)
+    except Exception:
+        pass
 
 
 def quotation_visible_in_production(quotation) -> bool:

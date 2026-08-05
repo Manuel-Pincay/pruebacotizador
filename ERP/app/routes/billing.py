@@ -760,6 +760,23 @@ async def billing_from_quotation_create(
             url=f"/billing/from-quotation/{quotation_id}/preview?error={quote(str(exc))}",
             status_code=302,
         )
+    try:
+        from app.services.notification_service import NotificationService
+
+        q = preview.get("quotation")
+        client = getattr(q, "client", None) if q is not None else None
+        client_name = getattr(client, "name", None) or "—"
+        user_label = getattr(user, "full_name", None) or getattr(user, "username", None) or "—"
+        invoice_ref = getattr(invoice, "numero_comprobante", None) or f"#{invoice.id}"
+        NotificationService.notify_quote_sent_to_billing(
+            client=client_name,
+            quotation_id=quotation_id,
+            total=total,
+            invoice_ref=invoice_ref,
+            user=user_label,
+        )
+    except Exception:
+        pass
     return RedirectResponse(url=f"/billing/{invoice.id}", status_code=302)
 
 

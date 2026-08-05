@@ -136,9 +136,9 @@
           <tr class="bg-purple-50/70 border-t">
             <td colspan="4" class="px-3 py-2.5 font-bold text-purple-900">{{ group.label }}</td>
             <td class="px-3 py-2.5 text-right font-bold text-purple-800">${{ "%.2f"|format(group.total) }}</td>
-            <td class="px-3 py-2.5 text-right text-xs text-purple-600">{{ group.items|length }} ítem(s)</td>
+            <td class="px-3 py-2.5 text-right text-xs text-purple-600">{{ group['items']|length }} ítem(s)</td>
           </tr>
-          {% for q in group.items %}
+          {% for q in group['items'] %}
           <tr class="border-t hover:bg-purple-50/40 cursor-pointer" onclick="location.href='/quotations/{{ q.id }}'">
             <td class="p-3 font-bold">#{{ q.id }}</td>
             <td class="p-3">{{ q.created_at.strftime('%d/%m/%Y') if q.created_at else '—' }}</td>

@@ -190,10 +190,12 @@
                 Siguiente paso: <strong>{{ next_status_label }}</strong>
                 {% if next_status_hint %}<span class="text-gray-400">· {{ next_status_hint }}</span>{% endif %}
             </p>
-            <a href="/production/{{ order.id }}/advance"
-                class="inline-flex justify-center bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium shrink-0">
-                Avanzar a {{ next_status_label }} →
-            </a>
+            <form method="POST" action="/production/{{ order.id }}/advance" class="shrink-0">
+                <button type="submit"
+                    class="inline-flex justify-center bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium">
+                    Avanzar a {{ next_status_label }} →
+                </button>
+            </form>
         </div>
         {% endif %}
     </div>

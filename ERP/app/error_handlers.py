@@ -115,6 +115,19 @@ def _error_response(request: Request, exc: Exception, *, status_code: int) -> Re
         request.url.path,
         payload["message"],
     )
+    if status_code >= 500:
+        try:
+            from app.auth.session import resolve_user_session
+            from app.services.notification_service import NotificationService
+
+            username = resolve_user_session(request.cookies.get("user")) or "—"
+            NotificationService.notify_system_error(
+                module=f"{request.method} {payload['path']}",
+                detail=f"{payload['title']}: {payload['message']}",
+                user=username,
+            )
+        except Exception:
+            pass
     if _wants_json(request):
         return JSONResponse(
             status_code=status_code,

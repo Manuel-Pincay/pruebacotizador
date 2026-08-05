@@ -372,14 +372,12 @@
 <script>
     async function approveQuotation(id) {
         if (!(await ErpDialog.confirm("¿Aprobar cotización?"))) return;
-
-        window.location.href = `/quotations/${id}/approve`;
+        erpPost(`/quotations/${id}/approve`);
     }
 
     async function cancelQuotation(id) {
         if (!(await ErpDialog.confirm("¿Cancelar cotización?"))) return;
-
-        window.location.href = `/quotations/${id}/cancel`;
+        erpPost(`/quotations/${id}/cancel`);
     }
 
     async function deleteQuotation(id) {
@@ -413,8 +411,7 @@
 
     async function reactivateQuotation(id) {
         if (!(await ErpDialog.confirm("¿Reactivar cotización? Volverá a estado pendiente."))) return;
-
-        window.location.href = `/quotations/${id}/reactivate`;
+        erpPost(`/quotations/${id}/reactivate`);
     }
 </script>
 {% endblock %}

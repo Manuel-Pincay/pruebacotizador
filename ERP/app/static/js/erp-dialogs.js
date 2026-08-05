@@ -141,12 +141,27 @@
     },
   };
 
+  function erpPost(url) {
+    if (!url) {
+      return;
+    }
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = url;
+    form.style.display = "none";
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   function erpConfirmLink(event, message, options) {
     event.preventDefault();
     const link = event.currentTarget;
+    const url =
+      (link && (link.getAttribute("data-erp-post") || link.getAttribute("href"))) ||
+      "";
     ErpDialog.confirm(message, options).then(function (confirmed) {
-      if (confirmed && link.href) {
-        window.location.href = link.href;
+      if (confirmed && url) {
+        erpPost(url);
       }
     });
     return false;
@@ -181,6 +196,9 @@
 
     const href = trigger.getAttribute("data-erp-href") || trigger.getAttribute("href");
     const formId = trigger.getAttribute("data-erp-form");
+    const usePost =
+      trigger.getAttribute("data-erp-method") === "POST" ||
+      trigger.hasAttribute("data-erp-post");
 
     if (formId) {
       document.getElementById(formId)?.submit();
@@ -188,7 +206,11 @@
     }
 
     if (href) {
-      window.location.href = href;
+      if (usePost) {
+        erpPost(href);
+      } else {
+        window.location.href = href;
+      }
       return;
     }
 
@@ -201,4 +223,5 @@
   global.ErpDialog = ErpDialog;
   global.erpConfirmLink = erpConfirmLink;
   global.erpConfirmForm = erpConfirmForm;
+  global.erpPost = erpPost;
 })(window);

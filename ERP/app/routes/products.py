@@ -525,7 +525,7 @@ async def update_product(
     # =====================================
 
 
-@router.get("/{product_id}/delete")
+@router.post("/{product_id}/delete")
 async def delete_product(
     request: Request, product_id: int, db: Session = Depends(get_db)
 ):

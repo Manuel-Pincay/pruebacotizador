@@ -327,6 +327,21 @@ def _apply_autorizacion(db: Session, invoice: ElectronicInvoice, autorizacion: d
             from app.services.invoice_email_service import try_auto_send_after_authorization
 
             try_auto_send_after_authorization(db, invoice.id)
+        try:
+            from app.services.notification_service import NotificationService
+
+            client_name = invoice.client.name if invoice.client else "—"
+            estab = invoice.codigo_establecimiento or "001"
+            pto = invoice.codigo_punto_emision or "001"
+            seq = invoice.secuencial or ""
+            ref = f"{estab}-{pto}-{seq}"
+            NotificationService.notify_invoice_authorized(
+                client=client_name,
+                invoice_ref=ref,
+                total=invoice.importe_total,
+            )
+        except Exception:
+            pass
         return {"success": True, "estado": "AUTORIZADA", "invoice": invoice, "autorizacion": autorizacion}
 
     if estado in ("NO AUTORIZADO", "RECHAZADO"):

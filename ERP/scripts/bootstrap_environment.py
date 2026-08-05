@@ -22,6 +22,9 @@ REQUIRED_IMPORTS = (
     "pymysql",
     "alembic",
     "cryptography",
+    "dotenv",
+    "requests",
+    "httpx",
 )
 
 

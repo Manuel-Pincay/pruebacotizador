@@ -111,6 +111,9 @@ async def create_user(
 
     role: str = Form(...),
 
+    telegram_chat_id: str = Form(""),
+    telegram_notify: str | None = Form(None),
+
     db: Session = Depends(get_db)
 
 ):
@@ -140,16 +143,20 @@ async def create_user(
                 },
             )
 
+        chat = (telegram_chat_id or "").strip() or None
+        notify = False
+        if (role or "").lower() == "admin" and chat:
+            notify = telegram_notify == "yes"
+        else:
+            chat = None
+
         new_user = User(
-
             username=username,
-
             full_name=full_name,
-
             password=hash_password(password),
-
-            role=role
-
+            role=role,
+            telegram_chat_id=chat,
+            telegram_notify=notify,
         )
 
         db.add(new_user)
@@ -227,6 +234,8 @@ async def update_user(
     password: str = Form(""),
     role: str = Form(...),
     active: str | None = Form(None),
+    telegram_chat_id: str = Form(""),
+    telegram_notify: str | None = Form(None),
     db: Session = Depends(get_db)
 ):
 
@@ -266,6 +275,14 @@ async def update_user(
     if password.strip():
         edit_user.password = hash_password(password.strip())
 
+    chat = (telegram_chat_id or "").strip() or None
+    if (role or "").lower() == "admin" and chat:
+        edit_user.telegram_chat_id = chat
+        edit_user.telegram_notify = telegram_notify == "yes"
+    else:
+        edit_user.telegram_chat_id = None
+        edit_user.telegram_notify = False
+
     db.commit()
 
     return RedirectResponse(url="/users", status_code=302)
@@ -275,7 +292,7 @@ async def update_user(
 # DELETE USER
 # =========================================
 
-@router.get("/{user_id}/delete")
+@router.post("/{user_id}/delete")
 async def delete_user(
     request: Request,
     user_id: int,

@@ -257,12 +257,21 @@ def _add_items_to_quotation(
             sync_product_image(db, product_id, image_name)
 
         resolved_logo = normalize_logo_type(item.get("logo_type") or item.get("logo"))
-        item_discount = float(item.get("item_discount") or item.get("discount") or 0)
-        quantity = item.get("quantity", 1)
-        unit_price = item.get("price", 0)
-        line_total = item.get("total")
-        if line_total is None:
-            line_total = compute_item_total(quantity, unit_price, item_discount)
+        item_discount = max(
+            0.0,
+            min(float(item.get("item_discount") or item.get("discount") or 0), 100.0),
+        )
+        try:
+            quantity = int(item.get("quantity", 1) or 0)
+        except (TypeError, ValueError):
+            quantity = 0
+        if quantity < 1:
+            raise ValueError("Cada producto debe tener cantidad mayor o igual a 1.")
+        try:
+            unit_price = float(item.get("price", 0) or 0)
+        except (TypeError, ValueError):
+            unit_price = 0.0
+        line_total = compute_item_total(quantity, unit_price, item_discount)
         db.add(
             QuotationItem(
                 quotation_id=quotation.id,
@@ -562,6 +571,9 @@ async def create_quotation(
 
         items_data = merge_shipping_into_items(db, items_data, shipping_cost)
 
+        discount = max(0.0, min(float(discount or 0), 100.0))
+        shipping_cost = max(0.0, float(shipping_cost or 0))
+
         parsed_delivery_date = None
         if delivery_date:
             parsed_delivery_date = datetime.strptime(delivery_date, "%Y-%m-%d").date()
@@ -612,8 +624,9 @@ async def create_quotation(
             item_images[idx] = await _item_image_from_form(request, idx)
 
         _add_items_to_quotation(db, quotation, items_data, item_images, default_tarifa_iva=float(iva or 0))
-
-        db.commit()
+        db.flush()
+        db.expire(quotation, ["items"])
+        recalculate_quotation(quotation, db)
 
         try:
             log_activity(db, "Cotización creada", f"Cotización #{quotation.id}")
@@ -733,7 +746,7 @@ async def update_item(
     return RedirectResponse(url=f"/quotations/{item.quotation_id}", status_code=302)
 
 
-@router.get("/quotation-items/{item_id}/delete")
+@router.post("/quotation-items/{item_id}/delete")
 async def delete_item(
     request: Request, item_id: int, db: Session = Depends(get_db)
 ):
@@ -970,7 +983,7 @@ async def quotation_send_to_design(
         )
 
 
-@router.get("/{quotation_id}/approve")
+@router.post("/{quotation_id}/approve")
 async def approve_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
@@ -978,7 +991,12 @@ async def approve_quotation(
     if isinstance(user, RedirectResponse):
         return user
 
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
+    quotation = (
+        db.query(Quotation)
+        .options(joinedload(Quotation.client))
+        .filter(Quotation.id == quotation_id)
+        .first()
+    )
     if not quotation:
         return RedirectResponse(url="/quotations", status_code=302)
 
@@ -988,6 +1006,7 @@ async def approve_quotation(
     quotation.status = "aprobada"
     ensure_production_order(db, quotation)
     db.commit()
+    db.refresh(quotation)
 
     try:
         log_activity(db, "Cotización aprobada", f"Cotización #{quotation.id}")
@@ -1008,11 +1027,24 @@ async def approve_quotation(
         f"/quotations/{quotation.id}",
         exclude_user_id=getattr(user, "id", None),
     )
+    try:
+        from app.services.notification_service import NotificationService
+
+        client_name = quotation.client.name if quotation.client else "—"
+        user_label = getattr(user, "full_name", None) or getattr(user, "username", None) or "—"
+        NotificationService.notify_quote_approved(
+            client=client_name,
+            quotation_id=quotation.id,
+            total=quotation.total,
+            user=user_label,
+        )
+    except Exception:
+        pass
 
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
 
-@router.get("/{quotation_id}/cancel")
+@router.post("/{quotation_id}/cancel")
 async def cancel_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
@@ -1031,7 +1063,10 @@ async def cancel_quotation(
 
     quotation = (
         db.query(Quotation)
-        .options(joinedload(Quotation.electronic_invoice))
+        .options(
+            joinedload(Quotation.electronic_invoice),
+            joinedload(Quotation.client),
+        )
         .filter(Quotation.id == quotation_id)
         .first()
     )
@@ -1099,25 +1134,22 @@ async def cancel_quotation(
         f"/quotations/{quotation.id}",
         exclude_user_id=getattr(user, "id", None),
     )
+    try:
+        from app.services.notification_service import NotificationService
+
+        client_name = quotation.client.name if quotation.client else "—"
+        user_label = getattr(user, "full_name", None) or getattr(user, "username", None) or "—"
+        NotificationService.notify_quote_cancelled(
+            client=client_name,
+            quotation_id=quotation.id,
+            total=quotation.total,
+            previous_status=previous,
+            user=user_label,
+        )
+    except Exception:
+        pass
 
     return RedirectResponse(url=f"{detail_url}?cancelled=1", status_code=302)
-
-
-@router.get("/{quotation_id}/delete")
-async def delete_quotation(
-    request: Request, quotation_id: int, db: Session = Depends(get_db)
-):
-    user = role_required(request, ["admin"])
-    if isinstance(user, RedirectResponse):
-        return user
-
-    quotation = db.query(Quotation).filter(Quotation.id == quotation_id).first()
-    if not quotation:
-        return RedirectResponse(url="/quotations", status_code=302)
-
-    _purge_quotation(db, quotation)
-    db.commit()
-    return RedirectResponse(url="/quotations", status_code=302)
 
 
 @router.post("/{quotation_id}/delete")
@@ -1146,7 +1178,7 @@ async def delete_quotation_with_password(
     return RedirectResponse(url="/quotations/?deleted=1", status_code=302)
 
 
-@router.get("/{quotation_id}/reactivate")
+@router.post("/{quotation_id}/reactivate")
 async def reactivate_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
@@ -1163,9 +1195,28 @@ async def reactivate_quotation(
 
     previous = (quotation.status or "").lower()
     quotation.status = "pendiente"
-    db.query(ProductionOrder).filter(
-        ProductionOrder.quotation_id == quotation.id
-    ).delete(synchronize_session=False)
+    order_ids = [
+        row[0]
+        for row in db.query(ProductionOrder.id)
+        .filter(ProductionOrder.quotation_id == quotation.id)
+        .all()
+    ]
+    if order_ids:
+        from app.models.production_order_history import ProductionOrderHistory
+        from app.models.raw_material_movement import RawMaterialMovement
+
+        db.query(RawMaterialMovement).filter(
+            RawMaterialMovement.production_order_id.in_(order_ids)
+        ).update(
+            {RawMaterialMovement.production_order_id: None},
+            synchronize_session=False,
+        )
+        db.query(ProductionOrderHistory).filter(
+            ProductionOrderHistory.production_order_id.in_(order_ids)
+        ).delete(synchronize_session=False)
+        db.query(ProductionOrder).filter(
+            ProductionOrder.id.in_(order_ids)
+        ).delete(synchronize_session=False)
     db.commit()
     log_quotation_event(
         db,
@@ -1395,7 +1446,7 @@ async def update_shipping_cost(
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
 
-@router.get("/{quotation_id}/production")
+@router.post("/{quotation_id}/production")
 async def production_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
@@ -1420,7 +1471,7 @@ async def production_quotation(
     return RedirectResponse(url="/production/", status_code=302)
 
 
-@router.get("/{quotation_id}/shipping")
+@router.post("/{quotation_id}/shipping")
 async def shipping_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
@@ -1440,7 +1491,7 @@ async def shipping_quotation(
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
 
-@router.get("/{quotation_id}/delivered")
+@router.post("/{quotation_id}/delivered")
 async def delivered_quotation(
     request: Request, quotation_id: int, db: Session = Depends(get_db)
 ):
@@ -1454,6 +1505,16 @@ async def delivered_quotation(
 
     quotation.status = "entregado"
     db.commit()
+    try:
+        from app.services.notification_service import NotificationService
+
+        client_name = quotation.client.name if quotation.client else "—"
+        NotificationService.notify_order_delivered(
+            client=client_name,
+            order_id=f"Cotización #{quotation.id}",
+        )
+    except Exception:
+        pass
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
 

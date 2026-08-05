@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.database import Base, engine, SessionLocal
@@ -53,8 +55,15 @@ from app.error_handlers import register_error_handlers
 
 try:
     prepare_database()
+    settings.validate_security_settings()
     table_count = len(Base.metadata.tables)
     print(f"\n✓ Base de datos MySQL lista ({table_count} tablas)\n")
+except RuntimeError as e:
+    print("\n" + "=" * 60)
+    print("ERROR DE SEGURIDAD EN PRODUCCIÓN")
+    print("=" * 60)
+    print(str(e))
+    raise
 except Exception as e:
     print("\n" + "=" * 60)
     print("ERROR PREPARANDO BASE DE DATOS")
@@ -62,7 +71,22 @@ except Exception as e:
     print(type(e).__name__)
     print(str(e))
     raise
-app = FastAPI(title="SISTEMA ERP")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        from app.services.notification_service import NotificationService
+        from app.services.telegram_service import reset_telegram_service
+
+        reset_telegram_service()
+        NotificationService.notify_server_started()
+    except Exception:
+        pass
+    yield
+
+
+app = FastAPI(title="SISTEMA ERP", lifespan=lifespan)
 register_error_handlers(app)
 
 app.mount(
@@ -70,8 +94,6 @@ app.mount(
     StaticFiles(directory="app/static"),
     name="static"
 )
-
-
 
 app.mount(
     "/uploads",
@@ -127,5 +149,30 @@ def create_admin():
     db.close()
 
 
+def _seed_admin_telegram_from_env() -> None:
+    """Si el admin aún no tiene Chat ID, copia el del .env (una sola vez)."""
+    try:
+        from app.services.telegram_service import parse_chat_ids
+
+        ids = parse_chat_ids(settings.telegram_chat_id)
+        if not ids:
+            return
+        db = SessionLocal()
+        try:
+            admin = (
+                db.query(User)
+                .filter(User.username == "admin", User.role == "admin")
+                .first()
+            )
+            if admin and not (admin.telegram_chat_id or "").strip():
+                admin.telegram_chat_id = ids[0]
+                admin.telegram_notify = True
+                db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass
+
 
 create_admin()
+_seed_admin_telegram_from_env()

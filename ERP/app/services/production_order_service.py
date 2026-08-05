@@ -278,6 +278,20 @@ def transition_status(
 
     db.commit()
     db.refresh(order)
+    if target == "entregado":
+        try:
+            from app.services.notification_service import NotificationService
+
+            client_name = "—"
+            if quotation and quotation.client:
+                client_name = quotation.client.name or "—"
+            NotificationService.notify_order_delivered(
+                client=client_name,
+                order_id=f"OP-{order.id:04d}",
+                delivered_at=order.completed_at,
+            )
+        except Exception:
+            pass
     return order
 
 

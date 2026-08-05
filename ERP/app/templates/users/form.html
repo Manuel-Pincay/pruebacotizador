@@ -145,6 +145,49 @@
 
         {% endif %}
 
+        {# Telegram: solo administradores pueden configurar y recibir #}
+        <div id="telegram-section" class="mb-8 p-4 rounded-xl border border-slate-200 bg-slate-50 {% if edit_mode and edit_user.role != 'admin' %}hidden{% elif not edit_mode %}hidden{% endif %}">
+            <h2 class="text-sm font-bold text-slate-800 mb-1">Telegram (solo Admin)</h2>
+            <p class="text-xs text-slate-500 mb-4">
+                El usuario debe haber enviado /start al bot. Chat ID:
+                <code class="text-[11px]">getUpdates</code> en la API de Telegram.
+            </p>
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-2">Chat ID de Telegram</label>
+                <input
+                    type="text"
+                    name="telegram_chat_id"
+                    value="{{ edit_user.telegram_chat_id if edit_mode and edit_user.telegram_chat_id else '' }}"
+                    placeholder="Ej: 1632661017"
+                    class="w-full border rounded-xl p-3"
+                    pattern="[0-9\-,\s]*"
+                >
+            </div>
+            <label class="flex items-center gap-3">
+                <input
+                    type="checkbox"
+                    name="telegram_notify"
+                    value="yes"
+                    {% if edit_mode and edit_user.telegram_notify %}checked{% endif %}
+                >
+                <span class="text-sm font-semibold">Recibir notificaciones del ERP por Telegram</span>
+            </label>
+        </div>
+
+        <script>
+        (function () {
+            var role = document.querySelector('select[name="role"]');
+            var section = document.getElementById('telegram-section');
+            if (!role || !section) return;
+            function sync() {
+                if (role.value === 'admin') section.classList.remove('hidden');
+                else section.classList.add('hidden');
+            }
+            role.addEventListener('change', sync);
+            sync();
+        })();
+        </script>
+
         <button
             type="submit"
             class="bg-purple-700 hover:bg-purple-800 text-white px-8 py-3 rounded-xl transition"

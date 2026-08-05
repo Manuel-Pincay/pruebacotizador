@@ -178,6 +178,21 @@ def adjust_stock(
         db.refresh(material)
     else:
         db.flush()
+
+    min_stock = float(material.min_stock or 0)
+    new_stock = float(material.stock or 0)
+    if previous > min_stock and new_stock <= min_stock:
+        try:
+            from app.services.notification_service import NotificationService
+
+            NotificationService.notify_material_shortage(
+                material=getattr(material, "label", None) or material.name,
+                stock=new_stock,
+                min_stock=min_stock,
+                material_id=material.id,
+            )
+        except Exception:
+            pass
     return material
 
 

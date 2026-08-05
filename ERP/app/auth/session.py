@@ -30,15 +30,16 @@ def resolve_user_session(cookie_value: str | None) -> str | None:
         return username if username else None
     except (BadSignature, SignatureExpired):
         pass
-    # Compatibilidad: cookie antigua con username en texto plano
-    if (
-        cookie_value
-        and cookie_value != LEGACY_ADMIN_TOKEN
-        and len(cookie_value) <= 150
-        and " " not in cookie_value
-        and cookie_value.count(".") < 2
-    ):
-        return cookie_value
+    # Compatibilidad opcional (desactivada por defecto / en producción)
+    if settings.allow_legacy_session:
+        if (
+            cookie_value
+            and cookie_value != LEGACY_ADMIN_TOKEN
+            and len(cookie_value) <= 150
+            and " " not in cookie_value
+            and cookie_value.count(".") < 2
+        ):
+            return cookie_value
     return None
 
 
@@ -49,7 +50,7 @@ def sign_admin_session() -> str:
 def is_admin_session_valid(cookie_value: str | None) -> bool:
     if not cookie_value:
         return False
-    if cookie_value == LEGACY_ADMIN_TOKEN:
+    if settings.allow_legacy_session and cookie_value == LEGACY_ADMIN_TOKEN:
         return True
     try:
         data = _admin_serializer.loads(

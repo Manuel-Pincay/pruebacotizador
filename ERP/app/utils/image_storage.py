@@ -428,13 +428,17 @@ def delete_payment_receipt(filename: str | None) -> None:
         path.unlink(missing_ok=True)
 
 
-def payment_receipt_url(filename: str | None) -> str | None:
+def payment_receipt_url(filename: str | None, payment_id: int | None = None) -> str | None:
+    """URL autenticada del comprobante (no exponer /uploads/payments)."""
     if not filename:
         return None
     safe_name = Path(filename).name
     path = PAYMENTS_DIR / safe_name
-    if path.exists() and path.is_file():
-        return f"/uploads/payments/{safe_name}"
+    if not (path.exists() and path.is_file()):
+        return None
+    if payment_id is not None:
+        return f"/payments/{payment_id}/receipt"
+    # Sin id no hay ruta pública segura
     return None
 
 

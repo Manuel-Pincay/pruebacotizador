@@ -333,7 +333,7 @@ async def update_client(
         )
 
 
-@router.get("/{client_id}/delete")
+@router.post("/{client_id}/delete")
 async def delete_client(client_id: int, request: Request, db: Session = Depends(get_db)):
 
     user = role_required(request, ["admin", "ventas"])

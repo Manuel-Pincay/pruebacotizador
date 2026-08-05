@@ -207,7 +207,7 @@ async def api_create_category(
 # =====================================
 
 
-@router.get("/category/{category_id}/delete")
+@router.post("/category/{category_id}/delete")
 async def delete_category(request: Request, category_id: int, db: Session = Depends(get_db)):
 
     user = _require_admin(request)
@@ -227,7 +227,7 @@ async def delete_category(request: Request, category_id: int, db: Session = Depe
     return RedirectResponse("/product-settings", status_code=302)
 
 
-@router.get("/init")
+@router.post("/init")
 async def initialize_catalogs(request: Request, db: Session = Depends(get_db)):
 
     user = _require_admin(request)
@@ -371,7 +371,7 @@ async def api_create_material(
     return JSONResponse(content=result)
 
 
-@router.get("/material/{material_id}/delete")
+@router.post("/material/{material_id}/delete")
 async def delete_material(
     request: Request,
     material_id: int,
@@ -457,7 +457,7 @@ async def api_create_color(
 # =====================================
 
 
-@router.get("/color/{color_id}/delete")
+@router.post("/color/{color_id}/delete")
 async def delete_color(
     request: Request,
     color_id: int,
@@ -543,7 +543,7 @@ async def api_create_theme(
 # =====================================
 
 
-@router.get("/theme/{theme_id}/delete")
+@router.post("/theme/{theme_id}/delete")
 async def delete_theme(
     request: Request,
     theme_id: int,
@@ -627,7 +627,7 @@ async def api_create_thickness(
 # =====================================
 
 
-@router.get("/thickness/{thickness_id}/delete")
+@router.post("/thickness/{thickness_id}/delete")
 async def delete_thickness(
     request: Request,
     thickness_id: int,
@@ -714,7 +714,7 @@ async def api_create_unit(
 # =====================================
 
 
-@router.get("/unit/{unit_id}/delete")
+@router.post("/unit/{unit_id}/delete")
 async def delete_unit(
     request: Request,
     unit_id: int,

@@ -24,6 +24,8 @@ REQUIRED_PACKAGES: tuple[tuple[str, str], ...] = (
     ("PIL", "pillow"),
     ("cryptography", "cryptography"),
     ("itsdangerous", "itsdangerous"),
+    ("requests", "requests"),
+    ("httpx", "httpx"),
 )
 
 MIN_PYTHON = (3, 10)

@@ -51,8 +51,34 @@ class Settings:
     smtp_use_tls: bool = _env_bool("SMTP_USE_TLS", True)
     smtp_enabled: bool = _env_bool("SMTP_ENABLED", False)
 
+    # Telegram Bot (notificaciones externas)
+    telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
+    enable_telegram: bool = _env_bool(
+        "ENABLE_TELEGRAM",
+        _env_bool("TELEGRAM_ENABLED", False),
+    )
+
+    # Cookies/sesión legacy (texto plano / token "authenticated"). Off por defecto.
+    allow_legacy_session: bool = _env_bool("ERP_ALLOW_LEGACY_SESSION", False)
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    def validate_security_settings(self) -> None:
+        """En producción, aborta si secrets por defecto siguen activos."""
+        if not self.is_production:
+            return
+        weak: list[str] = []
+        if self.secret_key in {"", "erp-dev-secret-change-in-production"}:
+            weak.append("ERP_SECRET_KEY")
+        if self.secretadmin_password in {"", "203211"}:
+            weak.append("ERP_SECRETADMIN_PASSWORD")
+        if weak:
+            raise RuntimeError(
+                "Configuración insegura en producción. Cambie: " + ", ".join(weak)
+            )
+
 
 settings = Settings()

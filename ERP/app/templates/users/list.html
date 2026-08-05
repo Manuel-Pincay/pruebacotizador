@@ -39,6 +39,10 @@
                 </th>
 
                 <th class="text-left p-4">
+                    Telegram
+                </th>
+
+                <th class="text-left p-4">
                     Acciones
                 </th>
 
@@ -112,6 +116,16 @@
 
                     {% endif %}
 
+                </td>
+
+                <td class="p-4 text-sm">
+                    {% if user.role == 'admin' and user.telegram_notify and user.telegram_chat_id %}
+                    <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-xs font-medium">Activo</span>
+                    {% elif user.role == 'admin' %}
+                    <span class="text-gray-400 text-xs">No configurado</span>
+                    {% else %}
+                    <span class="text-gray-300 text-xs">—</span>
+                    {% endif %}
                 </td>
 
                 <!-- ACTIONS -->
