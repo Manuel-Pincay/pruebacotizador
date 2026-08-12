@@ -480,7 +480,13 @@ async def billing_new(request: Request, db: Session = Depends(get_db)):
         .order_by(desc("uso_count"), Client.name.asc())
         .all()
     )
-    products = db.query(Product).order_by(Product.name).limit(500).all()
+    products = (
+        db.query(Product)
+        .filter(Product.active.is_(True))
+        .order_by(Product.name)
+        .limit(500)
+        .all()
+    )
     config = db.query(CompanyConfig).first()
     cert = db.query(SriCertificate).order_by(SriCertificate.id.desc()).first()
     validation = validate_sri_config(db, config, cert) if config else None

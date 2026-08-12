@@ -85,3 +85,17 @@ def test_billing_rejects_wrong_status():
     result = validate_quotation_for_billing(_mock_db_no_sri(), q)
     codes = {e.campo for e in result.errores}
     assert "cotizacion.estado" in codes
+
+
+def test_billing_allows_in_progress_work_status():
+    """Facturar es independiente del avance: aprobada/producción/envío valen."""
+    for status in ("aprobada", "produccion", "enviado", "enviada"):
+        q = SimpleNamespace(
+            status=status,
+            electronic_invoice=None,
+            payment_status="pagada",
+            items=[SimpleNamespace(id=1, detail="Item", product=None)],
+            client=None,
+        )
+        result = validate_quotation_for_billing(_mock_db_no_sri(), q)
+        assert "cotizacion.estado" not in {e.campo for e in result.errores}, status

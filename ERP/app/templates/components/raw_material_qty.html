@@ -1,0 +1,22 @@
+{# Cantidad de planchas/metros con fracciones (0.25, 0.5, …) #}
+{% macro raw_material_qty_field(value='') %}
+{% set qty_val = value if value not in [none, '', undefined] else '' %}
+<div class="max-w-sm">
+  <label class="block text-xs text-gray-600 mb-1" for="raw_material_qty">Cantidad a consumir *</label>
+  <input type="number" name="raw_material_qty" id="raw_material_qty"
+    step="0.01" min="0.01" inputmode="decimal"
+    placeholder="Ej: 0.5"
+    value="{{ qty_val }}"
+    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+  <div class="flex flex-wrap gap-1.5 mt-2" id="raw_qty_presets">
+    <button type="button" data-qty="0.25" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">1/4</button>
+    <button type="button" data-qty="0.5" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">1/2</button>
+    <button type="button" data-qty="0.75" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">3/4</button>
+    <button type="button" data-qty="1" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">1</button>
+    <button type="button" data-qty="2" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">2</button>
+  </div>
+  <p id="raw_material_unit_hint" class="text-xs text-gray-500 mt-1.5">
+    En <strong>planchas</strong> puede usar decimales: 0.25 (cuarto), 0.5 (media), 1 (completa).
+  </p>
+</div>
+{% endmacro %}

@@ -13,10 +13,29 @@ def parse_tarifa_iva(value, default: float = 0.0) -> float:
 
 
 def default_tarifa_from_config(config) -> float:
-    """IVA por defecto de la empresa (0% es válido)."""
+    """IVA comercial de cotizaciones (0% es válido). No usar para factura SRI."""
     if config is None:
         return 0.0
     return parse_tarifa_iva(getattr(config, "iva_default", None), default=0.0)
+
+
+def default_sri_tarifa_from_config(config) -> float:
+    """IVA SRI al facturar desde cotización (p. ej. 15%). Independiente del cotizador."""
+    if config is None:
+        return 15.0
+    return parse_tarifa_iva(getattr(config, "sri_iva_default", None), default=15.0)
+
+
+# Códigos SRI que deben permanecer en 0% aunque haya default de facturación.
+_SRI_ZERO_CODIGOS = {"6", "7"}  # No objeto de impuesto / Exento IVA
+
+
+def _is_transport_product(product) -> bool:
+    if product is None:
+        return False
+    code = (getattr(product, "code", None) or "").strip().upper()
+    name = (getattr(product, "name", None) or "").strip().lower()
+    return code == "SRV-TRANSPORTE" or name == "servicio de transporte"
 
 
 def resolve_product_tarifa_iva(product, default_tarifa_iva: float) -> float:
@@ -34,6 +53,38 @@ def resolve_product_codigo_iva(product, tarifa_iva: float) -> str:
     if codigo is not None and str(codigo).strip() != "":
         return str(codigo).strip()
     return codigo_iva_from_tarifa(tarifa_iva)
+
+
+def resolve_quotation_billing_iva(product, sri_default_tarifa: float) -> tuple[float, str]:
+    """
+    IVA para líneas de factura SRI creadas desde cotización.
+
+    Las cotizaciones pueden ir al 0% comercial; al facturar se aplica
+    ``sri_iva_default`` automáticamente. Excepciones: transporte y
+    productos marcados como no objeto / exento.
+    """
+    sri_default = float(sri_default_tarifa if sri_default_tarifa is not None else 15.0)
+    if _is_transport_product(product):
+        return 0.0, "0"
+
+    codigo_raw = ""
+    if product is not None:
+        codigo_raw = str(getattr(product, "codigo_iva", None) or "").strip()
+    if codigo_raw in _SRI_ZERO_CODIGOS:
+        return 0.0, codigo_raw
+
+    catalog_tarifa = None
+    if product is not None:
+        raw = getattr(product, "tarifa_iva", None)
+        if raw is not None and raw != "":
+            catalog_tarifa = float(raw)
+
+    # Producto ya configurado con tarifa gravada (>0) → respetar catálogo
+    if catalog_tarifa is not None and catalog_tarifa > 0:
+        return catalog_tarifa, resolve_product_codigo_iva(product, catalog_tarifa)
+
+    # 0% / sin configurar / heredado de cotización → IVA SRI vigente
+    return sri_default, codigo_iva_from_tarifa(sri_default)
 
 
 def compute_line(
@@ -75,8 +126,18 @@ def compute_invoice_totals(lines, descuento_global=0, propina=0):
     }
 
 
-def quotation_item_to_line(item, global_discount_pct=0, default_tarifa_iva=0):
-    """Convierte un QuotationItem a línea fiscal SRI."""
+def quotation_item_to_line(
+    item,
+    global_discount_pct=0,
+    default_tarifa_iva=0,
+    *,
+    apply_sri_billing_iva: bool = False,
+):
+    """Convierte un QuotationItem a línea fiscal SRI.
+
+    Con ``apply_sri_billing_iva=True`` (facturar desde cotización) usa el IVA
+    SRI configurado aunque el producto/cotización estén en 0% comercial.
+    """
     from app.services.quotation_service import compute_item_total
 
     item_discount = float(getattr(item, "item_discount", 0) or 0)
@@ -90,8 +151,11 @@ def quotation_item_to_line(item, global_discount_pct=0, default_tarifa_iva=0):
         descuento_abs = 0
 
     product = getattr(item, "product", None)
-    tarifa_iva = resolve_product_tarifa_iva(product, default_tarifa_iva)
-    codigo_iva = resolve_product_codigo_iva(product, tarifa_iva)
+    if apply_sri_billing_iva:
+        tarifa_iva, codigo_iva = resolve_quotation_billing_iva(product, default_tarifa_iva)
+    else:
+        tarifa_iva = resolve_product_tarifa_iva(product, default_tarifa_iva)
+        codigo_iva = resolve_product_codigo_iva(product, tarifa_iva)
     codigo_principal = (
         (getattr(product, "code", None) or "").strip()
         or f"COT-{item.id}"

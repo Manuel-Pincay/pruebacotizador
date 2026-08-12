@@ -43,10 +43,9 @@ from app.services.production_helpers import (
     status_column_config,
 )
 from app.services.logo_types import register_logo_template_globals
+from app.services.design_catalog_service import list_design_sizes, list_usb_references
 from app.services.production_order_service import (
     DESIGN_MATERIALS,
-    DESIGN_SIZES,
-    USB_REFERENCES,
     PRODUCTION_ORDER_STATUSES,
     PRODUCTION_STATUS_SEQUENCE,
     approve_design,
@@ -865,10 +864,17 @@ async def save_fabrication(
 
     use_fab = str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
     rm_id = int(raw_material_id) if str(raw_material_id or "").strip().isdigit() else None
+    from urllib.parse import quote
+
+    from app.services.raw_material_service import parse_raw_material_qty
+
     try:
-        rm_qty = float(raw_material_qty) if str(raw_material_qty or "").strip() else None
-    except (TypeError, ValueError):
-        rm_qty = None
+        rm_qty = parse_raw_material_qty(raw_material_qty) if use_fab else None
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/production/{order_id}?fab_error={quote(str(exc))}",
+            status_code=302,
+        )
 
     try:
         update_design_fields(
@@ -967,8 +973,8 @@ def _production_detail_context(order, request, shipment, user, db) -> dict:
         "can_edit_fabrication": can_edit_fab,
         "can_manage_order": can_manage_order,
         "materials": DESIGN_MATERIALS,
-        "sizes": DESIGN_SIZES,
-        "usb_references": USB_REFERENCES,
+        "sizes": list_design_sizes(db),
+        "usb_references": list_usb_references(db),
         "history": build_history_list(po) if po else [],
         "fab_error": request.query_params.get("fab_error", ""),
     }

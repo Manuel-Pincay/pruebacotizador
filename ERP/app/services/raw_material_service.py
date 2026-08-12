@@ -247,9 +247,11 @@ def set_fabrication_source(
 
     qty = float(raw_material_qty or 0)
     if qty <= 0:
-        # Por defecto: 1 plancha o metros = copias (heurística mínima)
-        copies = max(1, int(order.design_copies or 1))
-        qty = float(copies) if material.kind == "plancha" else float(copies)
+        raise ValueError(
+            "Indique cuántas planchas (o metros) consumirá. "
+            "Puede usar fracciones: 0.25, 0.5, 0.75, 1…"
+        )
+    qty = round(qty, 3)
 
     if float(material.stock or 0) < qty:
         raise ValueError(
@@ -261,6 +263,24 @@ def set_fabrication_source(
     order.raw_material_qty = qty
     db.flush()
     return order
+
+
+def parse_raw_material_qty(value) -> float | None:
+    """Normaliza cantidad desde formulario ('0,5' / '0.5'). Vacío → None."""
+    if value is None:
+        return None
+    text = str(value).strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        qty = float(text)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Cantidad inválida. Use números decimales, por ejemplo 0.25 o 0.5."
+        ) from exc
+    if qty <= 0:
+        raise ValueError("La cantidad a consumir debe ser mayor a cero (ej. 0.25, 0.5, 1).")
+    return round(qty, 3)
 
 
 def consume_for_production(

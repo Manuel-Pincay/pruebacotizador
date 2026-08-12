@@ -9,10 +9,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config.settings import settings
+from app.utils.db_errors import integrity_error_user_message
 
 logger = logging.getLogger("erp.errors")
 _templates = Jinja2Templates(directory="app/templates")
@@ -32,7 +33,13 @@ def _hints_for_exception(exc: Exception) -> list[str]:
     text = f"{type(exc).__name__} {exc}".lower()
     hints: list[str] = []
 
-    if isinstance(exc, OperationalError) or "can't connect" in text or "connection refused" in text:
+    if isinstance(exc, IntegrityError):
+        hints.extend([
+            "El registro está en uso o duplica un valor único.",
+            "No borre catálogo (productos/clientes) si ya se usó en cotizaciones o facturas.",
+            "Use Editar en lugar de Eliminar cuando el dato ya tiene historial.",
+        ])
+    elif isinstance(exc, OperationalError) or "can't connect" in text or "connection refused" in text:
         hints.extend([
             "Verifique que MySQL esté en ejecución (servicios.msc → MySQL80).",
             "Revise DATABASE_URL en el archivo .env (usuario, clave, host y base).",
@@ -73,7 +80,13 @@ def _describe_exception(exc: Exception) -> tuple[str, str]:
         message = "; ".join(parts) if parts else "Revise los campos del formulario e intente de nuevo."
         return "Datos inválidos", message
 
+    if isinstance(exc, IntegrityError):
+        return "Operación no permitida", integrity_error_user_message(exc)
+
     if isinstance(exc, SQLAlchemyError):
+        # En producción no volcar SQL crudo
+        if settings.is_production:
+            return "Error de base de datos", "No se pudo completar la operación. Intente de nuevo o contacte al administrador."
         return "Error de base de datos", str(getattr(exc, "orig", exc))
 
     return type(exc).__name__, str(exc) or "Ocurrió un error inesperado."
@@ -150,6 +163,11 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         return _error_response(request, exc, status_code=422)
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_exception_handler(request: Request, exc: IntegrityError):
+        # 409: conflicto de negocio (FK / unique), no un 500 "roto"
+        return _error_response(request, exc, status_code=409)
 
     @app.exception_handler(SQLAlchemyError)
     async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):

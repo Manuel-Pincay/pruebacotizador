@@ -48,6 +48,7 @@ def create_billable_product(
         cost=0,
         stock=0,
         custom=custom,
+        active=True,
         image=image or "",
         tarifa_iva=tarifa,
         codigo_iva=codigo,

@@ -77,19 +77,32 @@ def _parse_sri_product_fields(
 
 
 @router.get("/", response_class=HTMLResponse)
-async def products_page(request: Request, db: Session = Depends(get_db)):
-
+async def products_page(
+    request: Request,
+    status: str = "active",
+    db: Session = Depends(get_db),
+):
     user = role_required(request, PRODUCT_VIEW_ROLES)
 
     if isinstance(user, RedirectResponse):
         return user
 
-    products = db.query(Product).order_by(Product.name.asc()).all()
+    status_key = (status or "active").strip().lower()
+    if status_key not in {"active", "archived", "all"}:
+        status_key = "active"
+
+    query = db.query(Product)
+    if status_key == "active":
+        query = query.filter(Product.active.is_(True))
+    elif status_key == "archived":
+        query = query.filter(Product.active.is_(False))
+    products = query.order_by(Product.name.asc()).all()
 
     total_products = len(products)
     out_of_stock = sum(1 for p in products if (p.stock or 0) <= 0)
     low_stock = sum(1 for p in products if 0 < (p.stock or 0) <= 5)
     custom_count = sum(1 for p in products if p.custom)
+    archived_total = db.query(Product).filter(Product.active.is_(False)).count()
 
     return templates.TemplateResponse(
         request=request,
@@ -101,8 +114,14 @@ async def products_page(request: Request, db: Session = Depends(get_db)):
             "out_of_stock": out_of_stock,
             "low_stock": low_stock,
             "custom_count": custom_count,
+            "archived_total": archived_total,
+            "status_filter": status_key,
             "is_admin": user.role == "admin",
             "can_manage_products": user.role in PRODUCT_MANAGE_ROLES,
+            "flash_deleted": request.query_params.get("deleted") == "1",
+            "flash_archived": request.query_params.get("archived") == "1",
+            "flash_reactivated": request.query_params.get("reactivated") == "1",
+            "flash_error": request.query_params.get("error", ""),
         },
     )
 
@@ -162,6 +181,7 @@ def search_products(request: Request, q: str, db: Session = Depends(get_db)):
 
     products = (
         db.query(Product)
+        .filter(Product.active.is_(True))
         .filter(
             or_(
                 Product.name.ilike(f"%{q}%"),
@@ -277,6 +297,7 @@ async def create_product(
         cost=cost,
         stock=stock,
         custom=True if custom == "yes" else False,
+        active=True,
         image=image_name,
         codigo_auxiliar=sri_aux,
         tarifa_iva=sri_tarifa,
@@ -525,44 +546,131 @@ async def update_product(
     # =====================================
 
 
-@router.post("/{product_id}/delete")
-async def delete_product(
+@router.post("/{product_id}/archive")
+async def archive_product_route(
     request: Request, product_id: int, db: Session = Depends(get_db)
 ):
+    from urllib.parse import quote
+
+    from app.services.product_delete_service import archive_product
 
     user = role_required(request, PRODUCT_MANAGE_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return RedirectResponse(url="/products?error=not_found", status_code=302)
+    if not product.active:
+        return RedirectResponse(url="/products?status=archived", status_code=302)
+
     try:
-
-        product = db.query(Product).filter(Product.id == product_id).first()
-
-        if product:
-            image_name = product.image
-            db.delete(product)
-            db.commit()
-            delete_product_files(image_name)
-
-        return RedirectResponse(url="/products", status_code=302)
-
-    except Exception as e:
-
+        archive_product(db, product)
+        db.commit()
+        try:
+            log_activity(db, "PRODUCTO_ARCHIVADO", f"Producto #{product.id} — {product.name}")
+        except Exception:
+            pass
+        return RedirectResponse(url="/products?archived=1", status_code=302)
+    except ValueError as exc:
         db.rollback()
+        return RedirectResponse(url=f"/products?error={quote(str(exc))}", status_code=302)
+    except Exception:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/products?error={quote('No se pudo archivar el producto.')}",
+            status_code=302,
+        )
 
-        print("ERROR DELETE PRODUCT:", str(e))
 
-        return HTMLResponse(
-            content=f"""
-            <h1>
-                Error eliminando producto
-            </h1>
+@router.post("/{product_id}/reactivate")
+async def reactivate_product_route(
+    request: Request, product_id: int, db: Session = Depends(get_db)
+):
+    from urllib.parse import quote
 
-            <p>
-                {str(e)}
-            </p>
-            """,
-            status_code=500,
+    from app.services.product_delete_service import reactivate_product
+
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return RedirectResponse(url="/products?error=not_found", status_code=302)
+
+    try:
+        reactivate_product(db, product)
+        db.commit()
+        try:
+            log_activity(db, "PRODUCTO_REACTIVADO", f"Producto #{product.id} — {product.name}")
+        except Exception:
+            pass
+        return RedirectResponse(url="/products?reactivated=1", status_code=302)
+    except Exception:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/products?error={quote('No se pudo reactivar el producto.')}",
+            status_code=302,
+        )
+
+
+@router.post("/{product_id}/delete")
+async def delete_product(
+    request: Request, product_id: int, db: Session = Depends(get_db)
+):
+    """Borrado físico solo si no hay historial; si hay uso, redirige a archivar."""
+    from urllib.parse import quote
+
+    from sqlalchemy.exc import IntegrityError
+
+    from app.services.product_delete_service import (
+        archive_product,
+        product_delete_block_reason,
+        product_is_referenced,
+    )
+    from app.utils.db_errors import integrity_error_user_message
+
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return RedirectResponse(url="/products?error=not_found", status_code=302)
+
+    # Si está referenciado: archivar en lugar de romper FK
+    if product_is_referenced(db, product_id):
+        try:
+            archive_product(db, product)
+            db.commit()
+            return RedirectResponse(url="/products?archived=1", status_code=302)
+        except ValueError as exc:
+            db.rollback()
+            return RedirectResponse(url=f"/products?error={quote(str(exc))}", status_code=302)
+
+    reason = product_delete_block_reason(db, product_id)
+    if reason:
+        return RedirectResponse(
+            url=f"/products?error={quote(reason)}",
+            status_code=302,
+        )
+
+    try:
+        image_name = product.image
+        db.delete(product)
+        db.commit()
+        delete_product_files(image_name)
+        return RedirectResponse(url="/products?deleted=1", status_code=302)
+    except IntegrityError as exc:
+        db.rollback()
+        msg = integrity_error_user_message(exc)
+        return RedirectResponse(url=f"/products?error={quote(msg)}", status_code=302)
+    except Exception:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/products?error={quote('No se pudo eliminar el producto. Intente de nuevo.')}",
+            status_code=302,
         )
 
 
@@ -573,7 +681,7 @@ async def products_api(request: Request, db: Session = Depends(get_db)):
     if isinstance(user, RedirectResponse):
         return user
 
-    products = db.query(Product).all()
+    products = db.query(Product).filter(Product.active.is_(True)).all()
 
     return [
         {
@@ -661,7 +769,7 @@ async def catalog_modal(
     if isinstance(user, RedirectResponse):
         return user
 
-    query = db.query(Product)
+    query = db.query(Product).filter(Product.active.is_(True))
 
     search = q.strip()
     if search:

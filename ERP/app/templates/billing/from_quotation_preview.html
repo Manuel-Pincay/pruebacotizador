@@ -4,12 +4,32 @@
   <a href="/quotations/{{ quotation.id }}" class="text-purple-600 text-sm font-medium hover:underline">← Cotización #{{ quotation.id }}</a>
   <h1 class="text-3xl font-bold text-slate-800 mt-2">Revisar factura electrónica</h1>
   <p class="text-gray-500 mt-1">
-    Los datos se tomarán de la cotización aprobada. La cotización no se modifica.
+    Los datos se toman de la cotización. Facturar <strong>no cambia</strong> el estado de trabajo
+    (diseño, producción, envío, entrega). El IVA SRI se aplica automáticamente según la
+    configuración de la empresa (independiente del IVA 0% de la cotización).
   </p>
 </div>
 
 {% if request.query_params.get('error') %}
 <div class="mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl whitespace-pre-wrap">{{ request.query_params.get('error') }}</div>
+{% endif %}
+
+{% set pay_blocked = quotation.payment_status != 'pagada' %}
+{% if pay_blocked %}
+<div class="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-xl">
+  <h2 class="font-bold text-amber-950 mb-1">Pago incompleto — no se puede facturar aún</h2>
+  <p class="text-sm text-amber-900">
+    {% if quotation.payment_status == 'sin_abono' %}
+    Esta cotización no tiene abonos. Registre el <strong>pago completo</strong> antes de crear la factura.
+    {% else %}
+    Hay un abono parcial. Debe completar el saldo pendiente antes de facturar.
+    {% endif %}
+  </p>
+  <a href="/quotations/{{ quotation.id }}#pagos"
+    class="inline-flex mt-3 items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+    Ir a registrar pago →
+  </a>
+</div>
 {% endif %}
 
 {% if not validation.valido %}
@@ -25,6 +45,9 @@
   {% endif %}
   {% if quotation.client %}
   <a href="/clients/{{ quotation.client.id }}/edit" class="inline-block mt-3 ml-4 text-purple-700 font-semibold text-sm">Editar cliente →</a>
+  {% endif %}
+  {% if pay_blocked %}
+  <a href="/quotations/{{ quotation.id }}#pagos" class="inline-block mt-3 ml-4 text-amber-800 font-semibold text-sm">Registrar pago →</a>
   {% endif %}
 </div>
 {% endif %}
@@ -144,8 +167,14 @@
       </p>
     </form>
     {% else %}
-    <div class="bg-gray-100 rounded-2xl border p-6 text-sm text-gray-600">
-      Corrija los errores indicados para habilitar la creación de la factura.
+    <div class="bg-gray-100 rounded-2xl border p-6 text-sm text-gray-600 space-y-3">
+      <p>No se puede crear la factura hasta corregir los errores.</p>
+      {% if pay_blocked %}
+      <a href="/quotations/{{ quotation.id }}#pagos"
+        class="inline-flex w-full justify-center items-center bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-semibold">
+        Completar pago en la cotización
+      </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>

@@ -234,6 +234,29 @@ class NotificationService:
         )
 
     @staticmethod
+    def notify_order_status_changed(
+        *,
+        client: str,
+        order_id: int | str,
+        from_status: str,
+        to_status: str,
+        status_code: str = "",
+        user: str = "—",
+        quotation_id: int | str | None = None,
+    ) -> None:
+        _dispatch_async(
+            lambda: events.order_status_changed(
+                client=client or "—",
+                order_id=order_id,
+                from_status=from_status or "—",
+                to_status=to_status or "—",
+                status_code=status_code or "",
+                user=user or "—",
+                quotation_id=quotation_id,
+            ),
+        )
+
+    @staticmethod
     def notify_material_shortage(
         *,
         material: str,

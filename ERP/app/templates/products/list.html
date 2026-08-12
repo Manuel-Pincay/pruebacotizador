@@ -28,6 +28,43 @@
         {% endif %}
     </div>
 
+    {% if flash_deleted %}
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+      Producto eliminado correctamente.
+    </div>
+    {% endif %}
+    {% if flash_archived %}
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+      Producto archivado. Ya no aparece en cotizaciones nuevas; el historial se conserva.
+    </div>
+    {% endif %}
+    {% if flash_reactivated %}
+    <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+      Producto reactivado y disponible en el catálogo.
+    </div>
+    {% endif %}
+    {% if flash_error %}
+    <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-sm">
+      <p class="font-semibold mb-0.5">No se pudo completar la acción</p>
+      <p>{{ flash_error }}</p>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-2">
+      <a href="/products?status=active"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if status_filter == 'active' %}bg-purple-600 text-white{% else %}bg-white border border-gray-200 text-slate-700 hover:bg-slate-50{% endif %}">
+        Activos
+      </a>
+      <a href="/products?status=archived"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if status_filter == 'archived' %}bg-slate-700 text-white{% else %}bg-white border border-gray-200 text-slate-700 hover:bg-slate-50{% endif %}">
+        Archivados{% if archived_total %} ({{ archived_total }}){% endif %}
+      </a>
+      <a href="/products?status=all"
+        class="px-4 py-2 rounded-xl text-sm font-medium transition {% if status_filter == 'all' %}bg-indigo-600 text-white{% else %}bg-white border border-gray-200 text-slate-700 hover:bg-slate-50{% endif %}">
+        Todos
+      </a>
+    </div>
+
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100">
             <p class="text-xs sm:text-sm text-gray-500">Total productos</p>
@@ -98,6 +135,11 @@
                     Personalizado
                 </span>
                 {% endif %}
+                {% if not product.active %}
+                <span class="absolute top-3 left-3 bg-slate-800/90 text-white text-xs px-2.5 py-1 rounded-full font-medium">
+                    Archivado
+                </span>
+                {% endif %}
             </a>
 
             <div class="p-4 sm:p-5 flex flex-col flex-1 min-w-0">
@@ -165,16 +207,24 @@
                 </div>
 
                 {% if can_manage_products %}
-                <div class="mt-4 flex flex-col xs:flex-row gap-2 sm:flex-row">
+                <div class="mt-4 flex flex-col xs:flex-row gap-2 sm:flex-row flex-wrap">
                     <a href="/products/{{ product.id }}/edit"
                         class="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-center px-3 py-2.5 rounded-xl text-sm font-medium transition">
                         Editar
                     </a>
-                    <a href="/products/{{ product.id }}/delete"
-                        onclick="return erpConfirmLink(event, '¿Eliminar este producto?')"
-                        class="flex-1 bg-red-500 hover:bg-red-600 text-white text-center px-3 py-2.5 rounded-xl text-sm font-medium transition">
-                        Eliminar
+                    {% if product.active %}
+                    <a href="/products/{{ product.id }}/archive"
+                        onclick="return erpConfirmLink(event, '¿Archivar este producto? Dejará de aparecer en nuevas cotizaciones; el historial se conserva.')"
+                        class="flex-1 bg-slate-600 hover:bg-slate-700 text-white text-center px-3 py-2.5 rounded-xl text-sm font-medium transition">
+                        Archivar
                     </a>
+                    {% else %}
+                    <a href="/products/{{ product.id }}/reactivate"
+                        onclick="return erpConfirmLink(event, '¿Reactivar este producto en el catálogo?')"
+                        class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-center px-3 py-2.5 rounded-xl text-sm font-medium transition">
+                        Reactivar
+                    </a>
+                    {% endif %}
                 </div>
                 {% endif %}
 
@@ -194,9 +244,16 @@
 
     <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 sm:p-12 md:p-20 text-center">
         <div class="text-6xl sm:text-7xl mb-5">📦</div>
-        <h3 class="text-xl sm:text-2xl font-bold text-slate-800 mb-2">No hay productos registrados</h3>
+        <h3 class="text-xl sm:text-2xl font-bold text-slate-800 mb-2">
+          {% if status_filter == 'archived' %}No hay productos archivados
+          {% else %}No hay productos registrados{% endif %}
+        </h3>
         <p class="text-gray-500 max-w-md mx-auto mb-8 text-sm sm:text-base">
+          {% if status_filter == 'archived' %}
+          Los productos archivados dejan de aparecer en nuevas cotizaciones, pero se conservan en el historial.
+          {% else %}
             Aún no existe ningún producto en el catálogo. Crea el primero para usarlo en cotizaciones e inventario.
+          {% endif %}
         </p>
         {% if is_admin %}
         <div class="flex flex-col sm:flex-row gap-3 justify-center">

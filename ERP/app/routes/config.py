@@ -198,6 +198,7 @@ async def save_config(
     quotation_validity_days: int = Form(default=15),
     quotation_footer_text: str = Form(...),
     iva_default: int = Form(default=0),
+    sri_iva_default: int = Form(default=15),
     guide_sender_name: str = Form(""),
     guide_sender_city: str = Form("Manta"),
     guide_sender_region: str = Form("Ecuador"),
@@ -230,6 +231,7 @@ async def save_config(
     config.quotation_validity_days = quotation_validity_days
     config.quotation_footer_text = quotation_footer_text
     config.iva_default = iva_default
+    config.sri_iva_default = max(0, min(100, int(sri_iva_default)))
     config.guide_sender_name = guide_sender_name.strip() or None
     config.guide_sender_city = guide_sender_city.strip() or "Manta"
     config.guide_sender_region = guide_sender_region.strip() or "Ecuador"

@@ -28,7 +28,10 @@ class CompanyConfig(Base):
 
     quotation_footer_text = Column(String, default="Gracias por confiar en SISTEMA ERP.")
 
+    # IVA comercial de cotizaciones (PDF/totales). Independiente del SRI.
     iva_default = Column(Integer, default=0)
+    # IVA que se envía al SRI al facturar desde cotización (p. ej. 15%).
+    sri_iva_default = Column(Integer, default=15)
 
     guide_sender_name = Column(String, nullable=True)
     guide_sender_city = Column(String, default="Manta")

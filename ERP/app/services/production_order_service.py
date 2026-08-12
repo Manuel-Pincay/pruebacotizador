@@ -278,18 +278,33 @@ def transition_status(
 
     db.commit()
     db.refresh(order)
-    if target == "entregado":
+    if current != target:
         try:
             from app.services.notification_service import NotificationService
 
             client_name = "—"
             if quotation and quotation.client:
                 client_name = quotation.client.name or "—"
-            NotificationService.notify_order_delivered(
-                client=client_name,
-                order_id=f"OP-{order.id:04d}",
-                delivered_at=order.completed_at,
-            )
+            user_name = "—"
+            if user:
+                user_name = (user.full_name or user.username or "—").strip() or "—"
+            order_label = f"OP-{order.id:04d}"
+            if target == "entregado":
+                NotificationService.notify_order_delivered(
+                    client=client_name,
+                    order_id=order_label,
+                    delivered_at=order.completed_at,
+                )
+            else:
+                NotificationService.notify_order_status_changed(
+                    client=client_name,
+                    order_id=order_label,
+                    from_status=PRODUCTION_STATUS_LABELS.get(current, current),
+                    to_status=PRODUCTION_STATUS_LABELS.get(target, target),
+                    status_code=target,
+                    user=user_name,
+                    quotation_id=quotation.id if quotation else None,
+                )
         except Exception:
             pass
     return order

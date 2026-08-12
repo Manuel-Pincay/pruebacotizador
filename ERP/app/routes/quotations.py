@@ -350,7 +350,7 @@ async def new_quotation(request: Request, db: Session = Depends(get_db)):
         return user
 
     clients = db.query(Client).all()
-    products = db.query(Product).all()
+    products = db.query(Product).filter(Product.active.is_(True)).all()
     config = db.query(CompanyConfig).first()
     transport = get_or_create_transport_service_product(db)
     db.commit()
@@ -520,7 +520,7 @@ async def product_catalog(
         return user
 
     per_page = 10
-    query = db.query(Product)
+    query = db.query(Product).filter(Product.active.is_(True))
 
     if q:
         query = query.filter(Product.name.ilike(f"%{q}%"))
@@ -918,6 +918,7 @@ async def quotation_detail(
             "can_edit_quotation": quotation_can_edit_content(quotation) if quotation else False,
             "edit_lock_reason": quotation_edit_lock_reason(quotation) if quotation else "",
             "flash_edit_locked": request.query_params.get("edit_locked") == "1",
+            "can_bill": has_permission(user.role, "billing_create"),
             "events": events,
             "whatsapp_url": whatsapp_url,
         },
@@ -1324,7 +1325,7 @@ async def edit_quotation_page(
         return RedirectResponse(url=f"/quotations/{quotation_id}?edit_locked=1", status_code=302)
 
     clients = db.query(Client).all()
-    products = db.query(Product).all()
+    products = db.query(Product).filter(Product.active.is_(True)).all()
     config = db.query(CompanyConfig).first()
     transport = get_or_create_transport_service_product(db)
     db.commit()
@@ -1486,8 +1487,25 @@ async def shipping_quotation(
     if quotation.status != "produccion":
         return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
+    previous = quotation.status
     quotation.status = "enviado"
     db.commit()
+    try:
+        from app.services.notification_service import NotificationService
+
+        client_name = quotation.client.name if quotation.client else "—"
+        user_name = (user.full_name or user.username or "—").strip() or "—"
+        NotificationService.notify_order_status_changed(
+            client=client_name,
+            order_id=f"Cotización #{quotation.id}",
+            from_status=previous,
+            to_status="enviado",
+            status_code="envio",
+            user=user_name,
+            quotation_id=quotation.id,
+        )
+    except Exception:
+        pass
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
 
@@ -1583,7 +1601,12 @@ async def add_product_modal(
     if locked:
         return locked
 
-    products = db.query(Product).order_by(Product.name).all()
+    products = (
+        db.query(Product)
+        .filter(Product.active.is_(True))
+        .order_by(Product.name)
+        .all()
+    )
     return templates.TemplateResponse(
         request=request,
         name="partials/quotations/add_product_modal.html",
@@ -1636,7 +1659,11 @@ async def add_product_to_quotation(
             image_name = None
 
     if product_type == "catalogo":
-        product = db.query(Product).filter(Product.id == product_id).first()
+        product = (
+            db.query(Product)
+            .filter(Product.id == product_id, Product.active.is_(True))
+            .first()
+        )
         if not product:
             return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 

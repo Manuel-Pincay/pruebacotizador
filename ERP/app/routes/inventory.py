@@ -73,6 +73,7 @@ async def inventory_stock_page(request: Request, db: Session = Depends(get_db)):
 
     products = (
         db.query(Product)
+        .filter(Product.active.is_(True))
         .order_by(Product.name.asc())
         .all()
     )

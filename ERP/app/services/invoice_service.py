@@ -20,7 +20,7 @@ from app.services.sri_config_validator import (
 from app.utils.clave_acceso import ambiente_desde_clave, generar_clave_acceso
 from app.services.tax_service import (
     compute_invoice_totals,
-    default_tarifa_from_config,
+    default_sri_tarifa_from_config,
     quotation_item_to_line,
     round2,
 )
@@ -133,9 +133,15 @@ def _create_invoice_from_lines(
 
 
 def _quotation_lines_data(quotation: Quotation, config: CompanyConfig) -> list:
-    default_tarifa = default_tarifa_from_config(config)
+    """Líneas fiscales SRI desde cotización (aplica sri_iva_default, no el IVA comercial)."""
+    sri_tarifa = default_sri_tarifa_from_config(config)
     return [
-        quotation_item_to_line(item, quotation.discount or 0, default_tarifa)
+        quotation_item_to_line(
+            item,
+            quotation.discount or 0,
+            sri_tarifa,
+            apply_sri_billing_iva=True,
+        )
         for item in quotation.items
     ]
 
@@ -162,7 +168,11 @@ def validate_quotation_for_billing(db: Session, quotation: Quotation) -> Validat
 
     if quotation.status not in QUOTATION_BILLABLE_STATUSES:
         result.errores.append(
-            ValidationIssue("cotizacion.estado", "Solo se pueden facturar cotizaciones aprobadas.")
+            ValidationIssue(
+                "cotizacion.estado",
+                "Solo se pueden facturar cotizaciones aprobadas o en proceso "
+                "(diseño/producción/envío/entrega). Facturar no cambia el estado de trabajo.",
+            )
         )
     if quotation.electronic_invoice:
         result.errores.append(
@@ -183,12 +193,12 @@ def validate_quotation_for_billing(db: Session, quotation: Quotation) -> Validat
         sri_result = validate_sri_config(db, config, cert)
         result.errores.extend(sri_result.errores)
         result.advertencias.extend(sri_result.advertencias)
-        default_tarifa = default_tarifa_from_config(config)
+        sri_tarifa = default_sri_tarifa_from_config(config)
     else:
         result.errores.append(
             ValidationIssue("sri.config", "Configure la empresa emisora SRI antes de facturar.")
         )
-        default_tarifa = 0.0
+        sri_tarifa = 15.0
 
     if quotation.client:
         client_result = validate_client_for_invoice(quotation.client)
@@ -210,7 +220,7 @@ def validate_quotation_for_billing(db: Session, quotation: Quotation) -> Validat
                 ValidationIssue(
                     f"{prefix}.producto",
                     f"'{descripcion}' no está vinculado a un producto del catálogo. "
-                    "Se usará un código generado (COT-{id}).",
+                    f"Se usará un código generado (COT-{{id}}) e IVA SRI {sri_tarifa:g}%.",
                 )
             )
         else:
@@ -220,22 +230,6 @@ def validate_quotation_for_billing(db: Session, quotation: Quotation) -> Validat
                         f"{prefix}.codigo",
                         f"El producto '{product.name}' no tiene código; se usará COT-{item.id}. "
                         "Edite el producto en el catálogo antes de emitir.",
-                    )
-                )
-            tarifa = getattr(product, "tarifa_iva", None)
-            if tarifa is None or tarifa == "":
-                result.advertencias.append(
-                    ValidationIssue(
-                        f"{prefix}.iva",
-                        f"El producto '{product.name}' no tiene tarifa IVA; se aplicará {default_tarifa:g}%. "
-                        "Configure el IVA en el catálogo de productos.",
-                    )
-                )
-            elif float(tarifa) == 0 and not getattr(product, "codigo_iva", None):
-                result.advertencias.append(
-                    ValidationIssue(
-                        f"{prefix}.iva",
-                        f"El producto '{product.name}' tiene IVA 0% sin código SRI definido.",
                     )
                 )
 

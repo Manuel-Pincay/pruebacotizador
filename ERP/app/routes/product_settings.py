@@ -20,7 +20,10 @@ from app.models.productmaterial import ProductMaterial
 from app.models.productcolor import ProductColor
 from app.models.producttheme import ProductTheme
 from app.models.productthickness import ProductThickness
+from app.models.productsize import ProductSize
+from app.models.usb_reference import UsbReference
 from app.models.measurementunit import MeasurementUnit
+from app.services.design_catalog_service import DEFAULT_SIZES, DEFAULT_USBS
 
 router = APIRouter(prefix="/product-settings", tags=["product_settings"])
 
@@ -146,6 +149,10 @@ async def product_settings_page(request: Request, db: Session = Depends(get_db))
 
     units = db.query(MeasurementUnit).all()
 
+    sizes = db.query(ProductSize).order_by(ProductSize.name.asc()).all()
+
+    usbs = db.query(UsbReference).order_by(UsbReference.name.asc()).all()
+
     return templates.TemplateResponse(
         request=request,
         name="products/settings.html",
@@ -156,10 +163,13 @@ async def product_settings_page(request: Request, db: Session = Depends(get_db))
             "themes": themes,
             "thicknesses": thicknesses,
             "units": units,
+            "sizes": sizes,
+            "usbs": usbs,
             "user": user,
             "total_items": (
                 len(categories) + len(materials) + len(colors)
                 + len(themes) + len(thicknesses) + len(units)
+                + len(sizes) + len(usbs)
             ),
         },
     )
@@ -319,6 +329,16 @@ async def initialize_catalogs(request: Request, db: Session = Depends(get_db)):
         if not exists:
 
             db.add(MeasurementUnit(name=name, abbreviation=abbreviation))
+
+    for item in DEFAULT_SIZES:
+        exists = db.query(ProductSize).filter(ProductSize.name == item).first()
+        if not exists:
+            db.add(ProductSize(name=item))
+
+    for item in DEFAULT_USBS:
+        exists = db.query(UsbReference).filter(UsbReference.name == item).first()
+        if not exists:
+            db.add(UsbReference(name=item))
 
     db.commit()
 
@@ -741,3 +761,98 @@ async def delete_unit(
         "/product-settings",
         status_code=302
     )
+def _require_catalog_editor(request: Request):
+    """Admin o diseñador pueden agregar medidas/USB desde el formulario de diseño."""
+    user = role_required(request, ["admin", "disenador"])
+    if isinstance(user, RedirectResponse):
+        return user
+    return user
+
+
+def _create_size_or_usb_json(request: Request, db: Session, model, name: str):
+    user = _require_catalog_editor(request)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"success": False, "message": "No autorizado."})
+
+    cleaned = " ".join((name or "").split())
+    if not cleaned:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Ingresa un nombre válido."},
+        )
+
+    existing = (
+        db.query(model)
+        .filter(func.lower(model.name) == cleaned.lower())
+        .first()
+    )
+    if existing:
+        return {"success": True, "name": existing.name, "value": existing.name, "label": existing.name, "created": False}
+
+    db.add(model(name=cleaned))
+    db.commit()
+    return {"success": True, "name": cleaned, "value": cleaned, "label": cleaned, "created": True}
+
+
+@router.post("/size/new")
+async def create_size(request: Request, name: str = Form(...), db: Session = Depends(get_db)):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
+    cleaned = " ".join((name or "").split())
+    if cleaned and not db.query(ProductSize).filter(func.lower(ProductSize.name) == cleaned.lower()).first():
+        db.add(ProductSize(name=cleaned))
+        db.commit()
+    return RedirectResponse("/product-settings", status_code=302)
+
+
+@router.post("/api/size")
+async def api_create_size(request: Request, name: str = Form(...), db: Session = Depends(get_db)):
+    result = _create_size_or_usb_json(request, db, ProductSize, name)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
+
+
+@router.post("/size/{size_id}/delete")
+async def delete_size(request: Request, size_id: int, db: Session = Depends(get_db)):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
+    row = db.query(ProductSize).filter(ProductSize.id == size_id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return RedirectResponse("/product-settings", status_code=302)
+
+
+@router.post("/usb/new")
+async def create_usb(request: Request, name: str = Form(...), db: Session = Depends(get_db)):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
+    cleaned = " ".join((name or "").split())
+    if cleaned and not db.query(UsbReference).filter(func.lower(UsbReference.name) == cleaned.lower()).first():
+        db.add(UsbReference(name=cleaned))
+        db.commit()
+    return RedirectResponse("/product-settings", status_code=302)
+
+
+@router.post("/api/usb")
+async def api_create_usb(request: Request, name: str = Form(...), db: Session = Depends(get_db)):
+    result = _create_size_or_usb_json(request, db, UsbReference, name)
+    if isinstance(result, JSONResponse):
+        return result
+    return JSONResponse(content=result)
+
+
+@router.post("/usb/{usb_id}/delete")
+async def delete_usb(request: Request, usb_id: int, db: Session = Depends(get_db)):
+    user = _require_admin(request)
+    if isinstance(user, RedirectResponse):
+        return user
+    row = db.query(UsbReference).filter(UsbReference.id == usb_id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return RedirectResponse("/product-settings", status_code=302)

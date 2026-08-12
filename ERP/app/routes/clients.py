@@ -315,62 +315,56 @@ async def update_client(
 
         return RedirectResponse(url="/clients", status_code=302)
 
-    except Exception as e:
-
+    except Exception:
         db.rollback()
+        from urllib.parse import quote
 
-        return HTMLResponse(
-            content=f"""
-            <h1>
-                Error actualizando cliente
-            </h1>
-
-            <p>
-                {str(e)}
-            </p>
-            """,
-            status_code=500,
+        return RedirectResponse(
+            url=f"/clients/{client_id}/edit?error={quote('No se pudo guardar el cliente. Revise los datos e intente de nuevo.')}",
+            status_code=302,
         )
 
 
 @router.post("/{client_id}/delete")
 async def delete_client(client_id: int, request: Request, db: Session = Depends(get_db)):
+    from urllib.parse import quote
+
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.quotation import Quotation
+    from app.utils.db_errors import integrity_error_user_message
 
     user = role_required(request, ["admin", "ventas"])
     if isinstance(user, RedirectResponse):
         return user
 
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        return RedirectResponse(url="/clients?error=not_found", status_code=302)
+
+    in_use = (
+        db.query(Quotation.id)
+        .filter(Quotation.client_id == client_id)
+        .limit(1)
+        .first()
+    )
+    if in_use:
+        msg = "No se puede eliminar el cliente porque tiene cotizaciones asociadas."
+        return RedirectResponse(url=f"/clients?error={quote(msg)}", status_code=302)
+
     try:
-
-        client = db.query(Client).filter(Client.id == client_id).first()
-
-        if client:
-
-            db.delete(client)
-
-            db.commit()
-
-        return RedirectResponse(url="/clients", status_code=302)
-
-    except Exception as e:
-
+        db.delete(client)
+        db.commit()
+        return RedirectResponse(url="/clients?deleted=1", status_code=302)
+    except IntegrityError as exc:
         db.rollback()
-
-        return HTMLResponse(
-            content=f"""
-            <h1>
-                No se puede eliminar cliente
-            </h1>
-
-            <p>
-                Probablemente tiene cotizaciones asociadas
-            </p>
-
-            <p>
-                {str(e)}
-            </p>
-            """,
-            status_code=500,
+        msg = integrity_error_user_message(exc)
+        return RedirectResponse(url=f"/clients?error={quote(msg)}", status_code=302)
+    except Exception:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/clients?error={quote('No se pudo eliminar el cliente.')}",
+            status_code=302,
         )
 
 

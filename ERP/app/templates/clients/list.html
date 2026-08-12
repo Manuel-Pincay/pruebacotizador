@@ -22,6 +22,18 @@
     </div>
 </div>
 
+{% if request.query_params.get('deleted') == '1' %}
+<div class="mb-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+  Cliente eliminado correctamente.
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-sm">
+  <p class="font-semibold mb-0.5">No se pudo eliminar el cliente</p>
+  <p>{{ request.query_params.get('error') }}</p>
+</div>
+{% endif %}
+
 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
     <div class="bg-white rounded-2xl p-5 shadow-sm border-l-4 border-slate-400">
         <p class="text-sm text-gray-500">Total Clientes</p>

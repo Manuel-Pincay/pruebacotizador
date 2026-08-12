@@ -109,6 +109,10 @@
             <p class="text-xs text-gray-500">Espesores / Unid.</p>
             <p class="text-2xl font-bold text-slate-800">{{ thicknesses|length }} / {{ units|length }}</p>
         </div>
+        <div class="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <p class="text-xs text-gray-500">Medidas / USB</p>
+            <p class="text-2xl font-bold text-slate-800">{{ sizes|length }} / {{ usbs|length }}</p>
+        </div>
     </div>
 
     {% if total_items == 0 %}
@@ -192,6 +196,24 @@
                 class="bg-purple-600 hover:bg-purple-700 text-white h-10 px-4 rounded-xl text-sm font-medium transition shrink-0">
                 Agregar
             </button>
+        </form>
+        {% endcall %}
+
+        {% call catalog_panel('sizes', 'Medidas (diseño)', '✂️', sizes, '/product-settings/size/new', 'size', 'Nueva medida', 'No hay medidas. Ej: 120x90, A4.') %}
+        <form action="/product-settings/size/new" method="POST" class="flex gap-2">
+            <input type="text" name="name" placeholder="Ej: 120x90"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition shrink-0">+</button>
+        </form>
+        {% endcall %}
+
+        {% call catalog_panel('usbs', 'USB (diseño)', '💾', usbs, '/product-settings/usb/new', 'usb', 'Nueva USB', 'No hay USB registradas.') %}
+        <form action="/product-settings/usb/new" method="POST" class="flex gap-2">
+            <input type="text" name="name" placeholder="Ej: USB #1"
+                class="flex-1 border border-gray-200 px-3 py-2.5 rounded-xl text-sm" required>
+            <button type="submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition shrink-0">+</button>
         </form>
         {% endcall %}
 

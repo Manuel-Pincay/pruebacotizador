@@ -107,6 +107,41 @@ def order_delivered(
     )
 
 
+_STATUS_EMOJI = {
+    "pendiente": "⏳",
+    "diseno": "🎨",
+    "produccion": "🏭",
+    "envio": "📦",
+    "entregado": "🚚",
+    "cancelado": "❌",
+}
+
+
+def order_status_changed(
+    *,
+    client: str,
+    order_id: int | str,
+    from_status: str,
+    to_status: str,
+    status_code: str = "",
+    user: str = "—",
+    quotation_id: int | str | None = None,
+) -> str:
+    code = (status_code or "").strip().lower()
+    emoji = _STATUS_EMOJI.get(code, "🔄")
+    quote_line = ""
+    if quotation_id is not None:
+        quote_line = f"📄 Cotización: `#{quotation_id}`\n"
+    return (
+        f"{emoji} *Orden de trabajo — cambio de estado*\n\n"
+        f"👤 Cliente: `{client}`\n"
+        f"🏭 Pedido: `{order_id}`\n"
+        f"{quote_line}"
+        f"📌 De: `{from_status}` → *{to_status}*\n"
+        f"🙋 Usuario: `{user}`"
+    )
+
+
 def material_shortage(
     *,
     material: str,

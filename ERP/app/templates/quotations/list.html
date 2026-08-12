@@ -313,10 +313,10 @@
                                 title="Facturada — ver comprobante">
                                 ✅
                             </a>
-                            {% elif quotation.payment_status == 'pagada' %}
+                            {% else %}
                             <a href="/billing/from-quotation/{{ quotation.id }}/preview"
-                                class="w-10 h-10 flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 rounded-xl"
-                                title="Realizar factura SRI">
+                                class="w-10 h-10 flex items-center justify-center {% if quotation.payment_status == 'pagada' %}bg-emerald-100 hover:bg-emerald-200{% else %}bg-amber-100 hover:bg-amber-200{% endif %} rounded-xl"
+                                title="{% if quotation.payment_status == 'pagada' %}Facturar{% else %}Facturar (requiere pago completo){% endif %}">
                                 🧾
                             </a>
                             {% endif %}

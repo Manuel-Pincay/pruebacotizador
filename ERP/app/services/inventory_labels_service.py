@@ -29,7 +29,11 @@ def normalize_label_quantity(value) -> int:
 
 
 def search_products(db, *, search: str = "", limit: int = 500) -> list[Product]:
-    query = db.query(Product).order_by(Product.name.asc())
+    query = (
+        db.query(Product)
+        .filter(Product.active.is_(True))
+        .order_by(Product.name.asc())
+    )
     term = (search or "").strip()
     if term:
         like = f"%{term}%"
@@ -45,7 +49,7 @@ def find_product_by_code(db, code: str) -> Product | None:
         return None
     return (
         db.query(Product)
-        .filter(Product.code == normalized)
+        .filter(Product.active.is_(True), Product.code == normalized)
         .first()
     )
 

@@ -24,9 +24,15 @@ def get_or_create_transport_service_product(db: Session) -> Product:
         .first()
     )
     if product:
+        changed = False
         if product.tarifa_iva not in (0, 0.0) or str(product.codigo_iva or "") not in ("0", ""):
             product.tarifa_iva = 0
             product.codigo_iva = "0"
+            changed = True
+        if not getattr(product, "active", True):
+            product.active = True
+            changed = True
+        if changed:
             db.flush()
         return product
 
@@ -39,6 +45,7 @@ def get_or_create_transport_service_product(db: Session) -> Product:
         cost=0,
         stock=0,
         custom=False,
+        active=True,
         codigo_iva="0",
         tarifa_iva=0,
     )

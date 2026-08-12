@@ -15,6 +15,8 @@ from app.models.productcolor import ProductColor
 from app.models.productmaterial import ProductMaterial
 from app.models.producttheme import ProductTheme
 from app.models.productthickness import ProductThickness
+from app.models.productsize import ProductSize
+from app.models.usb_reference import UsbReference
 from app.models.design_observation import DesignObservation
 from app.models.design_tracking import DesignTracking
 from app.models.production_order import ProductionOrder
@@ -49,6 +51,8 @@ __all__ = [
     "ProductMaterial",
     "ProductTheme",
     "ProductThickness",
+    "ProductSize",
+    "UsbReference",
     "DesignObservation",
     "DesignTracking",
     "ProductionOrder",

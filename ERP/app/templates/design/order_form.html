@@ -1,6 +1,5 @@
 {% extends 'layouts/base.html' %}
-
-
+{% from "components/catalog_select.html" import catalog_select %}
 
 {% block content %}
 
@@ -119,11 +118,18 @@
 
                 <label class="block text-sm font-medium text-gray-700 mb-1">Medida</label>
 
-                <input type="text" name="size" list="sizeOptions" {% if readonly %}readonly{% endif %}
-
-                       value="{{ order.size }}" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
-
-                <datalist id="sizeOptions">{% for size in sizes %}<option value="{{ size }}"></option>{% endfor %}</datalist>
+                {% if readonly %}
+                <input type="text" name="size" readonly value="{{ order.size }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
+                {% else %}
+                {{ catalog_select(
+                    "size",
+                    sizes,
+                    "+ Agregar medida",
+                    "/product-settings/api/size",
+                    selected=order.size,
+                    extra_class="rounded-xl px-3 py-2.5 text-sm"
+                ) }}
+                {% endif %}
 
             </div>
 
@@ -137,11 +143,18 @@
 
                 <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
 
-                <input type="text" name="usb_reference" list="usbOptions" {% if readonly %}readonly{% endif %}
-
-                       value="{{ order.usb_reference }}" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
-
-                <datalist id="usbOptions">{% for usb in usb_references %}<option value="{{ usb }}"></option>{% endfor %}</datalist>
+                {% if readonly %}
+                <input type="text" name="usb_reference" readonly value="{{ order.usb_reference }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
+                {% else %}
+                {{ catalog_select(
+                    "usb_reference",
+                    usb_references,
+                    "+ Agregar USB",
+                    "/product-settings/api/usb",
+                    selected=order.usb_reference,
+                    extra_class="rounded-xl px-3 py-2.5 text-sm"
+                ) }}
+                {% endif %}
 
             </div>
 
@@ -192,13 +205,8 @@
                         <option value="">Cargando...</option>
                     </select>
                 </div>
-                <div class="max-w-xs">
-                    <label class="block text-xs text-gray-600 mb-1">Cantidad a consumir *</label>
-                    <input type="number" name="raw_material_qty" id="raw_material_qty" step="0.01" min="0.01"
-                        value="{{ order.raw_material_qty or order.copies or 1 }}"
-                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
-                    <p id="raw_material_unit_hint" class="text-xs text-gray-400 mt-1">planchas o metros</p>
-                </div>
+                {% from "components/raw_material_qty.html" import raw_material_qty_field %}
+                {{ raw_material_qty_field(order.raw_material_qty if order.raw_material_qty is not none else '') }}
             </div>
         </div>
         <script>
@@ -207,8 +215,18 @@
           const radios = document.querySelectorAll('.fab-source-radio');
           const fields = document.getElementById('fab-raw-fields');
           const sel = document.getElementById('raw_material_id');
+          const qtyInput = document.getElementById('raw_material_qty');
           const materialSelect = document.querySelector('select[name="material"]');
           const unitHint = document.getElementById('raw_material_unit_hint');
+          document.querySelectorAll('.raw-qty-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              if (qtyInput) qtyInput.value = btn.dataset.qty;
+            });
+          });
+          qtyInput?.addEventListener('blur', () => {
+            if (!qtyInput.value) return;
+            qtyInput.value = String(qtyInput.value).replace(',', '.');
+          });
           function toggleFields() {
             const useFab = document.querySelector('.fab-source-radio:checked')?.value === '1';
             fields?.classList.toggle('hidden', !useFab);
@@ -228,7 +246,8 @@
                 const opt = document.createElement('option');
                 opt.value = m.id;
                 opt.dataset.unit = m.unit;
-                opt.textContent = `${m.label} — ${m.stock} ${m.unit}${m.is_low_stock ? ' ⚠ bajo' : ''}`;
+                const stockLabel = Number(m.stock).toLocaleString('es-EC', { maximumFractionDigits: 3 });
+                opt.textContent = `${m.label} — ${stockLabel} ${m.unit}${m.is_low_stock ? ' ⚠ bajo' : ''}`;
                 if (selectedId && m.id == selectedId) opt.selected = true;
                 sel.appendChild(opt);
               });
@@ -239,7 +258,13 @@
           }
           function updateUnitHint() {
             const opt = sel?.options[sel.selectedIndex];
-            if (unitHint && opt?.dataset?.unit) unitHint.textContent = opt.dataset.unit;
+            if (!unitHint) return;
+            const unit = opt?.dataset?.unit || 'planchas';
+            if (unit === 'planchas') {
+              unitHint.innerHTML = 'Unidad: <strong>planchas</strong>. Decimales OK: 0.25 (1/4), 0.5 (media), 1 (completa).';
+            } else {
+              unitHint.innerHTML = 'Unidad: <strong>' + unit + '</strong>. Puede usar decimales (ej. 1.5).';
+            }
           }
           radios.forEach(r => r.addEventListener('change', toggleFields));
           materialSelect?.addEventListener('change', () => {
@@ -364,6 +389,8 @@
     {% endif %}
 
 </div>
+
+<script src="/static/js/catalog-select.js"></script>
 
 {% endblock %}
 
