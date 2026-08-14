@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime
 from datetime import datetime
 from app.database import Base
 
@@ -18,4 +18,9 @@ class Client(Base):
     client_type = Column(String)
     tipo_identificacion = Column(String(30), default="CEDULA")
     observations = Column(Text)
+    # Acceso al portal de tienda
+    password_hash = Column(String(255), nullable=True)
+    portal_active = Column(Boolean, default=False, nullable=False)
+    portal_verify_code = Column(String(10), nullable=True)
+    portal_verify_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)

@@ -18,6 +18,7 @@ from app.models.company_config import CompanyConfig
 from app.auth.security import verify_password, hash_password, verify_admin_password
 from app.auth.session import cookie_options, sign_user_session
 from app.auth.permissions import get_login_redirect_url
+from app.utils.urls import erp_path
 
 router = APIRouter()
 
@@ -201,7 +202,7 @@ async def recover_password(
 async def logout():
 
     response = RedirectResponse(
-        url="/login",
+        url=erp_path("/login"),
         status_code=302
     )
 

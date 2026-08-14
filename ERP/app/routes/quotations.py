@@ -597,6 +597,8 @@ async def create_quotation(
             shipping_cost=0,
             design_file=None,
             status="pendiente",
+            source="erp",
+            created_by_user_id=getattr(user, "id", None),
         )
 
         db.add(quotation)
@@ -1255,6 +1257,8 @@ async def duplicate_quotation(
         total=source.total,
         shipping_cost=source.shipping_cost or 0,
         status="pendiente",
+        source="erp",
+        created_by_user_id=getattr(user, "id", None),
         delivery_date=None,
         design_file=None,
     )
@@ -1445,6 +1449,73 @@ async def update_shipping_cost(
     sync_quotation_shipping_item(db, quotation, shipping_cost)
     db.commit()
     return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+
+@router.post("/{quotation_id}/delivery-date")
+async def update_quotation_delivery_date(
+    request: Request,
+    quotation_id: int,
+    delivery_date: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Fecha estimada de entrega (editable por staff; se muestra al cliente en tienda)."""
+    from datetime import datetime as dt
+
+    from app.services.production_helpers import set_quotation_delivery_date
+
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    quotation = (
+        db.query(Quotation)
+        .options(joinedload(Quotation.production_order))
+        .filter(Quotation.id == quotation_id)
+        .first()
+    )
+    if not quotation:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    st = (quotation.status or "").lower().strip()
+    if st in {"cancelada", "vencida"}:
+        return RedirectResponse(
+            url=f"/quotations/{quotation_id}?delivery_error=1",
+            status_code=302,
+        )
+
+    parsed = None
+    raw = (delivery_date or "").strip()
+    if raw:
+        try:
+            parsed = dt.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            return RedirectResponse(
+                url=f"/quotations/{quotation_id}?delivery_error=1",
+                status_code=302,
+            )
+
+    set_quotation_delivery_date(quotation, parsed)
+    db.commit()
+
+    try:
+        log_quotation_event(
+            db,
+            quotation.id,
+            "entrega",
+            (
+                f"Fecha de entrega estimada: {parsed.strftime('%d/%m/%Y')}"
+                if parsed
+                else "Fecha de entrega estimada eliminada"
+            ),
+            getattr(user, "id", None),
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(
+        url=f"/quotations/{quotation_id}?delivery_saved=1",
+        status_code=302,
+    )
 
 
 @router.post("/{quotation_id}/production")

@@ -1,0 +1,183 @@
+{% extends "store/layout.html" %}
+{% block title %}{{ company_name }} — Inicio{% endblock %}
+{% block content %}
+
+{# HERO CARRUSEL #}
+<section class="relative bg-gradient-to-br from-rose-50 via-white to-rose-50/40 overflow-hidden">
+  <div id="heroCarousel" class="max-w-6xl mx-auto px-4 py-8 sm:py-12 relative" data-count="{{ slides|length if slides else 1 }}">
+    {% if slides and slides|length > 0 %}
+      {% for slide in slides %}
+      <div class="hero-slide {% if not loop.first %}hidden{% endif %} grid lg:grid-cols-2 gap-8 lg:gap-12 items-center" data-index="{{ loop.index0 }}">
+        <div class="order-2 lg:order-1">
+          <h1 class="font-display text-4xl sm:text-5xl lg:text-6xl leading-[1.05] tracking-tight text-brand">
+            {{ slide.title }}
+          </h1>
+          {% if slide.subtitle %}
+          <p class="mt-4 text-slate-600 text-base sm:text-lg max-w-md leading-relaxed">{{ slide.subtitle }}</p>
+          {% endif %}
+          <a href="{{ slide.cta_url or '/tienda' }}" class="btn-brand inline-flex mt-7 px-6 py-3 rounded-full text-sm font-semibold shadow-sm">
+            {{ slide.cta_text or 'Ver productos' }}
+          </a>
+        </div>
+        <div class="order-1 lg:order-2 relative">
+          {% set simg = store_slide_image_url(slide.image) if store_slide_image_url is defined else none %}
+          <div class="rounded-[2rem] overflow-hidden shadow-lg border border-white min-h-[220px] sm:min-h-[320px] bg-rose-100">
+            {% if simg %}
+            <img src="{{ simg }}" alt="{{ slide.title }}" class="w-full h-full object-cover max-h-[420px]">
+            {% else %}
+            <div class="h-72 flex items-center justify-center text-rose-300 font-display text-3xl">{{ company_name }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if slides|length > 1 %}
+      <button type="button" id="heroPrev" class="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 border border-rose-100 shadow text-slate-600 hover:bg-white" aria-label="Anterior">‹</button>
+      <button type="button" id="heroNext" class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 border border-rose-100 shadow text-slate-600 hover:bg-white" aria-label="Siguiente">›</button>
+      <div class="flex justify-center gap-2 mt-6" id="heroDots">
+        {% for slide in slides %}
+        <button type="button" class="hero-dot w-2.5 h-2.5 rounded-full bg-rose-200 {% if loop.first %}active{% endif %}" data-index="{{ loop.index0 }}" aria-label="Slide {{ loop.index }}"></button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      <div class="grid lg:grid-cols-2 gap-8 items-center">
+        <div>
+          <h1 class="font-display text-4xl sm:text-5xl lg:text-6xl leading-[1.05] text-brand">Dale vida a tus creaciones</h1>
+          <p class="mt-4 text-slate-600 max-w-md">Cotiza productos desde la tienda. Configura el carrusel desde el panel admin.</p>
+          <a href="/tienda" class="btn-brand inline-flex mt-7 px-6 py-3 rounded-full text-sm font-semibold">Ver productos</a>
+        </div>
+        <div class="rounded-[2rem] min-h-[260px] bg-brand-soft border border-white shadow-inner"></div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{# FEATURES #}
+{% if home_settings %}
+<section class="border-y border-rose-100 bg-white">
+  <div class="max-w-6xl mx-auto px-4 py-8 grid sm:grid-cols-3 gap-6 text-center sm:text-left">
+    {% for feat in [
+      (home_settings.feature_1_title, home_settings.feature_1_text),
+      (home_settings.feature_2_title, home_settings.feature_2_text),
+      (home_settings.feature_3_title, home_settings.feature_3_text)
+    ] %}
+    {% if feat[0] %}
+    <div class="flex flex-col sm:flex-row items-center sm:items-start gap-3">
+      <span class="icon-ring shrink-0">♥</span>
+      <div>
+        <p class="font-semibold text-slate-800">{{ feat[0] }}</p>
+        {% if feat[1] %}<p class="text-sm text-slate-500 mt-0.5">{{ feat[1] }}</p>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# CATEGORÍAS #}
+{% if home_settings and home_settings.show_categories and category_cards %}
+<section class="px-4 py-14">
+  <div class="max-w-6xl mx-auto">
+    <h2 class="font-display text-3xl sm:text-4xl text-center text-brand mb-10">Categorías destacadas</h2>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {% for card in category_cards %}
+      <article class="bg-white rounded-2xl border border-rose-100 shadow-sm p-5 text-center flex flex-col">
+        <div class="h-36 rounded-xl bg-rose-50 mb-4 overflow-hidden flex items-center justify-center">
+          {% set cimg = product_image_url(card.image, thumb=true) if card.image else none %}
+          {% if cimg %}
+          <img src="{{ cimg }}" alt="{{ card.name }}" class="w-full h-full object-cover">
+          {% else %}
+          <span class="icon-ring">✦</span>
+          {% endif %}
+        </div>
+        <h3 class="font-semibold text-slate-800">{{ card.name }}</h3>
+        <p class="text-sm text-slate-500 mt-1 flex-1">{{ card.description }}</p>
+        <a href="{{ card.url }}" class="mt-4 inline-flex justify-center text-sm font-semibold text-brand hover:underline">Ver más</a>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# PRODUCTOS #}
+{% if home_settings and home_settings.show_featured_products %}
+<section class="px-4 pb-14">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex items-end justify-between gap-4 mb-8">
+      <h2 class="font-display text-3xl sm:text-4xl text-brand">Productos destacados</h2>
+      <a href="/tienda" class="text-sm font-medium text-brand hover:underline">Ver todos →</a>
+    </div>
+    {% if products %}
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+      {% for product in products %}
+      {% set next_url = '/' %}
+      {% include "store/_product_card.html" %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-center text-slate-500 text-sm py-10">Marca productos como “Visible en tienda” en el ERP.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{# TRUST #}
+{% if home_settings and home_settings.show_trust_bar %}
+<section class="bg-brand-soft">
+  <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+    {% for t in [
+      (home_settings.trust_1_title, home_settings.trust_1_text),
+      (home_settings.trust_2_title, home_settings.trust_2_text),
+      (home_settings.trust_3_title, home_settings.trust_3_text),
+      (home_settings.trust_4_title, home_settings.trust_4_text)
+    ] %}
+    {% if t[0] %}
+    <div>
+      <span class="icon-ring mx-auto mb-3 bg-white/70">✓</span>
+      <p class="font-semibold text-sm text-slate-800">{{ t[0] }}</p>
+      {% if t[1] %}<p class="text-xs text-slate-500 mt-1">{{ t[1] }}</p>{% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# NEWSLETTER (solo UI; sin backend de email aún) #}
+{% if home_settings and home_settings.show_newsletter %}
+<section class="px-4 py-12">
+  <div class="max-w-2xl mx-auto text-center">
+    <p class="font-display text-3xl text-brand mb-2">{{ home_settings.newsletter_title or 'Suscríbete a nuestro newsletter' }}</p>
+    <p class="text-sm text-slate-500 mb-5">Novedades y lanzamientos (próximamente).</p>
+    <form class="flex flex-col sm:flex-row gap-2 justify-center" onsubmit="event.preventDefault(); alert('Pronto activaremos el newsletter.');">
+      <input type="email" required placeholder="Tu correo" class="flex-1 rounded-full border border-rose-100 px-4 py-2.5 text-sm">
+      <button type="submit" class="btn-brand rounded-full px-6 py-2.5 text-sm font-semibold">Suscribirme</button>
+    </form>
+  </div>
+</section>
+{% endif %}
+
+{% if slides and slides|length > 1 %}
+<script>
+(function () {
+  const root = document.getElementById('heroCarousel');
+  if (!root) return;
+  const slides = [...root.querySelectorAll('.hero-slide')];
+  const dots = [...root.querySelectorAll('.hero-dot')];
+  let i = 0;
+  function show(n) {
+    i = (n + slides.length) % slides.length;
+    slides.forEach((el, idx) => el.classList.toggle('hidden', idx !== i));
+    dots.forEach((el, idx) => el.classList.toggle('active', idx === i));
+  }
+  document.getElementById('heroPrev')?.addEventListener('click', () => show(i - 1));
+  document.getElementById('heroNext')?.addEventListener('click', () => show(i + 1));
+  dots.forEach(d => d.addEventListener('click', () => show(Number(d.dataset.index))));
+  setInterval(() => show(i + 1), 6000);
+})();
+</script>
+{% endif %}
+{% endblock %}

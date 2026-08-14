@@ -49,9 +49,14 @@ from app.routes import product_settings
 from app.routes import billing
 from app.routes import reports
 from app.routes import notifications
+from app.routes import store
+from app.routes import store_cms
 
 from app.config.settings import settings
 from app.error_handlers import register_error_handlers
+from app.utils.urls import ERP_LEGACY_ROOTS, ERP_PREFIX
+from app.models.store_slide import StoreSlide  # noqa: F401
+from app.models.store_home_settings import StoreHomeSettings  # noqa: F401
 
 try:
     prepare_database()
@@ -89,6 +94,29 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="SISTEMA ERP", lifespan=lifespan)
 register_error_handlers(app)
 
+
+@app.middleware("http")
+async def redirect_legacy_erp_paths(request, call_next):
+    """Redirige /quotations → /erp/quotations (enlaces y favoritos antiguos)."""
+    path = request.url.path
+    if path == ERP_PREFIX or path.startswith(ERP_PREFIX + "/"):
+        return await call_next(request)
+    if path in {"/static", "/uploads"} or path.startswith("/static/") or path.startswith("/uploads/"):
+        return await call_next(request)
+
+    first = path.lstrip("/").split("/", 1)[0] if path.strip("/") else ""
+    if first in ERP_LEGACY_ROOTS:
+        from fastapi.responses import RedirectResponse
+
+        target = ERP_PREFIX + (path if path.startswith("/") else "/" + path)
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        # 307 conserva método (POST de formularios legacy)
+        return RedirectResponse(url=target, status_code=307)
+
+    return await call_next(request)
+
+
 app.mount(
     "/static",
     StaticFiles(directory="app/static"),
@@ -101,27 +129,31 @@ app.mount(
     name="uploads"
 )
 
-app.include_router(auth.router)
-app.include_router(dashboard.router)
-app.include_router(clients.router)
-app.include_router(products.router)
-app.include_router(quotations.router)
-app.include_router(payments.router)
-app.include_router(production_condensed.router)
-app.include_router(fabrication_condensed.router)
-app.include_router(design.router)
-app.include_router(production.router)
-app.include_router(inventory.router)
-app.include_router(shipments.router)
-app.include_router(users.router)
-app.include_router(config.router)
-app.include_router(imports.router)
-app.include_router(
-    product_settings.router
-)
-app.include_router(billing.router)
-app.include_router(reports.router)
-app.include_router(notifications.router)
+# Tienda pública en /
+app.include_router(store.router)
+
+# ERP bajo /erp (sin menú en la tienda; acceso directo /erp/login)
+_erp = ERP_PREFIX
+app.include_router(auth.router, prefix=_erp)
+app.include_router(dashboard.router, prefix=_erp)
+app.include_router(clients.router, prefix=_erp)
+app.include_router(products.router, prefix=_erp)
+app.include_router(quotations.router, prefix=_erp)
+app.include_router(payments.router, prefix=_erp)
+app.include_router(production_condensed.router, prefix=_erp)
+app.include_router(fabrication_condensed.router, prefix=_erp)
+app.include_router(design.router, prefix=_erp)
+app.include_router(production.router, prefix=_erp)
+app.include_router(inventory.router, prefix=_erp)
+app.include_router(shipments.router, prefix=_erp)
+app.include_router(users.router, prefix=_erp)
+app.include_router(config.router, prefix=_erp)
+app.include_router(imports.router, prefix=_erp)
+app.include_router(product_settings.router, prefix=_erp)
+app.include_router(billing.router, prefix=_erp)
+app.include_router(reports.router, prefix=_erp)
+app.include_router(notifications.router, prefix=_erp)
+app.include_router(store_cms.router, prefix=_erp)
 
 
 def create_admin():

@@ -266,10 +266,25 @@
                             🧾 Facturada
                         </a>
                         {% endif %}
+                        {% if (quotation.source or 'erp') == 'store' %}
+                        <span class="inline-flex items-center gap-1 bg-teal-50 text-teal-800 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-teal-200"
+                              title="Creada desde la tienda">
+                            Tienda
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 bg-slate-50 text-slate-600 px-2.5 py-0.5 rounded-full text-[11px] font-medium border border-slate-200"
+                              title="Creada en el ERP">
+                            ERP
+                        </span>
+                        {% endif %}
                         </div>
                     </td>
                     <td class="p-5">
-                        {% if quotation.payment_status == 'sin_abono' %}
+                        {% if quotation.has_pending_payment_verification %}
+                        <span class="inline-flex items-center gap-1 bg-amber-50 text-amber-800 px-2.5 py-1 rounded-full text-xs font-medium">
+                            ⏳ Esperando verificación
+                        </span>
+                        {% elif quotation.payment_status == 'sin_abono' %}
                         <span class="inline-flex items-center gap-1 bg-red-50 text-red-700 px-2.5 py-1 rounded-full text-xs font-medium">
                             🔴 Sin abono
                         </span>

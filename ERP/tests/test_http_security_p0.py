@@ -9,17 +9,31 @@ from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.models.quotation_event import QuotationEvent
 from app.models.user import User
+from app.utils.urls import ERP_PREFIX, erp_path
 from tests.conftest import user_cookie
 
 
-def test_anonymous_quotations_redirects(client: TestClient):
+def test_store_home_is_public(client: TestClient):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Acceso interno" in response.text
+
+
+def test_legacy_erp_path_redirects(client: TestClient):
     response = client.get("/quotations/")
+    assert response.status_code == 307
+    assert response.headers.get("location", "").startswith(ERP_PREFIX + "/quotations")
+
+
+def test_anonymous_quotations_redirects(client: TestClient):
+    response = client.get(erp_path("/quotations/"))
     assert response.status_code in (302, 303)
     assert "/login" in response.headers.get("location", "")
+    assert ERP_PREFIX in response.headers.get("location", "")
 
 
 def test_anonymous_pdf_redirects(client: TestClient, pending_quotation: Quotation):
-    response = client.get(f"/quotations/{pending_quotation.id}/pdf")
+    response = client.get(erp_path(f"/quotations/{pending_quotation.id}/pdf"))
     assert response.status_code in (302, 303)
     assert "/login" in response.headers.get("location", "")
 
@@ -28,7 +42,7 @@ def test_produccion_cannot_access_quotations(
     client: TestClient, produccion_user: User
 ):
     response = client.get(
-        "/quotations/",
+        erp_path("/quotations/"),
         cookies=user_cookie(produccion_user.username),
     )
     assert response.status_code in (302, 303)
@@ -40,7 +54,7 @@ def test_ventas_can_open_quotation_detail(
     client: TestClient, ventas_user: User, pending_quotation: Quotation
 ):
     response = client.get(
-        f"/quotations/{pending_quotation.id}",
+        erp_path(f"/quotations/{pending_quotation.id}"),
         cookies=user_cookie(ventas_user.username),
     )
     assert response.status_code == 200
@@ -57,7 +71,7 @@ def test_locked_quotation_rejects_quantity_update(
     )
     assert item is not None
     response = client.post(
-        f"/quotations/quotation-items/{item.id}/update-quantity",
+        erp_path(f"/quotations/quotation-items/{item.id}/update-quantity"),
         data={"quantity": "5"},
         cookies=user_cookie(ventas_user.username),
     )
@@ -74,7 +88,7 @@ def test_locked_quotation_allows_duplicate(
 ):
     source_id = locked_quotation.id
     response = client.post(
-        f"/quotations/{source_id}/duplicate",
+        erp_path(f"/quotations/{source_id}/duplicate"),
         cookies=user_cookie(ventas_user.username),
     )
     assert response.status_code in (302, 303)
@@ -106,6 +120,6 @@ def test_locked_quotation_allows_duplicate(
 
 
 def test_secretadmin_backup_requires_session(client: TestClient):
-    response = client.post("/secretadmin/backup")
+    response = client.post(erp_path("/secretadmin/backup"))
     assert response.status_code in (302, 303)
     assert "secretadmin" in response.headers.get("location", "")

@@ -232,6 +232,7 @@ async def create_product(
     cost: float = Form(...),
     stock: int = Form(0),
     custom: str = Form("no"),
+    store_visible: str = Form("no"),
     codigo_auxiliar: str = Form(""),
     tarifa_iva: str = Form("0"),
     codigo_iva: str = Form(""),
@@ -297,6 +298,7 @@ async def create_product(
         cost=cost,
         stock=stock,
         custom=True if custom == "yes" else False,
+        store_visible=True if store_visible == "yes" else False,
         active=True,
         image=image_name,
         codigo_auxiliar=sri_aux,
@@ -397,6 +399,7 @@ async def update_product(
     cost: float = Form(...),
     stock: int = Form(0),
     custom: str = Form("no"),
+    store_visible: str = Form("no"),
     codigo_auxiliar: str = Form(""),
     tarifa_iva: str = Form("0"),
     codigo_iva: str = Form(""),
@@ -509,6 +512,7 @@ async def update_product(
         product.stock = stock
 
         product.custom = True if custom == "yes" else False
+        product.store_visible = True if store_visible == "yes" else False
 
         sri_aux, sri_tarifa, sri_codigo = _parse_sri_product_fields(
             codigo_auxiliar, tarifa_iva, codigo_iva

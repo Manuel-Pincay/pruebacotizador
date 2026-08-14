@@ -135,11 +135,124 @@ async def admin_config(
 
     config = get_or_create_config(db)
 
+    from app.services.smtp_config_service import (
+        resolve_smtp_settings,
+        smtp_configured,
+        smtp_password_configured,
+    )
+
+    smtp = resolve_smtp_settings(config)
     return templates.TemplateResponse(
         request=request,
         name="admin/config.html",
-        context={"config": config}
+        context={
+            "config": config,
+            "smtp_configured": smtp_configured(config),
+            "smtp_password_set": smtp_password_configured(config),
+            "smtp_source": smtp.source if smtp else None,
+        },
     )
+
+
+@router.post("/config/smtp/save")
+async def admin_smtp_save(
+    request: Request,
+    db: Session = Depends(get_db),
+    action: str = Form("save"),
+    test_email: str = Form(""),
+    smtp_enabled: str = Form(""),
+    smtp_host: str = Form(""),
+    smtp_port: int = Form(587),
+    smtp_user: str = Form(""),
+    smtp_password: str = Form(""),
+    smtp_from: str = Form(""),
+    smtp_use_tls: str = Form(""),
+):
+    """Guarda / verifica SMTP desde Configuración de empresa."""
+    if not is_admin_session_valid(request.cookies.get("admin_token")):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    from app.services.email_service import EmailDeliveryError, send_test_email
+    from app.services.smtp_config_service import (
+        build_smtp_settings_from_form,
+        save_smtp_password,
+        smtp_password_configured,
+    )
+
+    config = get_or_create_config(db)
+    enabled = smtp_enabled == "on"
+    from_addr = (smtp_from or "").strip()
+    user_addr = (smtp_user or "").strip() or from_addr
+    host_val = (smtp_host or "").strip() or "smtp.gmail.com"
+
+    if enabled:
+        if not from_addr:
+            return RedirectResponse(
+                url="/secretadmin/config?smtp_error="
+                + quote("Indique el correo electrónico remitente."),
+                status_code=302,
+            )
+        has_pwd = bool((smtp_password or "").strip()) or smtp_password_configured(
+            config
+        )
+        if not has_pwd:
+            return RedirectResponse(
+                url="/secretadmin/config?smtp_error="
+                + quote(
+                    "Ingrese la contraseña de aplicación "
+                    "(no la contraseña normal de la cuenta)."
+                ),
+                status_code=302,
+            )
+
+    if action == "verify":
+        recipient = (test_email or "").strip().lower()
+        if not recipient or "@" not in recipient:
+            return RedirectResponse(
+                url="/secretadmin/config?smtp_error="
+                + quote("Indique a qué correo enviar la prueba."),
+                status_code=302,
+            )
+        if not enabled:
+            return RedirectResponse(
+                url="/secretadmin/config?smtp_error="
+                + quote("Active el envío de correo para poder verificar."),
+                status_code=302,
+            )
+        trial = build_smtp_settings_from_form(
+            enabled=True,
+            host=host_val,
+            port=smtp_port,
+            user=user_addr,
+            from_addr=from_addr,
+            password_plain=smtp_password,
+            use_tls=smtp_use_tls == "on",
+            existing_config=config,
+        )
+        company = (config.company_name if config else None) or "Su empresa"
+        try:
+            send_test_email(smtp=trial, to_address=recipient, company_name=company)
+        except EmailDeliveryError as exc:
+            return RedirectResponse(
+                url="/secretadmin/config?smtp_error="
+                + quote(f"No se pudo enviar el correo de prueba.\n\n{exc}"),
+                status_code=302,
+            )
+        return RedirectResponse(
+            url=f"/secretadmin/config?smtp=ok&to={quote(recipient)}",
+            status_code=302,
+        )
+
+    config.smtp_enabled = enabled
+    config.smtp_host = host_val if enabled else (host_val or None)
+    config.smtp_port = max(1, min(int(smtp_port or 587), 65535))
+    config.smtp_from = from_addr or None
+    config.smtp_user = user_addr or None
+    config.smtp_use_tls = smtp_use_tls == "on"
+    save_smtp_password(config, smtp_password)
+    db.commit()
+
+    return RedirectResponse(url="/secretadmin/config?smtp=saved", status_code=302)
 
 
 @router.get("/storage", response_class=HTMLResponse)
@@ -199,6 +312,7 @@ async def save_config(
     quotation_footer_text: str = Form(...),
     iva_default: int = Form(default=0),
     sri_iva_default: int = Form(default=15),
+    store_payment_instructions: str = Form(""),
     guide_sender_name: str = Form(""),
     guide_sender_city: str = Form("Manta"),
     guide_sender_region: str = Form("Ecuador"),
@@ -232,6 +346,7 @@ async def save_config(
     config.quotation_footer_text = quotation_footer_text
     config.iva_default = iva_default
     config.sri_iva_default = max(0, min(100, int(sri_iva_default)))
+    config.store_payment_instructions = (store_payment_instructions or "").strip() or None
     config.guide_sender_name = guide_sender_name.strip() or None
     config.guide_sender_city = guide_sender_city.strip() or "Manta"
     config.guide_sender_region = guide_sender_region.strip() or "Ecuador"

@@ -414,7 +414,7 @@ lucide.createIcons();
 
         <div class="p-6">
 
-    <div class="flex items-center gap-3">
+    <a href="/erp/" class="flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-white/40 hover:bg-white/5 transition -m-1 p-1">
 
         <div class="
             w-12 h-12
@@ -465,7 +465,7 @@ lucide.createIcons();
 
         </div>
 
-    </div>
+    </a>
 
 </div>
 
@@ -473,7 +473,14 @@ lucide.createIcons();
 
         <nav class="flex-1 p-3 sm:p-4 space-y-1 overflow-y-auto" id="sidebarNav">
           {% set current_role = user.role if user is defined and user else '' %}
-          {% set nav_path = request.url.path if request is defined else '' %}
+          {% set _raw_path = request.url.path if request is defined else '' %}
+          {% if _raw_path == '/erp' or _raw_path == '/erp/' %}
+            {% set nav_path = '/' %}
+          {% elif _raw_path.startswith('/erp/') %}
+            {% set nav_path = _raw_path[4:] %}
+          {% else %}
+            {% set nav_path = _raw_path %}
+          {% endif %}
 
           {% macro nav_active(href) -%}
             {%- if href == '/' -%}
@@ -588,7 +595,7 @@ lucide.createIcons();
 
           {% if current_role == 'produccion' %}
           {% set prod_order_active = nav_path in ['/production', '/production/'] or (nav_path.startswith('/production/') and nav_path.split('/')[2].isdigit() if nav_path.split('/')|length > 2 else false) %}
-          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
+          <a href="/erp/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
             <span>📊</span>
             <span>Dashboard Producción</span>
           </a>
@@ -608,11 +615,6 @@ lucide.createIcons();
           {% elif current_role == 'ventas' %}
           {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') %}
           {% set billing_menu_open = nav_path.startswith('/billing') %}
-          {{ nav_section('Inicio') }}
-          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
-            <span>📊</span>
-            <span>Dashboard</span>
-          </a>
           {{ nav_section('Comercial') }}
           <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
             <span>📄</span>
@@ -695,14 +697,9 @@ lucide.createIcons();
           {% set production_menu_open = nav_path.startswith('/production') and not nav_path.startswith('/production/condensed') %}
           {% set design_menu_open = nav_path.startswith('/design') %}
           {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') or nav_path.startswith('/product-settings') or nav_path.startswith('/imports') %}
-          {% set system_menu_open = nav_path.startswith('/users') or nav_path.startswith('/inventory') or nav_path.startswith('/secretadmin') %}
+          {% set system_menu_open = nav_path.startswith('/users') or nav_path.startswith('/inventory') or nav_path.startswith('/secretadmin') or nav_path.startswith('/store-cms') %}
           {% set billing_menu_open = nav_path.startswith('/billing') %}
           {% set admin_prod_order_active = nav_path in ['/production', '/production/'] or (nav_path.startswith('/production/') and nav_path.split('/')[2].isdigit() if nav_path.split('/')|length > 2 else false) %}
-          {{ nav_section('Inicio') }}
-          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
-            <span>📊</span>
-            <span>Dashboard</span>
-          </a>
           {{ nav_section('Comercial') }}
           <a href="/quotations" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/quotations') }}">
             <span>📄</span>
@@ -791,15 +788,13 @@ lucide.createIcons();
               <a href="/inventory/stock" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/stock') }}">📊 Stock productos</a>
               <a href="/inventory/materials" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/materials') }}">🪵 Materia prima</a>
               <a href="/inventory/labels" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/inventory/labels') }}">🏷️ Etiquetas</a>
+              <a href="/store-cms/" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/store-cms') }}">🏪 Tienda (home / carrusel)</a>
               <a href="/secretadmin/config" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/secretadmin') }}">⚙️ Configuración ERP</a>
             </div>
           </div>
 
           {% else %}
-          <a href="/" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/') }}">
-            <span>📊</span>
-            <span>Dashboard</span>
-          </a>
+          {# Roles sin menú específico: ir al inicio ERP vía logo #}
           {% endif %}
         </nav>
 

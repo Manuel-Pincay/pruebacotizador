@@ -33,6 +33,9 @@ class CompanyConfig(Base):
     # IVA que se envía al SRI al facturar desde cotización (p. ej. 15%).
     sri_iva_default = Column(Integer, default=15)
 
+    # Instrucciones de transferencia para la tienda (banco, cuenta, etc.)
+    store_payment_instructions = Column(Text, nullable=True)
+
     guide_sender_name = Column(String, nullable=True)
     guide_sender_city = Column(String, default="Manta")
     guide_sender_region = Column(String, default="Ecuador")

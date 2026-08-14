@@ -1,0 +1,71 @@
+{% extends "store/layout.html" %}
+{% block title %}Mi cuenta — {{ company_name }}{% endblock %}
+{% block content %}
+<section class="px-4 py-10 sm:py-14">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-8">
+      <div>
+        <h1 class="font-display text-4xl text-brand">Hola, {{ portal_client.name.split(' ')[0] if portal_client and portal_client.name else 'cliente' }}</h1>
+        <p class="text-sm text-slate-500 mt-1">{{ portal_client.email if portal_client else '' }}</p>
+      </div>
+      <div class="flex gap-2 text-sm">
+        <a href="/tienda" class="btn-brand px-4 py-2 rounded-full font-medium">Ir a comprar</a>
+        <a href="/tienda/cuenta/logout" class="px-4 py-2 rounded-full border border-rose-100 text-slate-600">Salir</a>
+      </div>
+    </div>
+
+    <h2 class="font-semibold text-slate-800 mb-3">Pedidos activos</h2>
+    {% if active_orders %}
+    <ul class="space-y-3 mb-10">
+      {% for row in active_orders %}
+      <li class="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="font-semibold">Pedido #{{ row.quotation.id }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">
+            {{ row.order_label }} · {{ row.payment.label }} · ${{ '%.2f'|format(row.quotation.total or 0) }}
+            {% if row.estimated_delivery %} · Entrega {{ row.estimated_delivery.strftime('%d/%m/%Y') }}{% endif %}
+          </p>
+        </div>
+        {% if row.quotation.store_access_token %}
+        <a href="/tienda/pedido/{{ row.quotation.id }}/{{ row.quotation.store_access_token }}"
+           class="text-sm font-medium text-brand hover:underline">Ver pedido</a>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500 mb-10">No tienes pedidos en curso.
+      <a href="/tienda" class="text-brand hover:underline">Explorar tienda</a>
+    </p>
+    {% endif %}
+
+    <h2 class="font-semibold text-slate-800 mb-3">Historial</h2>
+    {% if past_orders %}
+    <ul class="space-y-3">
+      {% for row in past_orders %}
+      <li class="bg-white/80 border border-rose-50 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="font-medium text-slate-800">Pedido #{{ row.quotation.id }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">
+            {% if row.is_cancelled %}
+            <span class="text-red-700 font-medium">Pedido cancelado</span>
+            {% else %}
+            {{ row.order_label }} · {{ row.payment.label }}
+            {% if row.estimated_delivery %} · Entrega {{ row.estimated_delivery.strftime('%d/%m/%Y') }}{% endif %}
+            {% endif %}
+            {% if row.quotation.created_at %} · {{ row.quotation.created_at.strftime('%d/%m/%Y') }}{% endif %}
+          </p>
+        </div>
+        {% if row.quotation.store_access_token %}
+        <a href="/tienda/pedido/{{ row.quotation.id }}/{{ row.quotation.store_access_token }}"
+           class="text-sm text-brand hover:underline">Detalle</a>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-500">Aún no hay pedidos entregados o cerrados.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

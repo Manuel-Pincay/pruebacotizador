@@ -1,0 +1,214 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">Tienda — Home y publicidad</h1>
+      <p class="text-sm text-gray-500 mt-1">Carrusel, barra superior, categorías y bloques del home público.</p>
+    </div>
+    <a href="/" target="_blank" rel="noopener" class="text-sm font-medium text-teal-700 hover:underline">Ver tienda ↗</a>
+  </div>
+
+  {% if flash %}
+  <div class="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3">Guardado correctamente.</div>
+  {% endif %}
+  {% if error %}
+  <div class="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-3">{{ error }}</div>
+  {% endif %}
+
+  <!-- CARRUSEL -->
+  <section class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+    <h2 class="text-lg font-bold text-slate-800 mb-4">Carrusel (hero)</h2>
+
+    {% if slides %}
+    <div class="space-y-4 mb-8">
+      {% for slide in slides %}
+      <form method="post" action="/store-cms/slides/{{ slide.id }}" enctype="multipart/form-data"
+            class="border border-gray-200 rounded-xl p-4 grid lg:grid-cols-[140px_1fr_auto] gap-4 items-start">
+        <div class="w-full h-28 rounded-lg bg-slate-100 overflow-hidden">
+          {% set img = store_slide_image_url(slide.image) %}
+          {% if img %}<img src="{{ img }}" alt="" class="w-full h-full object-cover">{% endif %}
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3 text-sm">
+          <div class="sm:col-span-2">
+            <label class="text-xs text-gray-500">Título</label>
+            <input name="title" value="{{ slide.title }}" required class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="text-xs text-gray-500">Subtítulo</label>
+            <input name="subtitle" value="{{ slide.subtitle or '' }}" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Texto botón</label>
+            <input name="cta_text" value="{{ slide.cta_text or '' }}" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">URL botón</label>
+            <input name="cta_url" value="{{ slide.cta_url or '/tienda' }}" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Orden</label>
+            <input type="number" name="sort_order" value="{{ slide.sort_order }}" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Activo</label>
+            <select name="active" class="w-full border rounded-lg px-3 py-2">
+              <option value="yes" {% if slide.active %}selected{% endif %}>Sí</option>
+              <option value="no" {% if not slide.active %}selected{% endif %}>No</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="text-xs text-gray-500">Cambiar imagen</label>
+            <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp" class="w-full text-sm">
+          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <button type="submit" class="bg-slate-800 text-white text-sm px-4 py-2 rounded-lg">Guardar</button>
+        </div>
+      </form>
+      <form method="post" action="/store-cms/slides/{{ slide.id }}/delete" onsubmit="return confirm('¿Eliminar slide?')">
+        <button type="submit" class="text-xs text-red-600 hover:underline mb-4">Eliminar slide #{{ slide.id }}</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500 mb-4">Aún no hay slides. Agrega el primero abajo.</p>
+    {% endif %}
+
+    <h3 class="font-semibold text-slate-700 mb-3">Nuevo slide</h3>
+    <form method="post" action="/store-cms/slides" enctype="multipart/form-data" class="grid sm:grid-cols-2 gap-3 text-sm border border-dashed border-gray-300 rounded-xl p-4">
+      <div class="sm:col-span-2">
+        <label class="text-xs text-gray-500">Título *</label>
+        <input name="title" required placeholder="Dale vida a tus creaciones" class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="text-xs text-gray-500">Subtítulo</label>
+        <input name="subtitle" class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">Texto botón</label>
+        <input name="cta_text" value="Ver productos" class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">URL botón</label>
+        <input name="cta_url" value="/tienda" class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">Orden</label>
+        <input type="number" name="sort_order" value="{{ slides|length }}" class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">Activo</label>
+        <select name="active" class="w-full border rounded-lg px-3 py-2">
+          <option value="yes">Sí</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="text-xs text-gray-500">Imagen</label>
+        <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp" class="w-full">
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" class="bg-pink-500 hover:bg-pink-600 text-white px-5 py-2.5 rounded-xl font-medium">Agregar slide</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- PUBLICIDAD / HOME -->
+  <section class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+    <h2 class="text-lg font-bold text-slate-800 mb-4">Opciones de publicidad (home)</h2>
+    <form method="post" action="/store-cms/settings" class="space-y-6 text-sm">
+      <div class="grid sm:grid-cols-2 gap-4">
+        <label class="flex items-center gap-2"><input type="checkbox" name="show_top_bar" value="yes" {% if settings.show_top_bar %}checked{% endif %}> Mostrar barra superior</label>
+        <div>
+          <label class="text-xs text-gray-500">Color acento tienda</label>
+          <input type="color" name="accent_color" value="{{ settings.accent_color or '#E8A0AC' }}" class="w-16 h-10 border rounded">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Barra izq.</label>
+          <input name="top_bar_left" value="{{ settings.top_bar_left or '' }}" class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Barra der.</label>
+          <input name="top_bar_right" value="{{ settings.top_bar_right or '' }}" class="w-full border rounded-lg px-3 py-2">
+        </div>
+      </div>
+
+      <div>
+        <h3 class="font-semibold mb-2">Beneficios bajo el carrusel</h3>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <div><input name="feature_1_title" value="{{ settings.feature_1_title or '' }}" placeholder="Título 1" class="w-full border rounded-lg px-3 py-2 mb-1"><input name="feature_1_text" value="{{ settings.feature_1_text or '' }}" placeholder="Texto 1" class="w-full border rounded-lg px-3 py-2"></div>
+          <div><input name="feature_2_title" value="{{ settings.feature_2_title or '' }}" placeholder="Título 2" class="w-full border rounded-lg px-3 py-2 mb-1"><input name="feature_2_text" value="{{ settings.feature_2_text or '' }}" placeholder="Texto 2" class="w-full border rounded-lg px-3 py-2"></div>
+          <div><input name="feature_3_title" value="{{ settings.feature_3_title or '' }}" placeholder="Título 3" class="w-full border rounded-lg px-3 py-2 mb-1"><input name="feature_3_text" value="{{ settings.feature_3_text or '' }}" placeholder="Texto 3" class="w-full border rounded-lg px-3 py-2"></div>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="flex items-center gap-2 mb-2"><input type="checkbox" name="show_categories" value="yes" {% if settings.show_categories %}checked{% endif %}> Mostrar categorías destacadas</label>
+          <label class="text-xs text-gray-500">Categorías (separadas por coma). Vacío = auto.</label>
+          <textarea name="featured_categories" rows="2" class="w-full border rounded-lg px-3 py-2" placeholder="Bases de MDF, Toppers, Adornos">{{ settings.featured_categories or '' }}</textarea>
+          {% if categories %}
+          <p class="text-xs text-gray-400 mt-1">Disponibles: {{ categories|join(', ') }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="flex items-center gap-2 mb-2"><input type="checkbox" name="show_featured_products" value="yes" {% if settings.show_featured_products %}checked{% endif %}> Mostrar productos destacados</label>
+          <label class="text-xs text-gray-500">IDs de producto (coma). Vacío = primeros del catálogo tienda.</label>
+          <input name="featured_product_ids" value="{{ settings.featured_product_ids or '' }}" class="w-full border rounded-lg px-3 py-2" placeholder="12, 45, 7">
+        </div>
+      </div>
+
+      <div>
+        <label class="flex items-center gap-2 mb-2"><input type="checkbox" name="show_trust_bar" value="yes" {% if settings.show_trust_bar %}checked{% endif %}> Barra de confianza</label>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <input name="trust_1_title" value="{{ settings.trust_1_title or '' }}" placeholder="Título 1" class="w-full border rounded-lg px-3 py-2 mb-1">
+            <input name="trust_1_text" value="{{ settings.trust_1_text or '' }}" placeholder="Texto 1" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <input name="trust_2_title" value="{{ settings.trust_2_title or '' }}" placeholder="Título 2" class="w-full border rounded-lg px-3 py-2 mb-1">
+            <input name="trust_2_text" value="{{ settings.trust_2_text or '' }}" placeholder="Texto 2" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <input name="trust_3_title" value="{{ settings.trust_3_title or '' }}" placeholder="Título 3" class="w-full border rounded-lg px-3 py-2 mb-1">
+            <input name="trust_3_text" value="{{ settings.trust_3_text or '' }}" placeholder="Texto 3" class="w-full border rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <input name="trust_4_title" value="{{ settings.trust_4_title or '' }}" placeholder="Título 4" class="w-full border rounded-lg px-3 py-2 mb-1">
+            <input name="trust_4_text" value="{{ settings.trust_4_text or '' }}" placeholder="Texto 4" class="w-full border rounded-lg px-3 py-2">
+          </div>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="flex items-center gap-2 mb-2"><input type="checkbox" name="show_newsletter" value="yes" {% if settings.show_newsletter %}checked{% endif %}> Newsletter</label>
+          <input name="newsletter_title" value="{{ settings.newsletter_title or '' }}" class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Menú extra (una línea: Etiqueta o Etiqueta|/ruta)</label>
+          <textarea name="nav_extra_links" rows="3" class="w-full border rounded-lg px-3 py-2" placeholder="Bases de MDF&#10;Toppers&#10;Contacto|/tienda#contacto">{{ settings.nav_extra_links or '' }}</textarea>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="font-semibold mb-2">Pie / contacto</h3>
+        <textarea name="footer_blurb" rows="2" class="w-full border rounded-lg px-3 py-2 mb-3" placeholder="Descripción breve">{{ settings.footer_blurb or '' }}</textarea>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input name="contact_address" value="{{ settings.contact_address or '' }}" placeholder="Dirección" class="border rounded-lg px-3 py-2">
+          <input name="contact_phone" value="{{ settings.contact_phone or '' }}" placeholder="Teléfono" class="border rounded-lg px-3 py-2">
+          <input name="contact_email" value="{{ settings.contact_email or '' }}" placeholder="Email" class="border rounded-lg px-3 py-2">
+          <input name="contact_hours" value="{{ settings.contact_hours or '' }}" placeholder="Horario" class="border rounded-lg px-3 py-2">
+          <input name="contact_whatsapp" value="{{ settings.contact_whatsapp or '' }}" placeholder="WhatsApp (solo números)" class="border rounded-lg px-3 py-2">
+          <input name="social_instagram" value="{{ settings.social_instagram or '' }}" placeholder="URL Instagram" class="border rounded-lg px-3 py-2">
+          <input name="social_facebook" value="{{ settings.social_facebook or '' }}" placeholder="URL Facebook" class="border rounded-lg px-3 py-2">
+          <input name="social_tiktok" value="{{ settings.social_tiktok or '' }}" placeholder="URL TikTok" class="border rounded-lg px-3 py-2">
+        </div>
+      </div>
+
+      <button type="submit" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2.5 rounded-xl font-semibold">Guardar publicidad</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

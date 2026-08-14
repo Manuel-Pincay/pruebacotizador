@@ -188,12 +188,12 @@
 
     {% if smtp_configured %}
     <p class="text-emerald-700 text-sm bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-      ✓ Correo configurado. Las facturas autorizadas se pueden enviar con PDF y XML adjuntos.
+      ✓ Correo configurado. Se usa para facturas (PDF/XML) y códigos de verificación de la tienda.
     </p>
     {% else %}
     <p class="text-slate-600 text-sm bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-      Complete los datos de su correo para que el sistema envíe automáticamente la factura al cliente
-      (con el PDF y el XML) cuando el SRI la autorice.
+      Complete los datos de su correo para enviar facturas al cliente y códigos de verificación
+      del registro en la tienda.
     </p>
     {% endif %}
 
@@ -202,8 +202,8 @@
       <label class="flex items-start gap-3 p-4 bg-purple-50 border border-purple-100 rounded-xl cursor-pointer">
         <input type="checkbox" name="smtp_enabled" class="rounded mt-0.5" {% if config.smtp_enabled or not smtp_configured %}checked{% endif %}>
         <span>
-          <span class="font-semibold text-slate-800 block">Activar envío de facturas por correo</span>
-          <span class="text-xs text-gray-600">Si lo desactiva, no se enviará ningún correo aunque guarde la configuración.</span>
+          <span class="font-semibold text-slate-800 block">Activar envío por correo (SMTP)</span>
+          <span class="text-xs text-gray-600">Facturas electrónicas y códigos de verificación de la tienda.</span>
         </span>
       </label>
 

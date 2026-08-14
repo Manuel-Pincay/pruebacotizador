@@ -1,0 +1,204 @@
+{% set company = company_name %}
+{% set primary = primary_color %}
+{% set home = home_settings if home_settings is defined else none %}
+{% set contact_phone = (home.contact_phone if home and home.contact_phone else '0983546624') %}
+{% set contact_whatsapp = (home.contact_whatsapp if home and home.contact_whatsapp else '593983546624') %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ company }}{% endblock %}</title>
+  {% set gc = inject_global_config() %}
+  {% if gc.logo_url %}
+  <link rel="icon" type="image/png" href="{{ gc.logo_url }}">
+  {% endif %}
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand: {{ primary }};
+      --brand-soft: color-mix(in srgb, {{ primary }} 18%, white);
+      --brand-deep: color-mix(in srgb, {{ primary }} 72%, #4a2c2a);
+      --ink: #2a2426;
+      --muted: #7a6f72;
+    }
+    body {
+      font-family: "Outfit", system-ui, sans-serif;
+      color: var(--ink);
+      background: #fff;
+      min-height: 100vh;
+    }
+    .font-display { font-family: "Cormorant Garamond", Georgia, serif; }
+    .btn-brand {
+      background: var(--brand);
+      color: #fff;
+    }
+    .btn-brand:hover { filter: brightness(0.96); }
+    .text-brand { color: var(--brand-deep); }
+    .bg-brand-soft { background: var(--brand-soft); }
+    .border-brand { border-color: var(--brand); }
+    .top-bar { background: var(--brand); }
+    .nav-pill-active {
+      background: color-mix(in srgb, var(--brand) 22%, white);
+      color: var(--brand-deep);
+    }
+    .icon-ring {
+      width: 2.75rem;
+      height: 2.75rem;
+      border: 1.5px solid var(--brand);
+      color: var(--brand-deep);
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hero-dot.active { background: var(--brand); }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="flex flex-col min-h-screen">
+  {% if home and home.show_top_bar and (home.top_bar_left or home.top_bar_right or contact_phone) %}
+  <div class="top-bar text-white text-[11px] sm:text-xs tracking-wide">
+    <div class="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
+      {% if home.top_bar_left %}<span>{{ home.top_bar_left }}</span>{% endif %}
+      {% if home.top_bar_left and (home.top_bar_right or contact_phone) %}<span class="opacity-50 hidden sm:inline">|</span>{% endif %}
+      {% if home.top_bar_right %}<span>{{ home.top_bar_right }}</span>
+      {% if contact_phone %}<span class="opacity-50 hidden sm:inline">|</span>{% endif %}
+      {% endif %}
+      {% if contact_phone %}
+      <a href="https://wa.me/{{ contact_whatsapp }}" class="hover:underline" target="_blank" rel="noopener">
+        Pedidos / asistencia: {{ contact_phone }}
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% elif contact_phone %}
+  <div class="top-bar text-white text-[11px] sm:text-xs tracking-wide">
+    <div class="max-w-6xl mx-auto px-4 py-2 text-center">
+      <a href="https://wa.me/{{ contact_whatsapp }}" class="hover:underline" target="_blank" rel="noopener">
+        Pedidos / asistencia: {{ contact_phone }}
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  <header class="border-b border-rose-100/80 bg-white/95 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 py-3 sm:py-4 flex items-center gap-3 sm:gap-6">
+      <a href="/" class="shrink-0 flex items-center gap-2 min-w-0">
+        {% if gc.logo_url %}
+        <img src="{{ gc.logo_url }}" alt="" class="h-9 w-9 object-contain rounded-full">
+        {% else %}
+        <span class="icon-ring text-sm">✦</span>
+        {% endif %}
+        <span class="font-display text-xl sm:text-2xl leading-none truncate" style="color: var(--brand-deep);">{{ company }}</span>
+      </a>
+
+      <form action="/tienda" method="get" class="hidden md:flex flex-1 max-w-xl mx-auto">
+        <div class="flex w-full rounded-full border border-rose-100 overflow-hidden bg-rose-50/40">
+          <input type="search" name="q" value="{{ q|default('') }}" placeholder="Buscar productos..."
+                 class="flex-1 bg-transparent px-4 py-2 text-sm outline-none">
+          <button type="submit" class="btn-brand px-4 text-sm font-medium">Buscar</button>
+        </div>
+      </form>
+
+      <nav class="ml-auto flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-slate-600 shrink-0">
+        <a href="https://wa.me/{{ contact_whatsapp }}" class="hidden sm:inline hover:text-slate-900"
+           target="_blank" rel="noopener" title="Asistencia">
+          {{ contact_phone }}
+        </a>
+        <a href="{% if portal_client %}/tienda/cuenta/{% else %}/tienda/cuenta/login{% endif %}"
+           class="inline-flex items-center gap-1.5 hover:text-slate-900" title="{% if portal_client %}Mi cuenta{% else %}Entrar{% endif %}">
+          <span class="icon-ring !w-9 !h-9 text-xs" aria-hidden="true">👤</span>
+          <span class="hidden sm:inline">{% if portal_client %}Mi cuenta{% else %}Entrar{% endif %}</span>
+        </a>
+        <a href="/tienda/carrito" class="relative inline-flex items-center gap-1.5 hover:text-slate-900">
+          <span class="icon-ring !w-9 !h-9 text-xs">🛒</span>
+          <span class="hidden lg:inline">Carrito</span>
+          {% if cart_count and cart_count > 0 %}
+          <span class="absolute -top-1 -right-1 min-w-[1.1rem] h-4 px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center bg-rose-500">{{ cart_count }}</span>
+          {% endif %}
+        </a>
+      </nav>
+    </div>
+
+    <div class="border-t border-rose-50">
+      <div class="max-w-6xl mx-auto px-4 py-2 flex gap-1 overflow-x-auto text-sm">
+        <a href="/" class="px-3 py-1.5 rounded-full whitespace-nowrap {% if request.url.path == '/' %}nav-pill-active font-medium{% else %}text-slate-600 hover:bg-rose-50{% endif %}">Inicio</a>
+        <a href="/tienda" class="px-3 py-1.5 rounded-full whitespace-nowrap {% if request.url.path.startswith('/tienda') and 'carrito' not in request.url.path and 'pedido' not in request.url.path and 'checkout' not in request.url.path and 'cuenta' not in request.url.path %}nav-pill-active font-medium{% else %}text-slate-600 hover:bg-rose-50{% endif %}">Tienda</a>
+        <a href="{% if portal_client %}/tienda/cuenta/{% else %}/tienda/cuenta/login{% endif %}"
+           class="px-3 py-1.5 rounded-full whitespace-nowrap sm:hidden {% if 'cuenta' in request.url.path %}nav-pill-active font-medium{% else %}text-slate-600 hover:bg-rose-50{% endif %}">
+          {% if portal_client %}Mi cuenta{% else %}Entrar{% endif %}
+        </a>
+        {% if nav_links is defined %}
+          {% for link in nav_links %}
+          <a href="{{ link.url }}" class="px-3 py-1.5 rounded-full whitespace-nowrap text-slate-600 hover:bg-rose-50">{{ link.label }}</a>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer id="contacto" class="mt-auto bg-[#2a2426] text-rose-50">
+    <div class="max-w-6xl mx-auto px-4 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8 text-sm">
+      <div>
+        <p class="font-display text-2xl text-white mb-3">{{ company }}</p>
+        <p class="text-rose-100/70 leading-relaxed">{{ home.footer_blurb if home and home.footer_blurb else 'Insumos y detalles para dar vida a tus creaciones.' }}</p>
+        <div class="flex gap-3 mt-4 text-xs">
+          {% if home and home.social_instagram %}<a href="{{ home.social_instagram }}" class="hover:text-white" target="_blank" rel="noopener">Instagram</a>{% endif %}
+          {% if home and home.social_facebook %}<a href="{{ home.social_facebook }}" class="hover:text-white" target="_blank" rel="noopener">Facebook</a>{% endif %}
+          {% if home and home.social_tiktok %}<a href="{{ home.social_tiktok }}" class="hover:text-white" target="_blank" rel="noopener">TikTok</a>{% endif %}
+          {% if home and home.contact_whatsapp %}
+          <a href="https://wa.me/{{ home.contact_whatsapp }}" class="hover:text-white" target="_blank" rel="noopener">WhatsApp</a>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <p class="font-semibold text-white mb-3">Enlaces</p>
+        <ul class="space-y-2 text-rose-100/70">
+          <li><a href="/" class="hover:text-white">Inicio</a></li>
+          <li><a href="/tienda" class="hover:text-white">Tienda</a></li>
+          <li><a href="/tienda/carrito" class="hover:text-white">Carrito</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold text-white mb-3">Información</p>
+        <ul class="space-y-2 text-rose-100/70">
+          <li>Pago por transferencia</li>
+          <li>Verificación manual del comprobante</li>
+          <li>Seguimiento de pedido online</li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold text-white mb-3">Contáctanos</p>
+        <ul class="space-y-2 text-rose-100/70">
+          {% if home and home.contact_address %}<li>{{ home.contact_address }}</li>{% endif %}
+          <li>
+            Pedidos / asistencia:
+            <a href="tel:{{ contact_phone }}" class="text-white hover:underline">{{ contact_phone }}</a>
+          </li>
+          <li>
+            <a href="https://wa.me/{{ contact_whatsapp }}" class="text-white hover:underline" target="_blank" rel="noopener">
+              WhatsApp {{ contact_phone }}
+            </a>
+          </li>
+          {% if home and home.contact_email %}<li>{{ home.contact_email }}</li>{% endif %}
+          {% if home and home.contact_hours %}<li>{{ home.contact_hours }}</li>{% endif %}
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-white/10">
+      <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-rose-100/50">
+        <span>© {{ company }}</span>
+        <a href="{{ erp_login_url }}" class="hover:text-rose-100">Acceso interno</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

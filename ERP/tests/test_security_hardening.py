@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.models.quotation import Quotation
 from app.models.user import User
+from app.utils.urls import erp_path
 from tests.conftest import _delete_quotation_tree, user_cookie
 
 
 def test_approve_get_rejected(client: TestClient, ventas_user: User, pending_quotation: Quotation):
     response = client.get(
-        f"/quotations/{pending_quotation.id}/approve",
+        erp_path(f"/quotations/{pending_quotation.id}/approve"),
         cookies=user_cookie(ventas_user.username),
     )
     assert response.status_code == 405
@@ -23,7 +24,7 @@ def test_approve_post_ok(
 ):
     qid = pending_quotation.id
     response = client.post(
-        f"/quotations/{qid}/approve",
+        erp_path(f"/quotations/{qid}/approve"),
         cookies=user_cookie(ventas_user.username),
     )
     assert response.status_code in (302, 303)
@@ -64,7 +65,7 @@ def test_create_rejects_zero_quantity(
         ),
     }
     response = client.post(
-        "/quotations/create",
+        erp_path("/quotations/create"),
         data=payload,
         cookies=user_cookie(ventas_user.username),
     )
@@ -96,7 +97,7 @@ def test_create_clamps_item_discount(
         ),
     }
     response = client.post(
-        "/quotations/create",
+        erp_path("/quotations/create"),
         data=payload,
         cookies=user_cookie(ventas_user.username),
     )
@@ -108,6 +109,7 @@ def test_create_clamps_item_discount(
     q = db.query(Quotation).filter(Quotation.id == qid).first()
     assert q is not None
     assert float(q.discount or 0) <= 100.0
+    assert (q.source or "erp") == "erp"
     assert q.items
     assert float(q.items[0].item_discount or 0) <= 100.0
     _delete_quotation_tree(db, qid)

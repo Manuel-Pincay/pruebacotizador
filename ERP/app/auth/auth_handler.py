@@ -6,6 +6,7 @@ from app.auth.session import resolve_user_session
 from app.auth.permissions import role_required as permissions_role_required
 from app.database import SessionLocal
 from app.models.user import User
+from app.utils.urls import erp_path
 
 
 def login_required(request: Request):
@@ -13,7 +14,7 @@ def login_required(request: Request):
     username = resolve_user_session(request.cookies.get("user"))
 
     if not username:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url=erp_path("/login"), status_code=302)
 
     db = SessionLocal()
 
@@ -22,10 +23,10 @@ def login_required(request: Request):
     db.close()
 
     if not user:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url=erp_path("/login"), status_code=302)
 
     if not getattr(user, "active", True):
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url=erp_path("/login"), status_code=302)
 
     return user
 

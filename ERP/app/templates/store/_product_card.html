@@ -1,0 +1,27 @@
+<article class="bg-white rounded-2xl border border-rose-100 shadow-sm overflow-hidden flex flex-col group">
+  <a href="/tienda/producto/{{ product.id }}" class="relative h-40 sm:h-44 bg-rose-50/60 block">
+    {% set img = product_image_url(product.image, thumb=true) %}
+    {% if img %}
+    <img src="{{ img }}" alt="{{ product.name }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300">
+    {% else %}
+    <div class="w-full h-full flex items-center justify-center text-rose-300 text-sm">Sin imagen</div>
+    {% endif %}
+  </a>
+  <div class="p-3 sm:p-4 flex flex-col flex-1">
+    <a href="/tienda/producto/{{ product.id }}" class="font-medium text-slate-800 text-sm leading-snug hover:underline line-clamp-2">
+      {{ product.name }}
+    </a>
+    {% if product.size or product.material %}
+    <p class="text-xs text-slate-400 mt-1 truncate">{{ product.size or product.material }}</p>
+    {% endif %}
+    <div class="mt-auto pt-3 flex items-center justify-between gap-2">
+      <p class="font-bold text-slate-800">${{ '%.2f'|format(product.price or 0) }}</p>
+      <form action="/tienda/carrito/agregar" method="post">
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+        <input type="hidden" name="quantity" value="1">
+        <input type="hidden" name="next" value="{{ next_url|default('/tienda/carrito?ok=1') }}">
+        <button type="submit" class="btn-brand w-9 h-9 rounded-full text-sm inline-flex items-center justify-center" title="Agregar">🛒</button>
+      </form>
+    </div>
+  </div>
+</article>

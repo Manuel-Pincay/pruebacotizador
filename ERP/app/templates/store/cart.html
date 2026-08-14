@@ -1,0 +1,66 @@
+{% extends "store/layout.html" %}
+{% block title %}Carrito — {{ company_name }}{% endblock %}
+{% block content %}
+<section class="px-4 sm:px-8 py-10 sm:py-14">
+  <div class="max-w-3xl mx-auto">
+    <h1 class="brand-font text-4xl tracking-tight mb-2">Carrito</h1>
+    <p class="text-slate-600 text-sm mb-8">Revisa tu pedido antes de solicitar la cotización.</p>
+
+    {% if flash == '1' %}
+    <div class="mb-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-sm px-4 py-3">Producto agregado.</div>
+    {% endif %}
+    {% if error == 'vacio' %}
+    <div class="mb-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3">Tu carrito está vacío.</div>
+    {% endif %}
+
+    {% if lines %}
+    <ul class="space-y-4">
+      {% for line in lines %}
+      <li class="bg-white/80 border border-white rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row gap-4">
+        <a href="/tienda/producto/{{ line.product.id }}" class="w-full sm:w-24 h-24 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+          {% set img = product_image_url(line.product.image, thumb=true) %}
+          {% if img %}<img src="{{ img }}" alt="" class="w-full h-full object-cover">{% endif %}
+        </a>
+        <div class="flex-1 min-w-0">
+          <a href="/tienda/producto/{{ line.product.id }}" class="font-semibold hover:underline">{{ line.product.name }}</a>
+          <p class="text-sm text-slate-500 mt-0.5">${{ '%.2f'|format(line.unit_price) }} c/u</p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <form action="/tienda/carrito/actualizar" method="post" class="flex items-center gap-2">
+              <input type="hidden" name="product_id" value="{{ line.product_id }}">
+              <input type="number" name="quantity" value="{{ line.quantity }}" min="1" max="999"
+                     class="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
+              <button type="submit" class="text-xs font-medium link-brand">Actualizar</button>
+            </form>
+            <form action="/tienda/carrito/quitar" method="post">
+              <input type="hidden" name="product_id" value="{{ line.product_id }}">
+              <button type="submit" class="text-xs text-red-600 hover:underline">Quitar</button>
+            </form>
+          </div>
+        </div>
+        <div class="sm:text-right font-bold" style="color: var(--brand);">
+          ${{ '%.2f'|format(line.line_total) }}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <div class="mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-slate-200/80 pt-6">
+      <p class="text-lg">Subtotal: <strong>${{ '%.2f'|format(subtotal) }}</strong></p>
+      <div class="flex flex-wrap gap-3">
+        <a href="/tienda" class="px-5 py-2.5 rounded-full border border-rose-100 bg-white text-sm font-medium">Seguir comprando</a>
+        {% if portal_client %}
+        <a href="/tienda/checkout" class="btn-brand px-5 py-2.5 rounded-full text-sm font-semibold">Solicitar cotización</a>
+        {% else %}
+        <a href="/tienda/cuenta/login?next=/tienda/checkout" class="btn-brand px-5 py-2.5 rounded-full text-sm font-semibold">Entrar para comprar</a>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-300 bg-white/50 px-6 py-14 text-center text-slate-500">
+      Tu carrito está vacío.
+      <p class="mt-3"><a href="/tienda" class="link-brand font-medium hover:underline">Ir al catálogo</a></p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

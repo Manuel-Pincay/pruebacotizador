@@ -26,6 +26,8 @@ class Product(Base):
     # Soft-delete: archivado deja de aparecer en catálogo/nuevas cotizaciones
     # pero las cotizaciones históricas siguen apuntando al producto.
     active = Column(Boolean, default=True, nullable=False)
+    # Visible en la tienda pública (independiente de active en ERP).
+    store_visible = Column(Boolean, default=False, nullable=False)
     image = Column(String)
     codigo_auxiliar = Column(String(50), nullable=True)
     codigo_iva = Column(String(5), default="0")

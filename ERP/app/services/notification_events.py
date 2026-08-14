@@ -210,3 +210,26 @@ def server_started(*, env: str = "development", when: datetime | str | None = No
         f"🕐 Fecha: `{_dt(when)}`\n"
         "El servidor está en línea."
     )
+
+
+def store_order_created(
+    *,
+    client: str,
+    phone: str = "—",
+    email: str = "—",
+    quotation_id: int | str,
+    total,
+    items_count: int = 0,
+    when: datetime | str | None = None,
+) -> str:
+    return (
+        "🛒 *Nuevo pedido desde la tienda*\n\n"
+        f"👤 Cliente: `{client}`\n"
+        f"📞 Teléfono: `{phone or '—'}`\n"
+        f"✉️ Email: `{email or '—'}`\n"
+        f"📄 Cotización: `#{quotation_id}`\n"
+        f"📦 Ítems: `{items_count}`\n"
+        f"💰 Total: `{_money(total)}`\n"
+        f"🕐 Fecha: `{_dt(when)}`\n"
+        "Revisa el pedido en el ERP (origen Tienda)."
+    )

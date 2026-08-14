@@ -213,6 +213,32 @@ def order_delivery_date(order: ProductionOrder) -> date | None:
     return None
 
 
+def set_quotation_delivery_date(quotation, delivery: date | None) -> None:
+    """Actualiza fecha de entrega en cotización y sincroniza la OP si existe."""
+    from datetime import time as time_cls
+
+    quotation.delivery_date = delivery
+    order = getattr(quotation, "production_order", None)
+    if order is not None:
+        if delivery is None:
+            order.delivery_date = None
+        else:
+            order.delivery_date = datetime.combine(delivery, time_cls.min)
+
+
+def quotation_estimated_delivery(quotation) -> date | None:
+    """Fecha estimada para mostrar al cliente (OP o cotización)."""
+    order = getattr(quotation, "production_order", None)
+    if order is not None:
+        od = order_delivery_date(order)
+        if od:
+            return od
+    qd = getattr(quotation, "delivery_date", None)
+    if qd is None:
+        return None
+    return qd.date() if isinstance(qd, datetime) else qd
+
+
 COMPLETED_ORDER_STATUSES = ("despachado", "entregado", "cancelado")
 
 from app.services.production_order_service import (  # noqa: E402

@@ -180,6 +180,21 @@
 
             </div>
 
+            <div class="mt-5">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Instrucciones de transferencia (tienda)
+                </label>
+                <textarea
+                    name="store_payment_instructions"
+                    rows="4"
+                    class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-teal-500 focus:outline-none transition text-sm"
+                    placeholder="Banco X · Cuenta 1234567890 · Nombre: Mi Empresa&#10;Envía el comprobante desde el enlace de tu pedido."
+                >{{ config.store_payment_instructions or '' }}</textarea>
+                <p class="text-xs text-gray-500 mt-1.5">
+                    Se muestra al cliente en el seguimiento del pedido. No hay cobro en línea: solo registro y verificación manual.
+                </p>
+            </div>
+
         </div>
 
         <!-- REMITENTE GUÍAS DE ENVÍO -->
@@ -609,6 +624,194 @@
         </div>
 
     </form>
+
+    <!-- CORREO SMTP (formulario aparte) -->
+    <div class="mt-6 bg-white rounded-2xl shadow p-6">
+      <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+        <span class="bg-teal-100 text-teal-700 rounded-lg p-2 mr-3">📧</span>
+        Correo SMTP
+      </h2>
+      <p class="text-sm text-gray-500 mb-4">
+        Envía códigos de verificación de la tienda y facturas electrónicas.
+        Recomendado: Gmail con <strong>contraseña de aplicación</strong>.
+      </p>
+
+      {% if request.query_params.get('smtp') == 'saved' %}
+      <div class="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm">
+        Configuración SMTP guardada.
+      </div>
+      {% endif %}
+      {% if request.query_params.get('smtp') == 'ok' %}
+      <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm">
+        Correo de prueba enviado a {{ request.query_params.get('to') or 'tu bandeja' }}.
+      </div>
+      {% endif %}
+      {% if request.query_params.get('smtp_error') %}
+      <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl text-sm whitespace-pre-line">{{ request.query_params.get('smtp_error') }}</div>
+      {% endif %}
+
+      {% if smtp_configured %}
+      <p class="mb-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+        ✓ SMTP activo
+        {% if smtp_source == 'env' %}(desde <code class="text-xs">.env</code>){% else %}(guardado en el ERP){% endif %}.
+      </p>
+      {% else %}
+      <p class="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+        SMTP no configurado. Sin esto, en desarrollo el código de verificación se muestra en pantalla;
+        en producción el registro por correo fallará.
+      </p>
+      {% endif %}
+
+      <form method="post" action="/secretadmin/config/smtp/save" class="space-y-4 border-t border-gray-100 pt-5" id="smtp-config-form">
+        <label class="flex items-start gap-3 p-4 bg-teal-50 border border-teal-100 rounded-xl cursor-pointer">
+          <input type="checkbox" name="smtp_enabled" class="rounded mt-0.5"
+                 {% if config.smtp_enabled or not smtp_configured %}checked{% endif %}>
+          <span>
+            <span class="font-semibold text-gray-800 block">Activar envío por correo</span>
+            <span class="text-xs text-gray-600">Códigos de la tienda y facturas (si usa facturación).</span>
+          </span>
+        </label>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo de correo</label>
+            <select id="smtp-provider" class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-teal-500 focus:outline-none">
+              <option value="gmail">Gmail</option>
+              <option value="outlook">Outlook / Hotmail</option>
+              <option value="yahoo">Yahoo</option>
+              <option value="other">Otro (avanzado)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Correo remitente *</label>
+            <input type="email" name="smtp_from" id="smtp-from"
+                   value="{{ config.smtp_from or config.smtp_user or '' }}"
+                   placeholder="tienda@empresa.com"
+                   class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-teal-500 focus:outline-none">
+          </div>
+        </div>
+        <input type="hidden" name="smtp_user" id="smtp-user" value="{{ config.smtp_user or config.smtp_from or '' }}">
+
+        <div id="smtp-help-gmail" class="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
+          <p class="font-medium text-slate-800">Gmail — contraseña de aplicación:</p>
+          <ol class="list-decimal list-inside space-y-0.5">
+            <li>Active la verificación en 2 pasos en su cuenta Google</li>
+            <li>Abra <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" class="text-teal-700 underline">Contraseñas de aplicación</a></li>
+            <li>Cree una para «Correo» y pegue los 16 caracteres abajo</li>
+          </ol>
+        </div>
+        <div id="smtp-help-outlook" class="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1 hidden">
+          <p class="font-medium text-slate-800">Outlook / Hotmail:</p>
+          <p class="text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-1">
+            Cuentas personales @hotmail/@outlook a menudo bloquean SMTP. Prefiera Gmail o correo de empresa.
+          </p>
+          <p>Si su cuenta lo permite: Seguridad → Contraseñas de aplicación.</p>
+        </div>
+        <div id="smtp-help-yahoo" class="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3 hidden">
+          Yahoo: Configuración → Seguridad → Generar contraseña de aplicación.
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Contraseña de aplicación *</label>
+          <input type="password" name="smtp_password" autocomplete="new-password"
+                 placeholder="{% if smtp_password_set %}Dejar vacío para no cambiarla{% else %}Pegue la contraseña de aplicación{% endif %}"
+                 class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-teal-500 focus:outline-none">
+          {% if smtp_password_set %}
+          <p class="text-xs text-emerald-600 mt-1">✓ Ya hay una contraseña guardada cifrada.</p>
+          {% endif %}
+        </div>
+
+        <details class="group">
+          <summary class="cursor-pointer text-sm font-medium text-gray-600 hover:text-teal-700">
+            Opciones técnicas (servidor / puerto)
+          </summary>
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border border-gray-200 rounded-xl">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-medium text-gray-500 mb-1">Servidor SMTP</label>
+              <input name="smtp_host" id="smtp-host" value="{{ config.smtp_host or 'smtp.gmail.com' }}"
+                     class="w-full border-2 border-gray-300 rounded-xl p-2.5 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Puerto</label>
+              <input type="number" name="smtp_port" id="smtp-port" value="{{ config.smtp_port or 587 }}"
+                     class="w-full border-2 border-gray-300 rounded-xl p-2.5 text-sm">
+              <p class="text-[11px] text-gray-400 mt-1">587 = TLS · 465 = SSL</p>
+            </div>
+            <div class="sm:col-span-3">
+              <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" name="smtp_use_tls" id="smtp-use-tls" class="rounded"
+                       {% if config.smtp_use_tls != False %}checked{% endif %}>
+                Usar STARTTLS (puerto 587). En puerto 465 se usa SSL automático.
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Correo de prueba</label>
+            <input type="email" name="test_email" placeholder="tu@correo.com"
+                   value="{{ config.smtp_from or '' }}"
+                   class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-teal-500 focus:outline-none">
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <button type="submit" name="action" value="save"
+                    class="bg-teal-600 hover:bg-teal-700 text-white px-5 py-3 rounded-xl font-semibold transition">
+              Guardar SMTP
+            </button>
+            <button type="submit" name="action" value="verify"
+                    class="bg-white border-2 border-teal-600 text-teal-700 hover:bg-teal-50 px-5 py-3 rounded-xl font-semibold transition">
+              Enviar prueba
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <script>
+    (function () {
+      var PRESETS = {
+        gmail:   { host: 'smtp.gmail.com',         port: 587, tls: true, help: 'gmail' },
+        outlook: { host: 'smtp-mail.outlook.com',  port: 587, tls: true, help: 'outlook' },
+        yahoo:   { host: 'smtp.mail.yahoo.com',    port: 587, tls: true, help: 'yahoo' }
+      };
+      var provider = document.getElementById('smtp-provider');
+      var host = document.getElementById('smtp-host');
+      var port = document.getElementById('smtp-port');
+      var tls = document.getElementById('smtp-use-tls');
+      var from = document.getElementById('smtp-from');
+      var user = document.getElementById('smtp-user');
+      function syncUser() { if (from && user) user.value = from.value; }
+      function showHelp(key) {
+        ['gmail', 'outlook', 'yahoo'].forEach(function (k) {
+          var el = document.getElementById('smtp-help-' + k);
+          if (el) el.classList.toggle('hidden', k !== key);
+        });
+      }
+      function applyPreset() {
+        var p = PRESETS[provider.value];
+        if (p) {
+          if (host) host.value = p.host;
+          if (port) port.value = p.port;
+          if (tls) tls.checked = p.tls;
+          showHelp(p.help);
+        } else {
+          showHelp('');
+        }
+      }
+      if (provider) {
+        provider.addEventListener('change', applyPreset);
+        var h = (host && host.value || '').toLowerCase();
+        if (h.indexOf('gmail') >= 0) provider.value = 'gmail';
+        else if (h.indexOf('outlook') >= 0 || h.indexOf('office365') >= 0) provider.value = 'outlook';
+        else if (h.indexOf('yahoo') >= 0) provider.value = 'yahoo';
+        else if (h) provider.value = 'other';
+        showHelp(provider.value === 'other' ? '' : provider.value);
+      }
+      if (from) from.addEventListener('input', syncUser);
+      syncUser();
+    })();
+    </script>
 
 </div>
 

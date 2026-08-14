@@ -1,6 +1,8 @@
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 
+from app.utils.urls import erp_path
+
 ROLE_ADMIN = "admin"
 ROLE_VENTAS = "ventas"
 ROLE_PRODUCCION = "produccion"
@@ -76,11 +78,11 @@ def role_required(request: Request, allowed_roles: list):
         return user
 
     if not getattr(user, "active", True):
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url=erp_path("/login"), status_code=302)
 
     expanded = _expand_roles(allowed_roles)
     if user.role not in expanded:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url=erp_path("/login"), status_code=302)
 
     return user
 
@@ -99,9 +101,9 @@ def has_permission(role: str, permission: str) -> bool:
 
 def get_login_redirect_url(role: str) -> str:
     if role == ROLE_DISENADOR:
-        return "/design/dashboard"
+        return erp_path("/design/dashboard")
     if role == ROLE_PRODUCCION:
-        return "/"
+        return erp_path("/")
     if role in {ROLE_DESPACHO, ROLE_TRANSPORTE}:
-        return "/shipments"
-    return "/"
+        return erp_path("/shipments")
+    return erp_path("/")

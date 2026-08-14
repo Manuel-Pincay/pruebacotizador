@@ -168,6 +168,9 @@ async def create_quotation_payment(
             reference=reference.strip()[:100] or None,
             notes=notes.strip() or None,
             transfer_receipt=receipt_filename,
+            verification_status="confirmed",
+            verified_at=datetime.utcnow(),
+            verified_by_user_id=getattr(user, "id", None),
         )
         db.add(payment)
         db.commit()
@@ -271,3 +274,110 @@ async def delete_payment(
     )
 
     return {"success": True, "quotation_id": quotation_id}
+
+
+@router.post("/payments/{payment_id}/confirm")
+async def confirm_payment(
+    payment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Staff confirma que la transferencia sí llegó."""
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    payment = (
+        db.query(QuotationPayment)
+        .options(joinedload(QuotationPayment.quotation).joinedload(Quotation.client))
+        .filter(QuotationPayment.id == payment_id)
+        .first()
+    )
+    if not payment:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    payment.verification_status = "confirmed"
+    payment.verified_at = datetime.utcnow()
+    payment.verified_by_user_id = getattr(user, "id", None)
+    db.commit()
+
+    quotation = payment.quotation
+    try:
+        log_activity(
+            db,
+            "Pago confirmado",
+            f"Abono #{payment.id} cotización #{payment.quotation_id}",
+        )
+        from app.utils.quotation_events import log_quotation_event
+
+        log_quotation_event(
+            db,
+            payment.quotation_id,
+            "pago_confirmado",
+            f"Pago ${float(payment.amount):.2f} confirmado",
+            getattr(user, "id", None),
+        )
+    except Exception:
+        pass
+
+    if quotation and quotation.payment_status == "pagada":
+        try:
+            from app.services.notification_service import NotificationService
+
+            client_name = quotation.client.name if quotation.client else "—"
+            NotificationService.notify_invoice_paid(
+                client=client_name,
+                invoice_ref=f"Cotización #{quotation.id}",
+                amount=quotation.total,
+            )
+        except Exception:
+            pass
+
+    return RedirectResponse(
+        url=f"/quotations/{payment.quotation_id}?payment_verified=1",
+        status_code=303,
+    )
+
+
+@router.post("/payments/{payment_id}/reject")
+async def reject_payment(
+    payment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Staff indica que el comprobante no es válido / no llegó el dinero."""
+    user = _require_quotation_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    payment = _get_payment_or_404(db, payment_id)
+    if not payment:
+        return RedirectResponse(url="/quotations", status_code=302)
+
+    payment.verification_status = "rejected"
+    payment.verified_at = datetime.utcnow()
+    payment.verified_by_user_id = getattr(user, "id", None)
+    db.commit()
+
+    try:
+        log_activity(
+            db,
+            "Pago rechazado",
+            f"Abono #{payment.id} cotización #{payment.quotation_id}",
+        )
+        from app.utils.quotation_events import log_quotation_event
+
+        log_quotation_event(
+            db,
+            payment.quotation_id,
+            "pago_rechazado",
+            f"Pago ${float(payment.amount):.2f} rechazado",
+            getattr(user, "id", None),
+        )
+    except Exception:
+        pass
+
+    return RedirectResponse(
+        url=f"/quotations/{payment.quotation_id}?payment_rejected=1",
+        status_code=303,
+    )

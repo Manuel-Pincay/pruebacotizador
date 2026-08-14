@@ -40,8 +40,11 @@ PRODUCTS_THUMBS_DIR = PRODUCTS_DIR / "thumbs"
 DESIGNS_DIR = Path("uploads/designs")
 LOGOS_DIR = Path("uploads/logos")
 PAYMENTS_DIR = Path("uploads/payments")
+STORE_SLIDES_DIR = Path("uploads/store/slides")
 
 ALLOWED_RECEIPT_EXTENSIONS = {"jpg", "jpeg", "png", "pdf"}
+MAX_STORE_SLIDE_BYTES = 5 * 1024 * 1024
+STORE_SLIDE_MAX_PX = 1920
 
 
 class UploadValidationError(Exception):
@@ -150,6 +153,35 @@ def save_design_image(data: bytes) -> str:
     image = _resize_max(image, DESIGN_MAX_PX)
     _save_webp(image, DESIGNS_DIR / name)
     return name
+
+
+def save_store_slide_image(data: bytes) -> str:
+    name = _new_webp_name()
+    image = _to_rgb(_open_image(data))
+    image = _resize_max(image, STORE_SLIDE_MAX_PX)
+    _save_webp(image, STORE_SLIDES_DIR / name)
+    return name
+
+
+def delete_store_slide_image(filename: str | None) -> None:
+    if not filename:
+        return
+    path = STORE_SLIDES_DIR / filename
+    if path.exists():
+        path.unlink(missing_ok=True)
+
+
+def store_slide_image_url(filename: str | None) -> str | None:
+    if not filename:
+        return None
+    stem = Path(filename).stem
+    path = _file_exists(
+        STORE_SLIDES_DIR / filename,
+        STORE_SLIDES_DIR / f"{stem}.webp",
+    )
+    if path:
+        return f"/uploads/store/slides/{path.name}"
+    return None
 
 
 def validate_company_icon_filename(filename: str | None) -> str:

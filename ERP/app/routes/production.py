@@ -816,14 +816,23 @@ async def update_production(
     order.priority = priority
     order.observations = observations
 
+    from app.services.production_helpers import set_quotation_delivery_date
+
     if delivery_date:
         try:
             parsed = datetime.strptime(delivery_date, "%Y-%m-%d").date()
-            order.delivery_date = datetime.combine(parsed, time.min)
-            if order.quotation and order.quotation.delivery_date != parsed:
-                order.quotation.delivery_date = parsed
+            if order.quotation:
+                set_quotation_delivery_date(order.quotation, parsed)
+            else:
+                order.delivery_date = datetime.combine(parsed, time.min)
         except ValueError:
             pass
+    else:
+        # Campo vacío = limpiar fecha en OP y cotización
+        if order.quotation:
+            set_quotation_delivery_date(order.quotation, None)
+        else:
+            order.delivery_date = None
 
     apply_production_status_change(order, status, db)
 
@@ -833,6 +842,51 @@ async def update_production(
         url=f"/production/{order_id}?saved=1",
         status_code=302
     )
+
+
+@router.post("/{order_id}/delivery-date")
+async def update_production_delivery_date(
+    request: Request,
+    order_id: int,
+    delivery_date: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Solo actualiza la fecha de entrega (y sincroniza la cotización)."""
+    from app.services.production_helpers import set_quotation_delivery_date
+
+    user = role_required(request, ["admin", "produccion", "ventas"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    order = (
+        db.query(ProductionOrder)
+        .options(joinedload(ProductionOrder.quotation))
+        .filter(ProductionOrder.id == order_id)
+        .first()
+    )
+    if not order:
+        return RedirectResponse(url="/production/", status_code=302)
+
+    parsed = None
+    raw = (delivery_date or "").strip()
+    if raw:
+        try:
+            parsed = datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            return RedirectResponse(
+                url=f"/production/{order_id}?fab_error=Fecha+inválida",
+                status_code=302,
+            )
+
+    if order.quotation:
+        set_quotation_delivery_date(order.quotation, parsed)
+    else:
+        order.delivery_date = (
+            datetime.combine(parsed, time.min) if parsed else None
+        )
+
+    db.commit()
+    return RedirectResponse(url=f"/production/{order_id}?saved=1", status_code=302)
 
 
 @router.post("/{order_id}/fabrication/")

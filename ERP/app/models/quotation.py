@@ -29,6 +29,20 @@ class Quotation(Base):
     total = Column(Float)
     shipping_cost = Column(Float, default=0)
     status = Column(String)
+    # Origen: erp (staff) | store (cliente en tienda)
+    source = Column(String(20), default="erp", nullable=False)
+    # Token para que el cliente vea su pedido sin login (solo tienda)
+    store_access_token = Column(String(64), nullable=True, unique=True, index=True)
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by_client_id = Column(
+        Integer,
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     delivery_date = Column(Date)
     design_file = Column(String)
 
@@ -37,7 +51,12 @@ class Quotation(Base):
         default=datetime.utcnow
     )
 
-    client = relationship("Client")
+    client = relationship("Client", foreign_keys=[client_id])
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id])
+    created_by_client = relationship(
+        "Client",
+        foreign_keys=[created_by_client_id],
+    )
     items = relationship(
         "QuotationItem",
         back_populates="quotation",
@@ -84,11 +103,32 @@ class Quotation(Base):
 
     @property
     def total_paid(self) -> float:
-        return sum(float(payment.amount or 0) for payment in self.payments)
+        """Solo abonos confirmados (pendientes de tienda no cuentan)."""
+        return sum(
+            float(payment.amount or 0)
+            for payment in self.payments
+            if (getattr(payment, "verification_status", None) or "confirmed")
+            == "confirmed"
+        )
+
+    @property
+    def amount_pending_verification(self) -> float:
+        return sum(
+            float(payment.amount or 0)
+            for payment in self.payments
+            if (getattr(payment, "verification_status", None) or "") == "pending"
+        )
 
     @property
     def pending_balance(self) -> float:
         return float(self.total or 0) - self.total_paid
+
+    @property
+    def open_balance_for_new_payment(self) -> float:
+        return max(
+            0.0,
+            float(self.total or 0) - self.total_paid - self.amount_pending_verification,
+        )
 
     @property
     def payment_status(self) -> str:
@@ -100,3 +140,10 @@ class Quotation(Base):
         if paid >= total:
             return "pagada"
         return "parcial"
+
+    @property
+    def has_pending_payment_verification(self) -> bool:
+        return any(
+            (getattr(p, "verification_status", None) or "") == "pending"
+            for p in self.payments
+        )

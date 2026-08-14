@@ -209,10 +209,11 @@
 
         {% if production_summary.table_items %}
         <div class="overflow-x-auto -mx-2">
-            <table class="w-full min-w-[720px] text-sm">
+            <table class="w-full min-w-[800px] text-sm">
                 <thead class="text-xs uppercase text-gray-500 border-b border-gray-100">
                     <tr>
                         <th class="text-left py-3 px-2 font-semibold">Orden</th>
+                        <th class="text-left py-3 px-2 font-semibold">Cotización</th>
                         <th class="text-left py-3 px-2 font-semibold">Cliente</th>
                         <th class="text-left py-3 px-2 font-semibold">Estado</th>
                         <th class="text-left py-3 px-2 font-semibold">Entrega</th>
@@ -226,6 +227,13 @@
                     {% set meta = item.delivery_meta %}
                     <tr class="hover:bg-purple-50/40 transition">
                         <td class="py-3 px-2 font-semibold text-slate-900">OP-{{ '%04d'|format(order.id) }}</td>
+                        <td class="py-3 px-2 whitespace-nowrap">
+                            {% if item.quotation_id %}
+                            <a href="/quotations/{{ item.quotation_id }}" class="text-purple-700 hover:text-purple-900 font-medium hover:underline">#{{ item.quotation_id }}</a>
+                            {% else %}
+                            <span class="text-gray-400">—</span>
+                            {% endif %}
+                        </td>
                         <td class="py-3 px-2 text-gray-700">{{ item.client_name }}</td>
                         <td class="py-3 px-2">{{ production_status_badge(order.status) }}</td>
                         <td class="py-3 px-2 text-gray-600 whitespace-nowrap">{{ meta.label }}</td>

@@ -1,0 +1,47 @@
+{% extends "store/layout.html" %}
+{% block title %}Confirmar correo — {{ company_name }}{% endblock %}
+{% block content %}
+<section class="px-4 py-12 sm:py-16">
+  <div class="max-w-md mx-auto bg-white rounded-2xl border border-rose-100 shadow-sm p-6 sm:p-8">
+    <h1 class="font-display text-3xl text-brand mb-2">Confirma tu correo</h1>
+    <p class="text-sm text-slate-500 mb-6">
+      Te enviamos un código de 6 dígitos a
+      <strong>{{ email_masked }}</strong>. Ingresalo para activar tu cuenta.
+    </p>
+
+    {% if flash %}
+    <div class="mb-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 text-sm px-4 py-3">
+      Código reenviado. Revisa tu bandeja (y spam).
+    </div>
+    {% endif %}
+    {% if error %}
+    <div class="mb-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-3">{{ error }}</div>
+    {% endif %}
+    {% if dev_code %}
+    <div class="mb-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm px-4 py-3">
+      <strong>Modo desarrollo</strong> (SMTP no configurado): tu código es
+      <span class="font-mono text-lg tracking-widest">{{ dev_code }}</span>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/tienda/cuenta/verificar" class="space-y-4 text-sm">
+      <input type="hidden" name="t" value="{{ verify_token }}">
+      <input type="hidden" name="next" value="{{ next_url or '/tienda/cuenta/' }}">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Código de verificación</label>
+        <input name="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               autocomplete="one-time-code"
+               class="w-full rounded-xl border border-rose-100 px-3 py-3 text-center text-xl tracking-[0.4em] font-mono"
+               placeholder="000000">
+      </div>
+      <button type="submit" class="btn-brand w-full py-2.5 rounded-full font-semibold">Confirmar cuenta</button>
+    </form>
+
+    <form method="post" action="/tienda/cuenta/verificar/reenviar" class="mt-4 text-center">
+      <input type="hidden" name="t" value="{{ verify_token }}">
+      <input type="hidden" name="next" value="{{ next_url or '/tienda/cuenta/' }}">
+      <button type="submit" class="text-sm text-brand hover:underline">Reenviar código</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

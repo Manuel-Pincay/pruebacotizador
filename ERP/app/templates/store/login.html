@@ -1,0 +1,31 @@
+{% extends "store/layout.html" %}
+{% block title %}Iniciar sesión — {{ company_name }}{% endblock %}
+{% block content %}
+<section class="px-4 py-12 sm:py-16">
+  <div class="max-w-md mx-auto bg-white rounded-2xl border border-rose-100 shadow-sm p-6 sm:p-8">
+    <h1 class="font-display text-3xl text-brand mb-2">Mi cuenta</h1>
+    <p class="text-sm text-slate-500 mb-6">Inicia sesión para comprar y ver tus pedidos.</p>
+    {% if error %}
+    <div class="mb-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-3">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/tienda/cuenta/login" class="space-y-4 text-sm">
+      <input type="hidden" name="next" value="{{ next_url or '/tienda/cuenta/' }}">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Email</label>
+        <input type="email" name="email" required value="{{ form_email|default('') }}"
+               class="w-full rounded-xl border border-rose-100 px-3 py-2.5">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Clave</label>
+        <input type="password" name="password" required minlength="6"
+               class="w-full rounded-xl border border-rose-100 px-3 py-2.5">
+      </div>
+      <button type="submit" class="btn-brand w-full py-2.5 rounded-full font-semibold">Entrar</button>
+    </form>
+    <p class="mt-5 text-sm text-slate-500 text-center">
+      ¿No tienes cuenta?
+      <a href="/tienda/cuenta/registro?next={{ (next_url or '/tienda/cuenta/')|urlencode }}" class="text-brand font-medium hover:underline">Regístrate</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

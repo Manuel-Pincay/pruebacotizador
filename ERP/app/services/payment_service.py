@@ -27,8 +27,19 @@ def parse_amount(value: str) -> Decimal:
     return amount.quantize(Decimal("0.01"))
 
 
-def validate_payment_amount(quotation: Quotation, amount: Decimal) -> None:
-    pending = Decimal(str(quotation.pending_balance)).quantize(Decimal("0.01"))
+def validate_payment_amount(
+    quotation: Quotation,
+    amount: Decimal,
+    *,
+    include_pending_verification: bool = True,
+) -> None:
+    if include_pending_verification:
+        open_bal = getattr(quotation, "open_balance_for_new_payment", None)
+        if open_bal is None:
+            open_bal = quotation.pending_balance
+        pending = Decimal(str(open_bal)).quantize(Decimal("0.01"))
+    else:
+        pending = Decimal(str(quotation.pending_balance)).quantize(Decimal("0.01"))
     if amount > pending:
         raise PaymentValidationError(
             f"El abono no puede superar el saldo pendiente (${pending:.2f})."
@@ -45,5 +56,8 @@ def serialize_payment(payment: QuotationPayment) -> dict:
         "reference": payment.reference,
         "notes": payment.notes,
         "transfer_receipt": payment.transfer_receipt,
+        "verification_status": getattr(payment, "verification_status", None)
+        or "confirmed",
+        "verification_label": getattr(payment, "verification_label", "Pago confirmado"),
         "created_at": payment.created_at.isoformat() if payment.created_at else None,
     }

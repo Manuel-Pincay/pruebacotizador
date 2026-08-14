@@ -306,6 +306,27 @@ class NotificationService:
         )
 
     @staticmethod
+    def notify_store_order_created(
+        *,
+        client: str,
+        phone: str = "—",
+        email: str = "—",
+        quotation_id: int | str,
+        total: Any,
+        items_count: int = 0,
+    ) -> None:
+        _dispatch_async(
+            lambda: events.store_order_created(
+                client=client or "—",
+                phone=phone or "—",
+                email=email or "—",
+                quotation_id=quotation_id,
+                total=total,
+                items_count=items_count,
+            ),
+        )
+
+    @staticmethod
     def notify_system_error(
         *,
         module: str,
