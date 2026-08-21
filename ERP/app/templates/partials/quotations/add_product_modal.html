@@ -1,233 +1,160 @@
 <form action="/quotations/{{ quotation_id }}/add-product" method="POST" id="addProductForm" enctype="multipart/form-data">
 {% from "components/logo_type_select.html" import logo_type_select %}
-    <div class="space-y-5">
-        <!-- TIPO -->
+    <div class="space-y-4">
+        <input type="hidden" id="product_type" name="product_type" value="catalogo" />
 
         <div>
-            <label class="block mb-2 font-medium"> Tipo de producto </label>
-
-            <select id="product_type" name="product_type" class="w-full border rounded-xl p-3"
-                onchange="toggleProductType()">
-                <option value="catalogo">Producto del catálogo</option>
-
-                <option value="personalizado">Producto personalizado</option>
-            </select>
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Tipo</p>
+            <div class="grid grid-cols-3 gap-2" id="product_type_tabs">
+                <button type="button" data-product-type="catalogo"
+                    class="product-type-tab rounded-xl border px-3 py-2.5 text-sm font-medium transition">
+                    Catálogo
+                </button>
+                <button type="button" data-product-type="nuevo"
+                    class="product-type-tab rounded-xl border px-3 py-2.5 text-sm font-medium transition">
+                    Nuevo
+                </button>
+                <button type="button" data-product-type="personalizado"
+                    class="product-type-tab rounded-xl border px-3 py-2.5 text-sm font-medium transition">
+                    Personalizado
+                </button>
+            </div>
+            <p id="product_type_hint" class="text-xs text-gray-500 mt-2"></p>
         </div>
 
         <!-- PRODUCTO CATALOGO -->
-
-        <div id="catalog_section">
-            <label class="block mb-2 font-medium"> Producto </label>
-
-            <div class="relative">
-                <input type="text" id="product_search_modal" placeholder="Buscar producto..." autocomplete="off"
-                    class="w-full border rounded-xl p-3" />
-
-                <div id="product_results_modal"
-                    class="hidden absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg max-h-72 overflow-y-auto">
+        <div id="catalog_section" class="space-y-3">
+            <div>
+                <label class="block mb-1.5 text-sm font-medium">Buscar producto</label>
+                <div class="relative">
+                    <input type="text" id="product_search_modal" placeholder="Nombre, código o categoría..."
+                        autocomplete="off" class="w-full border rounded-xl p-3" />
+                    <div id="product_results_modal"
+                        class="hidden absolute z-50 bg-white border rounded-xl mt-1 w-full shadow-lg max-h-72 overflow-y-auto">
+                    </div>
                 </div>
             </div>
-
+            <div id="catalog_selected_card" class="hidden rounded-xl border border-purple-100 bg-purple-50/70 px-3 py-2.5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-purple-600">Seleccionado</p>
+                <p id="catalog_selected_name" class="font-semibold text-slate-800 mt-0.5"></p>
+                <p id="catalog_selected_meta" class="text-xs text-gray-500 mt-0.5"></p>
+            </div>
             <input type="hidden" id="product_id_modal" name="product_id" />
             <input type="hidden" id="product_price_modal" />
         </div>
 
+        <!-- NUEVO PRODUCTO DE CATÁLOGO -->
+        <div id="nuevo_section" class="hidden space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block mb-1.5 text-sm font-medium">Nombre <span class="text-red-500">*</span></label>
+                    <input id="new_name_modal" type="text" name="new_name" placeholder="Nombre del producto"
+                        autocomplete="off" class="w-full border rounded-xl p-3" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Código</label>
+                    <input type="text" name="new_code" placeholder="Opcional, se genera solo"
+                        autocomplete="off" class="w-full border rounded-xl p-3" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Precio</label>
+                    <input type="number" step="0.01" min="0" name="new_price" value="0"
+                        class="w-full border rounded-xl p-3" />
+                </div>
+            </div>
+            <button type="button" id="toggle_nuevo_extras"
+                class="text-sm font-medium text-purple-700 hover:text-purple-900">
+                + Categoría, material y grosor
+            </button>
+            <div id="nuevo_extras" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Categoría</label>
+                    <input type="text" name="new_category" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Material</label>
+                    <input type="text" name="new_material" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Grosor</label>
+                    <input type="text" name="new_thickness" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                </div>
+            </div>
+        </div>
+
         <!-- PRODUCTO PERSONALIZADO -->
-
-        <div id="custom_section" class="hidden space-y-4">
-            <div>
-                <label class="block mb-2 font-medium"> Nombre del producto </label>
-
-             <input
-    id="detail_modal"
-    type="text"
-    name="detail"
-    placeholder="Ej: Topper personalizado"
-    class="w-full border rounded-xl p-3"
-/>
-            </div>
-
-            <div>
-                <label class="block mb-2 font-medium"> Precio unitario </label>
-
-                <input type="number" step="0.01" name="custom_price" class="w-full border rounded-xl p-3" />
-            </div>
-
-            <div>
-                <label class="block mb-2 font-medium"> Imagen </label>
-                <input type="file" name="product_image" accept=".png,.jpg,.jpeg,.webp"
-                    class="w-full border rounded-xl p-3 text-sm" />
+        <div id="custom_section" class="hidden space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block mb-1.5 text-sm font-medium">Nombre <span class="text-red-500">*</span></label>
+                    <input id="detail_modal" type="text" name="detail"
+                        placeholder="Nombre del producto personalizado"
+                        autocomplete="off" class="w-full border rounded-xl p-3" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Precio unitario</label>
+                    <input id="custom_price_modal" type="number" step="0.01" min="0" name="custom_price" value="0"
+                        class="w-full border rounded-xl p-3" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Imagen</label>
+                    <input type="file" name="product_image" accept=".png,.jpg,.jpeg,.webp"
+                        class="w-full border rounded-xl p-2.5 text-sm" />
+                </div>
             </div>
         </div>
 
-        <!-- CANTIDAD -->
-
-        <div>
-            <label class="block mb-2 font-medium"> Cantidad </label>
-
-            <input type="number" name="quantity" value="1" min="1" required class="w-full border rounded-xl p-3" />
+        <!-- LÍNEA -->
+        <div class="grid grid-cols-2 gap-3 pt-1">
+            <div>
+                <label class="block mb-1.5 text-sm font-medium">Cantidad</label>
+                <input type="number" name="quantity" value="1" min="1" required class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block mb-1.5 text-sm font-medium">Descuento %</label>
+                <input type="number" step="0.01" min="0" max="100" name="item_discount" value="0"
+                    class="w-full border rounded-xl p-3" />
+            </div>
         </div>
 
-        <!-- TEMATICA -->
-
-        <div>
-            <label class="block mb-2 font-medium"> Temática </label>
-
-            <input type="text" id="theme_modal" name="theme" class="w-full border rounded-xl p-3"
-                placeholder="Ej: Feliz cumpleaños" />
+        <div class="rounded-xl border border-gray-100">
+            <button type="button" id="toggle_line_details"
+                class="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-gray-50 rounded-xl">
+                <span>Temática, color, medida y logo</span>
+                <span id="line_details_chevron" class="text-gray-400">▾</span>
+            </button>
+            <div id="line_details" class="hidden px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Temática</label>
+                    <input type="text" id="theme_modal" name="theme" class="w-full border rounded-xl p-3"
+                        placeholder="Ej: Feliz cumpleaños" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Color</label>
+                    <input type="text" id="color_modal" name="color" class="w-full border rounded-xl p-3"
+                        placeholder="Ej: Dorado" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Medida</label>
+                    <input type="text" id="measure_modal" name="measure" class="w-full border rounded-xl p-3"
+                        placeholder="Ej: 20 cm" />
+                </div>
+                <div>
+                    <label class="block mb-1.5 text-sm font-medium">Tipo de logo</label>
+                    {{ logo_type_select("logo_type", "sin_logo", "logo_type_modal") }}
+                </div>
+            </div>
         </div>
 
-        <!-- COLOR -->
-
-        <div>
-            <label class="block mb-2 font-medium"> Color </label>
-
-            <input type="text" id="color_modal" name="color" class="w-full border rounded-xl p-3"
-                placeholder="Ej: Dorado" />
-        </div>
-
-        <!-- MEDIDA -->
-
-        <div>
-            <label class="block mb-2 font-medium"> Medida </label>
-
-            <input type="text" id="measure_modal" name="measure" class="w-full border rounded-xl p-3"
-                placeholder="Ej: 20 cm" />
-        </div>
-
-        <div>
-            <label class="block mb-2 font-medium"> Descuento % (ítem) </label>
-            <input type="number" step="0.01" min="0" max="100" name="item_discount" value="0"
-                class="w-full border rounded-xl p-3" />
-        </div>
-
-        <!-- LOGO -->
-
-        <div>
-            <label class="block mb-2 font-medium">Tipo de logo</label>
-            {{ logo_type_select("logo_type", "sin_logo", "logo_type_modal") }}
-        </div>
-
-        <!-- BOTONES -->
-
-        <div class="flex justify-end gap-3 pt-4">
+        <div class="flex justify-end gap-3 pt-2">
             <button type="button" onclick="closeItemModal()"
-                class="border border-gray-300 px-5 py-3 rounded-xl hover:bg-gray-50">
+                class="border border-gray-300 px-5 py-2.5 rounded-xl hover:bg-gray-50">
                 Cancelar
             </button>
-
-            <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl">
-                Agregar Producto
+            <button type="submit" id="add_product_submit"
+                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl font-medium">
+                Agregar producto
             </button>
         </div>
     </div>
 </form>
-
-<script>
-    function toggleProductType() {
-        const type = document.getElementById("product_type").value;
-
-        const catalog = document.getElementById("catalog_section");
-
-        const custom = document.getElementById("custom_section");
-
-        if (type === "personalizado") {
-            catalog.classList.add("hidden");
-
-            custom.classList.remove("hidden");
-        } else {
-            catalog.classList.remove("hidden");
-
-            custom.classList.add("hidden");
-        }
-    }
-    // =====================================
-    // BUSQUEDA PRODUCTOS MODAL
-    // =====================================
-
-    const searchInput = document.getElementById("product_search_modal");
-
-    const resultsBox = document.getElementById("product_results_modal");
-
-    searchInput.addEventListener("input", async function () {
-        const query = this.value.trim();
-
-        if (query.length < 1) {
-            resultsBox.innerHTML = "";
-
-            resultsBox.classList.add("hidden");
-
-            return;
-        }
-
-        try {
-            const response = await fetch(
-                `/products/search?q=${encodeURIComponent(query)}`,
-            );
-
-            const products = await response.json();
-
-            resultsBox.innerHTML = "";
-
-            if (products.length === 0) {
-                resultsBox.innerHTML = `
-                    <div class="p-3 text-gray-500">
-                        No se encontraron productos
-                    </div>
-                `;
-
-                resultsBox.classList.remove("hidden");
-
-                return;
-            }
-
-            products.forEach((product) => {
-                const div = document.createElement("div");
-
-                div.className = "p-3 border-b hover:bg-gray-100 cursor-pointer";
-
-                div.innerHTML = `
-                    <div class="font-semibold">
-                        ${product.name}
-                    </div>
-
-                    <div class="text-sm text-gray-500">
-                        $${product.price}
-                    </div>
-                `;
-
-                div.onclick = () => selectModalProduct(product);
-
-                resultsBox.appendChild(div);
-            });
-
-            resultsBox.classList.remove("hidden");
-        } catch (error) {
-            console.error(error);
-        }
-    });
-
-    function selectModalProduct(product) {
-        console.log("PRODUCTO COMPLETO");
-
-        console.log(product);
-
-        document.getElementById("product_search_modal").value = product.name;
-
-        document.getElementById("product_id_modal").value = product.id;
-
-        document.getElementById("theme_modal").value = product.theme || "";
-
-        document.getElementById("measure_modal").value = product.measure || "";
-
-        document.getElementById("color_modal").value = product.color || "";
-
-        document.getElementById("product_results_modal").classList.add("hidden");
-    }
-
-    document.addEventListener("click", function (event) {
-        if (!event.target.closest("#catalog_section")) {
-            document.getElementById("product_results_modal").classList.add("hidden");
-        }
-    });
-</script>

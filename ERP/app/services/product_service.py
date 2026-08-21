@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.models.product import Product
+from app.services.product_catalog_service import ensure_product_catalog_values
 from app.utils.sri_constants import codigo_iva_from_tarifa
 from app.utils.text_format import format_title_words
 
@@ -57,6 +58,101 @@ def create_billable_product(
     db.add(product)
     db.flush()
     return product
+
+
+def product_to_search_payload(product: Product) -> dict:
+    return {
+        "id": product.id,
+        "code": product.code or "",
+        "name": product.name or "",
+        "price": float(product.price or 0),
+        "stock": float(product.stock or 0),
+        "category": product.category or "",
+        "measure": product.size or "",
+        "theme": product.theme or "",
+        "color": product.color or "",
+        "material": product.material or "",
+        "thickness": product.thickness or "",
+        "custom": bool(product.custom),
+    }
+
+
+def _unique_catalog_code(db: Session) -> str:
+    for _ in range(8):
+        code = f"CAT-{uuid.uuid4().hex[:8].upper()}"
+        exists = db.query(Product.id).filter(Product.code == code).first()
+        if not exists:
+            return code
+    return f"CAT-{uuid.uuid4().hex[:12].upper()}"
+
+
+def create_catalog_product_quick(
+    db: Session,
+    *,
+    name: str,
+    code: str | None = None,
+    price: float = 0,
+    category: str | None = None,
+    color: str | None = None,
+    theme: str | None = None,
+    material: str | None = None,
+    size: str | None = None,
+    thickness: str | None = None,
+    description: str | None = None,
+    cost: float = 0,
+    tarifa_iva: float = 0,
+    codigo_iva: str | None = None,
+) -> tuple[Product | None, str | None]:
+    """Crea un producto general de catálogo con campos opcionales.
+
+    Obligatorio: nombre. El código se genera si viene vacío.
+    """
+    product_name = format_title_words(name)
+    if not product_name:
+        return None, "Ingresa el nombre del producto"
+
+    requested_code = (code or "").strip()
+    if requested_code:
+        existing = db.query(Product).filter(Product.code == requested_code).first()
+        if existing:
+            return None, f"Ya existe un producto con el código {requested_code}"
+        final_code = requested_code
+    else:
+        final_code = _unique_catalog_code(db)
+
+    catalog = ensure_product_catalog_values(
+        db,
+        category=category or "",
+        theme=theme or "",
+        material=material or "",
+        color=color or "",
+    )
+
+    product = create_billable_product(
+        db,
+        name=product_name,
+        description=description or product_name,
+        price=price,
+        tarifa_iva=tarifa_iva,
+        codigo_iva=codigo_iva,
+        custom=False,
+        category=catalog["category"] or "General",
+        material=catalog["material"],
+        color=catalog["color"],
+        size=(size or "").strip(),
+        thickness=format_title_words(thickness) if thickness else "",
+        theme=catalog["theme"],
+        code=final_code,
+    )
+    if not product:
+        return None, "No se pudo crear el producto"
+
+    try:
+        product.cost = float(cost or 0)
+    except (TypeError, ValueError):
+        product.cost = 0
+    db.flush()
+    return product, None
 
 
 def create_custom_product_from_quotation(

@@ -1,3 +1,6 @@
+from app.services.tax_service import is_shipping_item
+
+
 def compute_item_total(quantity, unit_price, item_discount=0) -> float:
     gross = float(quantity or 0) * float(unit_price or 0)
     discount = float(item_discount or 0)
@@ -56,8 +59,8 @@ def recalculate_quotation(
     quotation,
     db
 ):
-
-    subtotal = 0.0
+    products_subtotal = 0.0
+    shipping = 0.0
     for item in quotation.items:
         item_discount = getattr(item, "item_discount", 0) or 0
         item_total = compute_item_total(
@@ -66,22 +69,25 @@ def recalculate_quotation(
             item_discount,
         )
         item.total = item_total
-        subtotal += item_total
+        if is_shipping_item(item):
+            shipping += item_total
+        else:
+            products_subtotal += item_total
 
-    quotation.subtotal = subtotal
+    quotation.subtotal = products_subtotal
 
     discount = quotation.discount or 0
 
     iva = quotation.iva or 0
 
     subtotal_discount = (
-        subtotal -
+        products_subtotal -
         (
-            subtotal *
+            products_subtotal *
             discount / 100
         )
     )
 
-    quotation.total = subtotal_discount * (1 + iva / 100)
+    quotation.total = subtotal_discount * (1 + iva / 100) + shipping
 
     db.commit()

@@ -6,6 +6,7 @@ from fastapi import UploadFile
 from fastapi import File
 
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 from fastapi.templating import Jinja2Templates
@@ -26,7 +27,10 @@ from app.models.measurementunit import MeasurementUnit
 from app.models.product import Product
 
 from app.auth.auth_handler import role_required
+from app.models.company_config import CompanyConfig
 from app.services.product_catalog_service import ensure_product_catalog_values
+from app.services.product_service import create_catalog_product_quick, product_to_search_payload
+from app.services.tax_service import default_tarifa_from_config
 from app.utils.sri_constants import TARIFAS_IVA_PRODUCTO, codigo_iva_from_tarifa
 from app.utils.text_format import format_title_words
 from app.utils.dialog_response import dialog_message_response
@@ -195,19 +199,65 @@ def search_products(request: Request, q: str, db: Session = Depends(get_db)):
     )
 
     return [
-        {
-            "id": product.id,
-            "code": product.code,
-            "name": product.name,
-            "price": float(product.price or 0),
-            "stock": float(product.stock or 0),
-            "category": product.category or "",
-            "measure": product.size or "",
-            "theme": product.theme or "",
-            "color": product.color or "",
-        }
+        product_to_search_payload(product)
         for product in products
     ]
+
+
+@router.post("/api/quick-create")
+async def quick_create_product(request: Request, db: Session = Depends(get_db)):
+    """Alta rápida de producto de catálogo (no personalizado) desde cotización."""
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return JSONResponse(status_code=401, content={"error": "No autorizado"})
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "JSON inválido"})
+
+    name = (body.get("name") or "").strip()
+    if not name:
+        return JSONResponse(status_code=400, content={"error": "Ingresa el nombre del producto"})
+
+    try:
+        price = float(body.get("price") or 0)
+    except (TypeError, ValueError):
+        price = 0.0
+    try:
+        cost = float(body.get("cost") or 0)
+    except (TypeError, ValueError):
+        cost = 0.0
+
+    config = db.query(CompanyConfig).first()
+    tarifa = default_tarifa_from_config(config)
+
+    product, error = create_catalog_product_quick(
+        db,
+        name=name,
+        code=body.get("code"),
+        price=price,
+        category=body.get("category"),
+        color=body.get("color"),
+        theme=body.get("theme"),
+        material=body.get("material"),
+        size=body.get("size") or body.get("measure"),
+        thickness=body.get("thickness"),
+        description=body.get("description"),
+        cost=cost,
+        tarifa_iva=tarifa,
+    )
+    if error or not product:
+        return JSONResponse(status_code=400, content={"error": error or "No se pudo crear el producto"})
+
+    db.commit()
+    db.refresh(product)
+    try:
+        log_activity(db, "Producto creado", product.name or "Producto")
+    except Exception:
+        pass
+
+    return JSONResponse(product_to_search_payload(product))
 
 
 # =====================================

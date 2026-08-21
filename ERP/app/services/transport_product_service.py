@@ -100,13 +100,28 @@ def merge_shipping_into_items(db: Session, items_data: list, shipping_cost) -> l
     return merged
 
 
+def is_transport_quotation_item(item: QuotationItem, transport_id: int | None = None) -> bool:
+    if item is None:
+        return False
+    if is_transport_product_id(getattr(item, "product_id", None), transport_id):
+        return True
+    product = getattr(item, "product", None)
+    if product:
+        code = (product.code or "").strip().upper()
+        name = (product.name or "").strip().lower()
+        if code == TRANSPORT_PRODUCT_CODE:
+            return True
+        if name == TRANSPORT_PRODUCT_NAME.lower():
+            return True
+    detail = (getattr(item, "detail", None) or "").strip().lower()
+    return detail == TRANSPORT_PRODUCT_NAME.lower()
+
+
 def quotation_shipping_amount(quotation: Quotation, transport_id: int | None = None) -> float:
-    if transport_id:
-        for item in quotation.items or []:
-            if is_transport_product_id(item.product_id, transport_id):
-                return float(item.unit_price or item.total or 0)
-    legacy = float(getattr(quotation, "shipping_cost", None) or 0)
-    return legacy
+    for item in quotation.items or []:
+        if is_transport_quotation_item(item, transport_id):
+            return float(item.total or item.unit_price or 0)
+    return float(getattr(quotation, "shipping_cost", None) or 0)
 
 
 def sync_quotation_shipping_item(db: Session, quotation: Quotation, shipping_cost: float) -> None:
@@ -137,6 +152,11 @@ def sync_quotation_shipping_item(db: Session, quotation: Quotation, shipping_cos
         existing.unit_price = shipping
         existing.total = line_total
         existing.detail = TRANSPORT_PRODUCT_NAME
+        existing.measure = ""
+        existing.theme = ""
+        existing.color = ""
+        existing.logo = False
+        existing.logo_type = "sin_logo"
         existing.item_discount = 0
     else:
         db.add(

@@ -85,6 +85,10 @@
                         class="border border-purple-200 text-purple-700 hover:bg-purple-50 px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1">
                         🔍 Catálogo
                     </button>
+                    <button type="button" onclick="openNewCatalogProductModal()"
+                        class="border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-xs font-medium">
+                        + Nuevo producto
+                    </button>
                     <button type="button" onclick="openCustomModal()"
                         class="border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-xs font-medium">
                         + Personalizado
@@ -191,7 +195,7 @@
                 <div class="text-5xl mb-3">📋</div>
                 <h3 class="font-semibold text-slate-700">Sin productos en la cotización</h3>
                 <p class="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
-                    Busca un producto, ábrelo desde el catálogo o agrega uno personalizado.
+                    Busca un producto, crea uno nuevo, ábrelo desde el catálogo o agrega uno personalizado.
                 </p>
             </div>
         </div>
@@ -332,6 +336,74 @@
     </div>
 
 </div>
+
+<!-- NUEVO PRODUCTO DE CATÁLOGO -->
+<div id="new_catalog_product_modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 md:p-8 w-full max-w-[720px] mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-start mb-2">
+            <div>
+                <h2 class="text-2xl font-bold">Nuevo producto</h2>
+                <p class="text-sm text-gray-500 mt-1">Se guarda en el catálogo como producto general. Solo el nombre es obligatorio.</p>
+            </div>
+            <button type="button" onclick="closeNewCatalogProductModal()" class="text-2xl leading-none text-gray-400 hover:text-gray-700">✕</button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+            <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_name">Nombre <span class="text-red-500">*</span></label>
+                <input id="new_cat_name" type="text" placeholder="Ej: Base MDF 6mm" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_code">Código</label>
+                <input id="new_cat_code" type="text" placeholder="Opcional, se genera solo" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_price">Precio</label>
+                <input id="new_cat_price" type="number" step="0.01" min="0" placeholder="0.00" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_category">Categoría</label>
+                <input id="new_cat_category" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_color">Color</label>
+                <input id="new_cat_color" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_theme">Forma / temática</label>
+                <input id="new_cat_theme" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_measure">Medida</label>
+                <input id="new_cat_measure" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_material">Material</label>
+                <input id="new_cat_material" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_thickness">Grosor</label>
+                <input id="new_cat_thickness" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+            </div>
+            <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_description">Descripción</label>
+                <textarea id="new_cat_description" rows="2" placeholder="Opcional" class="w-full border rounded-xl p-3"></textarea>
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 mt-6">
+            <button type="button" onclick="closeNewCatalogProductModal()"
+                class="sm:flex-1 border border-gray-300 px-5 py-3 rounded-xl hover:bg-gray-50">
+                Cancelar
+            </button>
+            <button type="button" id="new_cat_save_btn" onclick="createCatalogProductAndAdd()"
+                class="sm:flex-[2] bg-purple-700 hover:bg-purple-800 text-white p-3 rounded-xl font-semibold">
+                Crear y agregar
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- CUSTOM MODAL -->
 <div id="catalogModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-6">
 
@@ -784,9 +856,9 @@
                 is_transport: true,
                 quantity: 1,
                 detail: TRANSPORT_PRODUCT_NAME,
-                measure: "-",
-                theme: "-",
-                color: "-",
+                measure: "",
+                theme: "",
+                color: "",
                 logo_type: "sin_logo",
                 item_discount: 0,
                 price: shipping,
@@ -1327,6 +1399,35 @@
         }
 
         quotationItems.forEach((item, index) => {
+            if (isTransportItem(item)) {
+                tbody.innerHTML += `
+          <tr class="border-t bg-slate-50/70">
+              <td class="p-4 text-gray-500">1</td>
+              <td class="p-4" colspan="6">
+                  <div class="font-semibold text-slate-800">${item.detail || TRANSPORT_PRODUCT_NAME}</div>
+                  <div class="text-xs text-gray-500 mt-0.5">Servicio de envío</div>
+              </td>
+              <td class="p-4">
+                  <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value="${item.price}"
+                      onchange="updatePrice(${index}, this.value)"
+                      class="w-32 border rounded-lg p-2"
+                  >
+              </td>
+              <td class="p-4 font-bold">$${item.total.toFixed(2)}</td>
+              <td class="p-4">
+                  <button
+                      onclick="removeItem(${index})"
+                      class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+                  >✕</button>
+              </td>
+          </tr>
+                `
+                return
+            }
 
             const thumbSrc = item.imagePreview || item.existing_image_url || ""
             const thumbHtml = thumbSrc
@@ -1509,60 +1610,44 @@
     // TOTALS
     // =====================================
 
-    function calculateTotals() {
-
+    function computeQuotationTotals() {
         let subtotal = 0
-
         quotationItems.forEach(item => {
-
-            subtotal += item.total
+            if (!isTransportItem(item)) {
+                subtotal += parseFloat(item.total) || 0
+            }
         })
 
-        let discountPercent = parseFloat(
-            document.getElementById("discount").value
-        ) || 0
-
-        let ivaPercent = parseFloat(
-            document.getElementById("iva").value
-        ) || 0
-
-        let discount = subtotal * (
-            discountPercent / 100
-        )
-
-        let subtotalAfterDiscount =
-            subtotal - discount
-
-        let iva = subtotalAfterDiscount * (
-            ivaPercent / 100
-        )
+        const discountPercent = parseFloat(document.getElementById("discount").value) || 0
+        const ivaPercent = parseFloat(document.getElementById("iva").value) || 0
+        const discount = subtotal * (discountPercent / 100)
+        const subtotalAfterDiscount = subtotal - discount
+        const iva = subtotalAfterDiscount * (ivaPercent / 100)
 
         const transportIdx = findTransportItemIndex()
-        let shipping = transportIdx >= 0
+        const shipping = transportIdx >= 0
             ? (parseFloat(quotationItems[transportIdx].total) || 0)
             : (parseFloat(document.getElementById("shipping_cost")?.value) || 0)
 
-        let total = subtotalAfterDiscount + iva
+        return {
+            subtotal,
+            discountPercent,
+            discount,
+            ivaPercent,
+            iva,
+            shipping,
+            total: subtotalAfterDiscount + iva + shipping,
+        }
+    }
 
-        document.getElementById(
-            "subtotal_text"
-        ).innerText = `$${subtotal.toFixed(2)}`
+    function calculateTotals() {
+        const totals = computeQuotationTotals()
 
-        document.getElementById(
-            "discount_text"
-        ).innerText = `$${discount.toFixed(2)}`
-
-        document.getElementById(
-            "iva_text"
-        ).innerText = `$${iva.toFixed(2)}`
-
-        document.getElementById(
-            "shipping_text"
-        ).innerText = `$${shipping.toFixed(2)}`
-
-        document.getElementById(
-            "total_text"
-        ).innerText = `$${total.toFixed(2)}`
+        document.getElementById("subtotal_text").innerText = `$${totals.subtotal.toFixed(2)}`
+        document.getElementById("discount_text").innerText = `$${totals.discount.toFixed(2)}`
+        document.getElementById("iva_text").innerText = `$${totals.iva.toFixed(2)}`
+        document.getElementById("shipping_text").innerText = `$${totals.shipping.toFixed(2)}`
+        document.getElementById("total_text").innerText = `$${totals.total.toFixed(2)}`
     }
 
 
@@ -1590,6 +1675,109 @@
         document.getElementById(
             "custom_modal"
         ).classList.remove("flex")
+    }
+
+    function openNewCatalogProductModal() {
+        const modal = document.getElementById("new_catalog_product_modal")
+        modal.classList.remove("hidden")
+        modal.classList.add("flex")
+        document.getElementById("new_cat_name")?.focus()
+    }
+
+    function closeNewCatalogProductModal() {
+        const modal = document.getElementById("new_catalog_product_modal")
+        modal.classList.add("hidden")
+        modal.classList.remove("flex")
+    }
+
+    function clearNewCatalogProductFields() {
+        ;[
+            "new_cat_name", "new_cat_code", "new_cat_price", "new_cat_category",
+            "new_cat_color", "new_cat_theme", "new_cat_measure", "new_cat_material",
+            "new_cat_thickness", "new_cat_description",
+        ].forEach(id => {
+            const el = document.getElementById(id)
+            if (el) el.value = ""
+        })
+    }
+
+    async function createCatalogProductAndAdd() {
+        const name = document.getElementById("new_cat_name")?.value.trim()
+        if (!name) {
+            ErpDialog.warning("Ingresa el nombre del producto")
+            document.getElementById("new_cat_name")?.focus()
+            return
+        }
+
+        const payload = {
+            name,
+            code: document.getElementById("new_cat_code")?.value.trim() || "",
+            price: document.getElementById("new_cat_price")?.value || 0,
+            category: document.getElementById("new_cat_category")?.value.trim() || "",
+            color: document.getElementById("new_cat_color")?.value.trim() || "",
+            theme: document.getElementById("new_cat_theme")?.value.trim() || "",
+            measure: document.getElementById("new_cat_measure")?.value.trim() || "",
+            material: document.getElementById("new_cat_material")?.value.trim() || "",
+            thickness: document.getElementById("new_cat_thickness")?.value.trim() || "",
+            description: document.getElementById("new_cat_description")?.value.trim() || "",
+        }
+
+        const btn = document.getElementById("new_cat_save_btn")
+        const prevText = btn?.textContent
+        if (btn) {
+            btn.disabled = true
+            btn.textContent = "Guardando..."
+        }
+
+        try {
+            const response = await fetch("/products/api/quick-create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            })
+            const data = await response.json().catch(() => ({}))
+            if (!response.ok) {
+                ErpDialog.error(data.error || "No se pudo crear el producto")
+                return
+            }
+
+            const exists = quotationItems.find(item => item.product_id == data.id)
+            if (exists) {
+                ErpDialog.warning("Este producto ya está en la cotización")
+                closeNewCatalogProductModal()
+                return
+            }
+
+            const price = parseFloat(data.price) || 0
+            const item = {
+                type: "inventory",
+                product_id: data.id,
+                quantity: 1,
+                detail: data.name,
+                measure: data.measure || payload.measure || "",
+                theme: data.theme || payload.theme || "",
+                color: data.color || payload.color || "",
+                logo_type: "sin_logo",
+                item_discount: 0,
+                price,
+                total: price,
+            }
+            computeItemTotal(item)
+            quotationItems.push(item)
+            renderItems()
+            calculateTotals()
+            clearNewCatalogProductFields()
+            closeNewCatalogProductModal()
+            ErpDialog.toast("Producto creado y agregado")
+        } catch (error) {
+            console.error(error)
+            ErpDialog.error("No se pudo crear el producto")
+        } finally {
+            if (btn) {
+                btn.disabled = false
+                btn.textContent = prevText || "Crear y agregar"
+            }
+        }
     }
 
 
@@ -1715,7 +1903,7 @@
             return
         }
 
-        if (quotationItems.length === 0) {
+        if (quotationItems.length === 0 || !quotationItems.some(item => !isTransportItem(item))) {
             ErpDialog.warning("Agrega productos")
             return
         }
@@ -1732,28 +1920,11 @@
             }
         }
 
-        let subtotal = 0
-
-        quotationItems.forEach(item => {
-
-            subtotal += item.total
-        })
-
-        let discount = parseFloat(
-            document.getElementById("discount").value
-        ) || 0
-
-        let iva = parseFloat(
-            document.getElementById("iva").value
-        ) || 0
-
-        let totalText = document.getElementById(
-            "total_text"
-        ).innerText
-
-        let total = parseFloat(
-            totalText.replace("$", "")
-        )
+        const totals = computeQuotationTotals()
+        let subtotal = totals.subtotal
+        let discount = totals.discountPercent
+        let iva = totals.ivaPercent
+        let total = totals.total
         let designInput = document.getElementById("design_files")
         if (designInput && designInput.files.length > 4) {
             ErpDialog.warning("Máximo 4 imágenes de diseño")

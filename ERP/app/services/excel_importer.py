@@ -17,6 +17,7 @@ from app.models.product import Product
 from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.services.logo_types import logo_type_label, resolve_item_logo_type
+from app.services.transport_product_service import quotation_shipping_amount
 from app.utils.text_format import format_title_words
 
 
@@ -348,7 +349,7 @@ def export_quotations_excel(db: Session) -> BytesIO:
         subtotal_after = subtotal - discount_amt
         iva_pct = float(quotation.iva or 0)
         iva_amt = subtotal_after * (iva_pct / 100)
-        shipping = float(quotation.shipping_cost or 0)
+        shipping = float(quotation_shipping_amount(quotation) or 0)
         total_paid = quotation.total_paid
         pending = quotation.pending_balance
         pay_status = PAYMENT_STATUS_LABELS.get(

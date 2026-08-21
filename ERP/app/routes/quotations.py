@@ -33,6 +33,7 @@ from app.services.logo_types import (
 )
 from app.services.production_helpers import ensure_production_order, cancel_stale_pending_quotations
 from app.services.product_service import (
+    create_catalog_product_quick,
     create_custom_product_from_quotation,
     resolve_custom_product_id,
     sync_product_image,
@@ -46,10 +47,12 @@ from app.services.quotation_service import (
 from app.services.transport_product_service import (
     TRANSPORT_PRODUCT_NAME,
     get_or_create_transport_service_product,
+    is_transport_quotation_item,
     merge_shipping_into_items,
     quotation_shipping_amount,
     sync_quotation_shipping_item,
 )
+from app.services.tax_service import is_shipping_item
 from app.services.quotation_design_service import (
     MAX_QUOTATION_DESIGNS,
     DesignLimitError,
@@ -59,6 +62,7 @@ from app.services.quotation_design_service import (
     sync_legacy_design_file,
 )
 from app.utils.activity import log_activity
+from app.utils.text_format import format_title_words
 from app.utils.quotation_events import log_quotation_event
 from app.utils.notifications import notify_roles
 from app.utils.whatsapp import build_whatsapp_url, quotation_whatsapp_message
@@ -93,6 +97,7 @@ templates.env.globals["payment_receipt_url"] = payment_receipt_url
 templates.env.globals["is_payment_receipt_pdf"] = is_payment_receipt_pdf
 templates.env.globals["is_payment_receipt_image"] = is_payment_receipt_image
 templates.env.globals["product_image_url"] = product_image_url
+templates.env.globals["is_shipping_item"] = is_shipping_item
 register_logo_template_globals(templates.env)
 
 QUOTATION_ROLES = ["admin", "ventas"]
@@ -703,6 +708,7 @@ async def update_item(
     color: str = Form(""),
     logo_type: str = Form("sin_logo"),
     item_discount: float = Form(0),
+    detail: str | None = Form(None),
     product_image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -732,6 +738,29 @@ async def update_item(
     item.color = color
     item.logo_type = resolved_logo
     item.logo = resolved_logo != LOGO_TYPE_SIN
+
+    is_custom_item = (not item.product_id) or (item.product is not None and item.product.custom)
+    if is_custom_item and detail is not None:
+        custom_name = format_title_words(detail)
+        if custom_name:
+            item.detail = custom_name
+            if item.product and item.product.custom:
+                item.product.name = custom_name
+                if not (item.product.description or "").strip():
+                    item.product.description = custom_name
+            elif not item.product_id:
+                custom_product = create_custom_product_from_quotation(
+                    db,
+                    name=custom_name,
+                    description=custom_name,
+                    color=color,
+                    size=measure,
+                    theme=theme,
+                    price=unit_price,
+                    image=item.product_image,
+                )
+                if custom_product:
+                    item.product_id = custom_product.id
 
     if product_image and product_image.filename:
         try:
@@ -1358,6 +1387,7 @@ async def edit_quotation_page(
                 "total": item.total,
                 "existing_image": item.product_image or "",
                 "existing_image_url": thumb or "",
+                "is_transport": is_transport_quotation_item(item, transport.id),
             }
         )
 
@@ -1422,8 +1452,9 @@ async def update_quotation(
         item_images[idx] = await _item_image_from_form(request, idx)
 
     _add_items_to_quotation(db, quotation, items_data, item_images, default_tarifa_iva=float(iva or 0))
-
-    db.commit()
+    db.flush()
+    db.expire(quotation, ["items"])
+    recalculate_quotation(quotation, db)
     return RedirectResponse(url=f"/quotations/{quotation.id}", status_code=302)
 
 
@@ -1690,9 +1721,15 @@ async def add_product_to_quotation(
     request: Request,
     quotation_id: int,
     product_type: str = Form(...),
-    product_id: int | None = Form(None),
+    product_id: str | None = Form(None),
     detail: str = Form(""),
-    custom_price: float = Form(0),
+    custom_price: str | None = Form("0"),
+    new_code: str = Form(""),
+    new_name: str = Form(""),
+    new_category: str = Form(""),
+    new_material: str = Form(""),
+    new_thickness: str = Form(""),
+    new_price: str | None = Form("0"),
     quantity: int = Form(...),
     theme: str = Form(""),
     measure: str = Form(""),
@@ -1719,6 +1756,10 @@ async def add_product_to_quotation(
 
     resolved_logo = normalize_logo_type(logo_type)
     line_discount = max(0.0, min(float(item_discount or 0), 100.0))
+    try:
+        unit_custom_price = float(custom_price or 0)
+    except (TypeError, ValueError):
+        unit_custom_price = 0.0
 
     image_name = None
     if product_image and product_image.filename:
@@ -1730,9 +1771,10 @@ async def add_product_to_quotation(
             image_name = None
 
     if product_type == "catalogo":
+        catalog_product_id = _normalize_product_id(product_id)
         product = (
             db.query(Product)
-            .filter(Product.id == product_id, Product.active.is_(True))
+            .filter(Product.id == catalog_product_id, Product.active.is_(True))
             .first()
         )
         if not product:
@@ -1752,22 +1794,31 @@ async def add_product_to_quotation(
             unit_price=product.price,
             total=compute_item_total(quantity, product.price, line_discount),
         )
-    else:
-        custom_product = create_custom_product_from_quotation(
+    elif product_type == "nuevo":
+        try:
+            catalog_price = float(new_price or custom_price or 0)
+        except (TypeError, ValueError):
+            catalog_price = 0.0
+        product, error = create_catalog_product_quick(
             db,
-            name=detail,
-            description=detail,
+            name=new_name or detail,
+            code=new_code,
+            price=catalog_price,
+            category=new_category,
             color=color,
-            size=measure,
             theme=theme,
-            price=custom_price,
-            image=image_name,
+            material=new_material,
+            size=measure,
+            thickness=new_thickness,
+            description=new_name or detail,
         )
+        if error or not product:
+            return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
 
         item = QuotationItem(
             quotation_id=quotation.id,
-            product_id=custom_product.id if custom_product else None,
-            detail=detail.strip(),
+            product_id=product.id,
+            detail=product.name,
             quantity=quantity,
             theme=theme,
             measure=measure,
@@ -1775,8 +1826,40 @@ async def add_product_to_quotation(
             logo=resolved_logo != LOGO_TYPE_SIN,
             logo_type=resolved_logo,
             item_discount=line_discount,
-            unit_price=custom_price,
-            total=compute_item_total(quantity, custom_price, line_discount),
+            unit_price=catalog_price,
+            total=compute_item_total(quantity, catalog_price, line_discount),
+        )
+    else:
+        custom_name = format_title_words(detail)
+        if not custom_name:
+            return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+        custom_product = create_custom_product_from_quotation(
+            db,
+            name=custom_name,
+            description=custom_name,
+            color=color,
+            size=measure,
+            theme=theme,
+            price=unit_custom_price,
+            image=image_name,
+        )
+        if not custom_product:
+            return RedirectResponse(url=f"/quotations/{quotation_id}", status_code=302)
+
+        item = QuotationItem(
+            quotation_id=quotation.id,
+            product_id=custom_product.id,
+            detail=custom_name,
+            quantity=quantity,
+            theme=theme,
+            measure=measure,
+            color=color,
+            logo=resolved_logo != LOGO_TYPE_SIN,
+            logo_type=resolved_logo,
+            item_discount=line_discount,
+            unit_price=unit_custom_price,
+            total=compute_item_total(quantity, unit_custom_price, line_discount),
             product_image=image_name,
         )
 

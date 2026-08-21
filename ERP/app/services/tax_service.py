@@ -38,6 +38,20 @@ def _is_transport_product(product) -> bool:
     return code == "SRV-TRANSPORTE" or name == "servicio de transporte"
 
 
+def is_shipping_item(item) -> bool:
+    """True si la línea es el servicio de transporte / costo de envío."""
+    if item is None:
+        return False
+    if isinstance(item, dict):
+        if item.get("is_transport"):
+            return True
+        detail = (item.get("detail") or "").strip().lower()
+        return detail == "servicio de transporte"
+    if _is_transport_product(getattr(item, "product", None)):
+        return True
+    return (getattr(item, "detail", None) or "").strip().lower() == "servicio de transporte"
+
+
 def resolve_product_tarifa_iva(product, default_tarifa_iva: float) -> float:
     """Tarifa IVA del producto; 0% no se sustituye por el default."""
     if product is None:

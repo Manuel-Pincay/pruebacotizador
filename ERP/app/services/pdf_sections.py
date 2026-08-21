@@ -11,6 +11,8 @@ from reportlab.platypus.flowables import HRFlowable
 import os
 
 from app.utils.image_storage import quotation_item_image_path
+from app.services.tax_service import is_shipping_item
+from app.services.transport_product_service import quotation_shipping_amount
 
 
 def build_header(quotation, config, styles):
@@ -307,6 +309,34 @@ def build_products_table(items, config):
     ]
 
     for item in items:
+        if is_shipping_item(item):
+            data.append(
+                [
+                    _pdf_cell_text(item.quantity, cell["right"], align="right"),
+                    _pdf_cell_text(
+                        item.detail or "Servicio de transporte",
+                        cell["left"],
+                        align="left",
+                    ),
+                    _pdf_cell_text("", cell["left"], align="left"),
+                    _pdf_cell_text("Servicio de envío", cell["left"], align="left"),
+                    _pdf_cell_text("", cell["left"], align="left"),
+                    _pdf_cell_text("", cell["center"], align="center"),
+                    _pdf_cell_text("", cell["right"], align="right"),
+                    _pdf_cell_text(
+                        f"${item.unit_price:.2f}",
+                        cell["right"],
+                        align="right",
+                    ),
+                    _pdf_cell_text(
+                        f"${item.total:.2f}",
+                        cell["right_bold"],
+                        align="right",
+                    ),
+                ]
+            )
+            continue
+
         logo_display = logo_type_pdf_label(resolve_item_logo_type(item))
         item_discount = float(getattr(item, "item_discount", 0) or 0)
 
@@ -442,12 +472,15 @@ def build_design_totals_section(quotation, config, design_paths=None):
 
     iva_percent = float(quotation.iva or 0)
     iva_amount = subtotal_after_discount * (iva_percent / 100)
+    shipping = float(quotation_shipping_amount(quotation) or 0)
 
     summary_rows = [
         ["SUBTOTAL", f"${subtotal:.2f}"],
         ["DESCUENTO", f"${discount_amount:.2f}"],
         [f"IVA ({iva_percent:.2f}%)", f"${iva_amount:.2f}"],
     ]
+    if shipping > 0:
+        summary_rows.append(["ENVÍO", f"${shipping:.2f}"])
 
     summary_table = Table(
         summary_rows,
@@ -459,8 +492,7 @@ def build_design_totals_section(quotation, config, design_paths=None):
             [
                 ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.HexColor("#E5E7EB")),
-                ("LINEBELOW", (0, 1), (-1, 1), 0.5, colors.HexColor("#E5E7EB")),
+                ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.HexColor("#E5E7EB")),
                 ("TOPPADDING", (0, 0), (-1, -1), 5),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),

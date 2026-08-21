@@ -7,12 +7,24 @@
     enctype="multipart/form-data"
     class="space-y-5"
 >
+    {% set is_custom_item = (not item.product_id) or (item.product and item.product.custom) %}
     {# ── Encabezado del ítem ── #}
     <div class="rounded-xl border border-purple-100 bg-purple-50/60 px-4 py-3">
         <p class="text-xs font-semibold uppercase tracking-wide text-purple-600">Producto</p>
+        {% if is_custom_item %}
+        <input
+            type="text"
+            name="detail"
+            value="{{ item.detail or (item.product.name if item.product else '') }}"
+            required
+            placeholder="Nombre del producto personalizado"
+            class="mt-1 w-full border border-purple-200 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+        />
+        {% else %}
         <p class="text-base font-bold text-slate-800 mt-0.5">
             {{ item.detail or (item.product.name if item.product else "Ítem #" ~ item.id) }}
         </p>
+        {% endif %}
         <p class="text-sm text-gray-600 mt-1">
             Subtotal línea:
             <span id="edit_item_line_total" class="font-semibold text-purple-700">${{ "%.2f"|format(item.total) }}</span>

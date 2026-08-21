@@ -380,9 +380,29 @@
 
         <tbody>
           {% for item in quotation.items %}
+          {% set is_transport = is_shipping_item(item) %}
 
-          <tr class="border-t">
+          <tr class="border-t {% if is_transport %}bg-slate-50/70{% endif %}">
             <td class="p-4">{{ loop.index }}</td>
+            {% if is_transport %}
+            <td class="p-4" colspan="5">
+              <div class="font-semibold">{{ item.detail or (item.product.name if item.product else "Servicio de transporte") }}</div>
+              <div class="text-xs text-gray-500 mt-0.5">Servicio de envío</div>
+            </td>
+            <td class="p-4">{{ item.quantity }}</td>
+            <td class="p-4">${{ "%.2f"|format(item.unit_price) }}</td>
+            <td class="p-4"></td>
+            <td class="p-4 font-bold text-purple-700">
+              ${{ "%.2f"|format(item.total) }}
+            </td>
+            <td class="p-4">
+              {% if can_edit_quotation %}
+              <button type="button" onclick="deleteItem({{ item.id }})">🗑</button>
+              {% else %}
+              <span class="text-xs text-gray-400">—</span>
+              {% endif %}
+            </td>
+            {% else %}
             <td class="p-4">
 
               <div class="flex items-center gap-3">
@@ -455,6 +475,7 @@
               <span class="text-xs text-gray-400">—</span>
               {% endif %}
             </td>
+            {% endif %}
           </tr>
 
           {% endfor %}
@@ -764,6 +785,141 @@
     panel.classList.add(sizeClass)
   }
 
+  function setProductTypeTabStyles(activeType) {
+    document.querySelectorAll(".product-type-tab").forEach((btn) => {
+      const active = btn.dataset.productType === activeType
+      btn.classList.toggle("bg-purple-600", active)
+      btn.classList.toggle("text-white", active)
+      btn.classList.toggle("border-purple-600", active)
+      btn.classList.toggle("bg-white", !active)
+      btn.classList.toggle("text-slate-700", !active)
+      btn.classList.toggle("border-gray-200", !active)
+    })
+  }
+
+  function setLineDetailsOpen(open) {
+    const details = document.getElementById("line_details")
+    const chevron = document.getElementById("line_details_chevron")
+    if (!details) return
+    details.classList.toggle("hidden", !open)
+    if (chevron) chevron.textContent = open ? "▴" : "▾"
+  }
+
+  function toggleProductType(nextType) {
+    const typeInput = document.getElementById("product_type")
+    if (!typeInput) return
+
+    if (nextType) typeInput.value = nextType
+    const type = typeInput.value
+    const isCustom = type === "personalizado"
+    const isNuevo = type === "nuevo"
+    const catalog = document.getElementById("catalog_section")
+    const custom = document.getElementById("custom_section")
+    const nuevo = document.getElementById("nuevo_section")
+    const detailInput = document.getElementById("detail_modal")
+    const newNameInput = document.getElementById("new_name_modal")
+    const searchInput = document.getElementById("product_search_modal")
+    const productId = document.getElementById("product_id_modal")
+    const hint = document.getElementById("product_type_hint")
+    const submitBtn = document.getElementById("add_product_submit")
+
+    catalog?.classList.toggle("hidden", isCustom || isNuevo)
+    custom?.classList.toggle("hidden", !isCustom)
+    nuevo?.classList.toggle("hidden", !isNuevo)
+    setProductTypeTabStyles(type)
+
+    if (hint) {
+      hint.textContent = isNuevo
+        ? "Crea un producto general en el catálogo. Solo el nombre es obligatorio."
+        : isCustom
+          ? "Producto a medida para esta cotización. Se guarda también en la base de datos."
+          : "Busca un producto existente y agrégalo a la cotización."
+    }
+    if (submitBtn) {
+      submitBtn.textContent = isNuevo
+        ? "Crear y agregar"
+        : isCustom
+          ? "Agregar personalizado"
+          : "Agregar producto"
+    }
+
+    if (detailInput) {
+      detailInput.required = isCustom
+      if (isCustom && !detailInput.value.trim() && searchInput?.value.trim()) {
+        detailInput.value = searchInput.value.trim()
+      }
+    }
+    if (newNameInput) {
+      newNameInput.required = isNuevo
+    }
+
+    if (productId) {
+      productId.disabled = isCustom || isNuevo
+      if (isCustom || isNuevo) productId.value = ""
+    }
+
+    if (isCustom || isNuevo) {
+      document.getElementById("catalog_selected_card")?.classList.add("hidden")
+    }
+  }
+
+  function initializeAddProductModal() {
+    document.querySelectorAll(".product-type-tab").forEach((btn) => {
+      btn.addEventListener("click", () => toggleProductType(btn.dataset.productType))
+    })
+    toggleProductType()
+
+    document.getElementById("toggle_line_details")?.addEventListener("click", () => {
+      const details = document.getElementById("line_details")
+      setLineDetailsOpen(details?.classList.contains("hidden"))
+    })
+
+    document.getElementById("toggle_nuevo_extras")?.addEventListener("click", (event) => {
+      const extras = document.getElementById("nuevo_extras")
+      if (!extras) return
+      const opening = extras.classList.contains("hidden")
+      extras.classList.toggle("hidden", !opening)
+      event.currentTarget.textContent = opening
+        ? "− Ocultar categoría, material y grosor"
+        : "+ Categoría, material y grosor"
+    })
+
+    const form = document.getElementById("addProductForm")
+    if (form) {
+      form.addEventListener("submit", function (event) {
+        const type = document.getElementById("product_type")?.value
+        if (type === "catalogo") {
+          const productId = document.getElementById("product_id_modal")?.value
+          if (!productId) {
+            event.preventDefault()
+            ErpDialog.warning("Selecciona un producto del catálogo")
+            document.getElementById("product_search_modal")?.focus()
+          }
+        } else if (type === "personalizado") {
+          const detailInput = document.getElementById("detail_modal")
+          const searchInput = document.getElementById("product_search_modal")
+          if (detailInput && !detailInput.value.trim() && searchInput?.value.trim()) {
+            detailInput.value = searchInput.value.trim()
+          }
+          if (!detailInput?.value.trim()) {
+            event.preventDefault()
+            ErpDialog.warning("Ingresa el nombre del producto personalizado")
+            detailInput?.focus()
+          }
+        } else if (type === "nuevo") {
+          const newNameInput = document.getElementById("new_name_modal")
+          if (!newNameInput?.value.trim()) {
+            event.preventDefault()
+            ErpDialog.warning("Ingresa el nombre del producto")
+            newNameInput?.focus()
+          }
+        }
+      })
+    }
+
+    initializeProductSearch()
+  }
+
   async function openAddProductModal() {
 
     const quotationId =
@@ -795,7 +951,7 @@
     "hidden"
   )
 
-  initializeProductSearch()
+  initializeAddProductModal()
 }
   function initializeProductSearch() {
 
@@ -951,38 +1107,29 @@
 
   function selectModalProduct(product) {
 
-    console.log(product)
+    document.getElementById("product_search_modal").value = product.name
+    document.getElementById("product_id_modal").value = product.id
+    document.getElementById("theme_modal").value = product.theme || ""
+    document.getElementById("measure_modal").value = product.measure || ""
+    document.getElementById("color_modal").value = product.color || ""
+    document.getElementById("product_results_modal").classList.add("hidden")
 
-    document.getElementById(
-      "product_search_modal"
-    ).value =
-      product.name
+    const card = document.getElementById("catalog_selected_card")
+    const nameEl = document.getElementById("catalog_selected_name")
+    const metaEl = document.getElementById("catalog_selected_meta")
+    if (card && nameEl) {
+      nameEl.textContent = product.name
+      if (metaEl) {
+        const bits = [product.code, product.category, product.price != null ? `$${parseFloat(product.price).toFixed(2)}` : ""]
+          .filter(Boolean)
+        metaEl.textContent = bits.join(" · ")
+      }
+      card.classList.remove("hidden")
+    }
 
-    document.getElementById(
-      "product_id_modal"
-    ).value =
-      product.id
-
-    document.getElementById(
-      "theme_modal"
-    ).value =
-      product.theme || ""
-
-    document.getElementById(
-      "measure_modal"
-    ).value =
-      product.measure || ""
-
-    document.getElementById(
-      "color_modal"
-    ).value =
-      product.color || ""
-
-    document.getElementById(
-      "product_results_modal"
-    ).classList.add(
-      "hidden"
-    )
+    if (product.theme || product.measure || product.color) {
+      setLineDetailsOpen(true)
+    }
   }
 
   async function updateQuantity(
