@@ -45,7 +45,8 @@
 <div class="flex flex-wrap gap-2 mb-4">
     <a href="/design/pending?filter=available" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium">Cotizaciones disponibles</a>
     <a href="/design/pending?filter=mine" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium">Mis diseños</a>
-    <a href="/design/orders" class="px-4 py-2 rounded-xl bg-purple-700 text-white text-sm font-medium">Datos de fabricación</a>
+    <a href="/design/shipping-today" class="px-4 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-sm font-medium">Envíos de hoy</a>
+    <a href="/design/orders" class="px-4 py-2 rounded-xl bg-purple-700 text-white text-sm font-medium">Órdenes de diseño</a>
     <a href="/design/pending" class="px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-medium">Todos los diseños</a>
 </div>
 
@@ -75,7 +76,14 @@
                 <tr class="border-t hover:bg-amber-50/40">
                     <td class="p-3 font-medium">#{{ row.quotation_id }}</td>
                     <td class="p-3">{{ row.client_name }}</td>
-                    <td class="p-3">{{ row.product_name }}</td>
+                    <td class="p-3">
+                        {% if row.products %}
+                        <div class="text-slate-800">{{ row.product_count }} producto{{ 's' if row.product_count != 1 else '' }}</div>
+                        <div class="text-xs text-gray-500">{{ row.products[0].product_name }}{% if row.product_count > 1 %} +{{ row.product_count - 1 }}{% endif %}</div>
+                        {% else %}
+                        {{ row.product_name }}
+                        {% endif %}
+                    </td>
                     <td class="p-3">{{ row.delivery_date.strftime('%d/%m/%Y') if row.delivery_date else '—' }}</td>
                     <td class="p-3">{{ design_status_badge(row.design_status, row.design_status_label) }}</td>
                     <td class="p-3 whitespace-nowrap">
@@ -125,14 +133,21 @@
                 <tr class="border-t hover:bg-gray-50">
                     <td class="p-3 font-medium">#{{ row.quotation_id }}</td>
                     <td class="p-3">{{ row.client_name }}</td>
-                    <td class="p-3">{{ row.product_name }}</td>
+                    <td class="p-3">
+                        {% if row.products %}
+                        <div class="text-slate-800">{{ row.product_count }} producto{{ 's' if row.product_count != 1 else '' }}</div>
+                        <div class="text-xs text-gray-500">{{ row.products[0].product_name }}{% if row.product_count > 1 %} +{{ row.product_count - 1 }}{% endif %}</div>
+                        {% else %}
+                        {{ row.product_name }}
+                        {% endif %}
+                    </td>
                     <td class="p-3">{{ row.delivery_date.strftime('%d/%m/%Y') if row.delivery_date else '—' }}</td>
                     <td class="p-3">{{ design_status_badge(row.design_status, row.design_status_label) }}</td>
                     <td class="p-3 whitespace-nowrap">
                         <a href="/design/items/{{ row.item_id }}" class="text-purple-700 hover:underline font-medium">Revisar</a>
                         {% if row.production_order_id %}
                         <span class="text-gray-300 mx-1">|</span>
-                        <a href="/design/orders/{{ row.production_order_id }}" class="text-indigo-700 hover:underline font-medium">Fabricación</a>
+                        <a href="/design/orders/{{ row.production_order_id }}" class="text-indigo-700 hover:underline font-medium">Trabajar orden</a>
                         {% endif %}
                     </td>
                 </tr>

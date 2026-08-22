@@ -14,6 +14,7 @@ from app.auth.auth_handler import role_required
 
 from app.auth.design_permissions import (
     can_attach_design_images,
+    can_edit_design_order,
     can_self_assign_design_item,
     can_view_design_item,
     designer_item_scope_user_id,
@@ -48,6 +49,8 @@ from app.services.design_service import (
     get_design_detail,
 
     list_design_items,
+    list_design_order_groups,
+    list_shipping_queue,
 
     list_designers,
 
@@ -112,6 +115,7 @@ def _load_item_for_access(db: Session, item_id: int) -> QuotationItem | None:
         .options(
             joinedload(QuotationItem.design_tracking),
             joinedload(QuotationItem.quotation).joinedload(Quotation.production_order),
+            joinedload(QuotationItem.quotation).joinedload(Quotation.items).joinedload(QuotationItem.product),
         )
         .filter(QuotationItem.id == item_id)
         .first()
@@ -137,7 +141,7 @@ async def design_dashboard(request: Request, db: Session = Depends(get_db)):
 
     kpis = compute_design_kpis(db, designer_scope_user_id=designer_scope)
 
-    available_items = list_design_items(
+    available_items = list_design_order_groups(
         db,
         design_filter="available",
         designer_scope_user_id=designer_scope,
@@ -146,7 +150,7 @@ async def design_dashboard(request: Request, db: Session = Depends(get_db)):
 
     # Abajo: solo diseños ya asignados / aceptados por el diseñador (fase pendiente/diseño)
     if user.role == ROLE_DISENADOR:
-        recent = list_design_items(
+        recent = list_design_order_groups(
             db,
             design_filter="mine",
             assigned_user_id=user.id,
@@ -158,7 +162,7 @@ async def design_dashboard(request: Request, db: Session = Depends(get_db)):
             if row.get("production_status") in {"pendiente", "diseno"}
         ][:8]
     else:
-        recent = list_design_items(
+        recent = list_design_order_groups(
             db,
             design_filter="pending",
             designer_scope_user_id=designer_scope,
@@ -197,90 +201,91 @@ async def design_dashboard(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/pending", response_class=HTMLResponse)
-
 async def design_pending(
-
     request: Request,
-
     filter: str = "pending",
-
+    sort: str = "delivery",
     db: Session = Depends(get_db),
-
 ):
-
     user = _require_design_access(request)
-
     if isinstance(user, RedirectResponse):
-
         return user
 
-
-
     designer_scope = designer_item_scope_user_id(user)
-
     assigned_id = user.id if user.role == ROLE_DISENADOR and filter == "mine" else None
 
     if filter == "mine":
-
         design_filter = "mine"
-
     elif filter in {"available", "disponibles", "unassigned"}:
-
         design_filter = "available"
-
     elif filter in {"diseno", "produccion", "envio", "entregado"}:
-
         design_filter = filter
-
     else:
-
         design_filter = "pending"
 
+    allowed_sorts = {
+        "delivery",
+        "delivery_desc",
+        "quotation",
+        "quotation_desc",
+        "client",
+        "client_desc",
+        "status",
+        "status_desc",
+        "designer",
+        "designer_desc",
+    }
+    sort_by = sort if sort in allowed_sorts else "delivery"
 
-
-    rows = list_design_items(
-
+    rows = list_design_order_groups(
         db,
-
         design_filter=design_filter,
-
         assigned_user_id=assigned_id,
-
         designer_scope_user_id=designer_scope if filter != "mine" else None,
-
+        sort_by=sort_by,
     )
-
-
 
     active = "available" if design_filter == "available" else filter
-
     return templates.TemplateResponse(
-
         request=request,
-
         name="design/pending.html",
-
         context={
-
             "user": user,
-
             "rows": rows,
-
             "active_filter": active,
-
+            "active_sort": sort_by,
             "design_statuses": DESIGN_STATUSES,
-
             "designers": list_designers(db) if is_design_admin(user) else [],
-
             "claim_error": request.query_params.get("claim_error", ""),
             "claim_success": request.query_params.get("claimed", ""),
-
         },
-
     )
 
 
 
+
+
+@router.get("/shipping-today", response_class=HTMLResponse)
+async def design_shipping_today(request: Request, db: Session = Depends(get_db)):
+    """Cola de envíos para imprimir pedidos del día."""
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    rows = list_shipping_queue(db)
+    today_rows = [row for row in rows if row.get("is_today")]
+    other_rows = [row for row in rows if not row.get("is_today")]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="design/shipping_today.html",
+        context={
+            "user": user,
+            "today_rows": today_rows,
+            "other_rows": other_rows,
+            "total_envio": len(rows),
+        },
+    )
 
 
 @router.get("/profile", response_class=HTMLResponse)
@@ -366,6 +371,13 @@ async def design_detail_page(
                 and detail.get("can_claim")
             ),
             "can_attach_images": can_attach_design_images(user, item),
+            "can_edit_products": can_attach_design_images(user, item)
+            and (
+                not item.quotation
+                or not item.quotation.production_order
+                or can_edit_design_order(user, item.quotation.production_order)
+            ),
+            "products_saved": request.query_params.get("products_saved", ""),
             "claimed": request.query_params.get("claimed", ""),
             "claim_error": request.query_params.get("claim_error", ""),
             "upload_ok": request.query_params.get("uploaded", ""),
@@ -374,6 +386,35 @@ async def design_detail_page(
         },
 
     )
+
+
+@router.post("/items/{item_id}/products")
+async def design_save_products_progress(
+    item_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Marca productos listos e inventario/producción de toda la orden."""
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    item = _load_item_for_access(db, item_id)
+    if not item or not can_view_design_item(user, item):
+        return RedirectResponse(url="/design/pending", status_code=302)
+    if not can_attach_design_images(user, item):
+        return RedirectResponse(url=f"/design/items/{item_id}", status_code=302)
+
+    po = item.quotation.production_order if item.quotation else None
+    if po and not can_edit_design_order(user, po):
+        return RedirectResponse(url=f"/design/items/{item_id}", status_code=302)
+
+    from app.services.production_order_service import apply_quotation_item_fulfillment
+
+    form = await request.form()
+    apply_quotation_item_fulfillment(item.quotation, form)
+    db.commit()
+    return RedirectResponse(url=f"/design/items/{item_id}?products_saved=1", status_code=302)
 
 
 @router.post("/items/{item_id}/designs")

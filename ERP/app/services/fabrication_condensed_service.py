@@ -35,6 +35,11 @@ from app.services.production_order_service import (
     transition_status,
 )
 from app.services.quotation_design_service import get_design_urls, sync_legacy_design_file
+from app.services.transport_product_service import (
+    TRANSPORT_PRODUCT_CODE,
+    TRANSPORT_PRODUCT_NAME,
+    is_transport_quotation_item,
+)
 
 COMPLETED_FABRICATION_STATUSES = {"envio", "entregado", "cancelado"}
 # Aún sin datos de fabricación (archivo/material/medida): no van al condensado
@@ -129,6 +134,17 @@ def _build_items_query(db: Session, quotation_ids: set[int]):
         .join(Client, Quotation.client_id == Client.id)
         .outerjoin(Product, QuotationItem.product_id == Product.id)
         .filter(QuotationItem.quotation_id.in_(quotation_ids))
+        .filter(
+            (Product.id.is_(None))
+            | (
+                (Product.code.is_(None) | (Product.code != TRANSPORT_PRODUCT_CODE))
+                & (Product.name.is_(None) | (Product.name != TRANSPORT_PRODUCT_NAME))
+            )
+        )
+        .filter(
+            QuotationItem.detail.is_(None)
+            | (QuotationItem.detail != TRANSPORT_PRODUCT_NAME)
+        )
         .options(
             joinedload(QuotationItem.quotation).joinedload(Quotation.client),
             joinedload(QuotationItem.quotation).joinedload(Quotation.designs),
@@ -459,7 +475,12 @@ def get_fabrication_order_detail(db: Session, quotation_id: int) -> dict[str, An
                 order_label=f"OP-{order.id:04d}",
                 item_number=index + 1,
             )
-            for index, item in enumerate(sorted(quotation.items or [], key=lambda row: row.id or 0))
+            for index, item in enumerate(
+                sorted(
+                    [row for row in (quotation.items or []) if not is_transport_quotation_item(row)],
+                    key=lambda row: row.id or 0,
+                )
+            )
         ],
     }
 

@@ -22,6 +22,7 @@ from app.services.production_order_service import (
     get_production_order_by_quotation,
     normalize_status,
     transition_status,
+    work_items_payload,
 )
 from app.services.quotation_design_service import (
     MAX_QUOTATION_DESIGNS,
@@ -246,6 +247,8 @@ def build_design_row(item: QuotationItem) -> dict[str, Any]:
         and production_status in DESIGN_PHASE_FILTER,
         "design_urls": get_design_urls(quotation) if quotation else [],
         "production_status": production_status,
+        "fulfill_from_inventory": bool(getattr(item, "fulfill_from_inventory", False)),
+        "design_item_done": bool(getattr(item, "design_item_done", False)),
     }
 
 
@@ -277,15 +280,107 @@ def list_design_items(
     return rows
 
 
+def list_design_order_groups(
+    db: Session,
+    *,
+    design_filter: str = "",
+    assigned_user_id: int | None = None,
+    designer_scope_user_id: int | None = None,
+    limit: int | None = None,
+    sort_by: str = "delivery",
+) -> list[dict[str, Any]]:
+    """Una fila por cotización, con la lista de productos."""
+    item_rows = list_design_items(
+        db,
+        design_filter=design_filter,
+        assigned_user_id=assigned_user_id,
+        designer_scope_user_id=designer_scope_user_id,
+    )
+    groups: list[dict[str, Any]] = []
+    by_quotation: dict[int, dict[str, Any]] = {}
+    for row in item_rows:
+        qid = row.get("quotation_id")
+        if qid is None:
+            continue
+        group = by_quotation.get(qid)
+        if group is None:
+            group = {
+                **row,
+                "products": [],
+                "product_count": 0,
+                "total_qty": 0,
+                "has_inventory": False,
+                "has_production": False,
+            }
+            by_quotation[qid] = group
+            groups.append(group)
+        group["products"].append(
+            {
+                "item_id": row["item_id"],
+                "product_name": row["product_name"],
+                "quantity": row["quantity"],
+                "fulfill_from_inventory": row.get("fulfill_from_inventory", False),
+                "design_item_done": row.get("design_item_done", False),
+            }
+        )
+        group["product_count"] = len(group["products"])
+        group["total_qty"] += int(row["quantity"] or 0)
+        if row.get("fulfill_from_inventory"):
+            group["has_inventory"] = True
+        else:
+            group["has_production"] = True
+
+    groups = sort_design_order_groups(groups, sort_by)
+    if limit:
+        return groups[:limit]
+    return groups
+
+
+def sort_design_order_groups(groups: list[dict[str, Any]], sort_by: str = "delivery") -> list[dict[str, Any]]:
+    """Ordena filas de diseño: delivery, quotation, client, status (+ _desc)."""
+    from datetime import date as date_cls
+
+    key = (sort_by or "delivery").strip().lower()
+    reverse = key.endswith("_desc")
+    if reverse:
+        key = key[: -len("_desc")]
+    elif key.endswith("_asc"):
+        key = key[: -len("_asc")]
+
+    far = date_cls.max
+
+    def sort_key(row: dict[str, Any]):
+        if key in {"quotation", "numero", "number", "cotizacion"}:
+            return (row.get("quotation_id") is None, row.get("quotation_id") or 0)
+        if key in {"client", "cliente"}:
+            return ((row.get("client_name") or "").strip().lower(), row.get("quotation_id") or 0)
+        if key in {"status", "estado"}:
+            return (
+                (row.get("design_status") or "").strip().lower(),
+                row.get("delivery_date") or far,
+                row.get("quotation_id") or 0,
+            )
+        if key in {"designer", "disenador"}:
+            assigned = (row.get("assigned_to") or "").strip().lower()
+            unassigned = 0 if row.get("assigned_to_user_id") else 1
+            return (unassigned, assigned, row.get("quotation_id") or 0)
+        # delivery (default)
+        return (row.get("delivery_date") is None, row.get("delivery_date") or far, row.get("quotation_id") or 0)
+
+    return sorted(groups, key=sort_key, reverse=reverse)
+
+
 def compute_design_kpis(db: Session, designer_scope_user_id: int | None = None) -> dict[str, int]:
     items = _base_design_items_query(db).all()
-    kpis = {code: 0 for code in PRODUCTION_STATUS_SEQUENCE}
-    kpis["available"] = 0
+    seen: dict[str, set[int]] = {code: set() for code in PRODUCTION_STATUS_SEQUENCE}
+    available_quotes: set[int] = set()
 
     for item in items:
         if not item_needs_design(item):
             continue
         quotation = item.quotation
+        if not quotation:
+            continue
         po = quotation.production_order if quotation else None
         tracking = item.design_tracking
         production_status = _order_production_status(quotation)
@@ -295,11 +390,13 @@ def compute_design_kpis(db: Session, designer_scope_user_id: int | None = None) 
             if assigned_id and assigned_id != designer_scope_user_id:
                 continue
 
-        if production_status in kpis:
-            kpis[production_status] += 1
+        if production_status in seen:
+            seen[production_status].add(quotation.id)
         if production_status in DESIGN_PHASE_FILTER and assigned_id is None:
-            kpis["available"] += 1
+            available_quotes.add(quotation.id)
 
+    kpis = {code: len(ids) for code, ids in seen.items()}
+    kpis["available"] = len(available_quotes)
     return kpis
 
 
@@ -517,6 +614,9 @@ def get_design_detail(db: Session, item_id: int) -> dict[str, Any] | None:
             joinedload(QuotationItem.quotation).joinedload(Quotation.client),
             joinedload(QuotationItem.quotation).joinedload(Quotation.designs),
             joinedload(QuotationItem.quotation)
+            .joinedload(Quotation.items)
+            .joinedload(QuotationItem.product),
+            joinedload(QuotationItem.quotation)
             .joinedload(Quotation.production_order)
             .joinedload(ProductionOrder.assignee),
             joinedload(QuotationItem.product),
@@ -552,6 +652,9 @@ def get_design_detail(db: Session, item_id: int) -> dict[str, Any] | None:
                 "url": url,
             })
 
+    products = work_items_payload(quotation)
+    products_done = sum(1 for row in products if row.get("design_item_done"))
+
     return {
         "item_id": item.id,
         "quotation_id": quotation.id if quotation else None,
@@ -567,6 +670,9 @@ def get_design_detail(db: Session, item_id: int) -> dict[str, Any] | None:
         "measure": item.measure or "—",
         "theme": item.theme or "—",
         "color": item.color or "—",
+        "products": products,
+        "products_done": products_done,
+        "products_total": len(products),
         "design_status": production_status,
         "design_status_label": PRODUCTION_STATUS_LABELS.get(production_status, production_status),
         "assigned_to": _assigned_label_from_po(po, tracking),
@@ -592,6 +698,56 @@ def get_design_detail(db: Session, item_id: int) -> dict[str, Any] | None:
             )
         ],
     }
+
+
+def list_shipping_queue(db: Session) -> list[dict[str, Any]]:
+    """Órdenes en envío, para imprimir los despachos del día."""
+    from datetime import date as date_cls
+
+    from app.services.shipment_service import get_latest_shipment
+
+    today = date_cls.today()
+    orders = (
+        db.query(ProductionOrder)
+        .options(
+            joinedload(ProductionOrder.quotation).joinedload(Quotation.client),
+            joinedload(ProductionOrder.quotation)
+            .joinedload(Quotation.items)
+            .joinedload(QuotationItem.product),
+        )
+        .all()
+    )
+    rows: list[dict[str, Any]] = []
+    for order in orders:
+        if normalize_status(order.status) != "envio":
+            continue
+        quotation = order.quotation
+        client = quotation.client if quotation else None
+        shipment = get_latest_shipment(db, quotation.id) if quotation else None
+        delivery = quotation.delivery_date if quotation else None
+        rows.append(
+            {
+                "order_id": order.id,
+                "order_label": f"OP-{order.id:04d}",
+                "quotation_id": quotation.id if quotation else None,
+                "client_name": client.name if client else "—",
+                "delivery_date": delivery,
+                "is_today": delivery == today,
+                "notes": order.design_notes or "",
+                "products": work_items_payload(quotation),
+                "guide_number": shipment.guide_number if shipment else None,
+                "shipment_id": shipment.id if shipment else None,
+            }
+        )
+    rows.sort(
+        key=lambda row: (
+            not row["is_today"],
+            row["delivery_date"] is None,
+            row["delivery_date"] or today,
+            row["quotation_id"] or 0,
+        )
+    )
+    return rows
 
 
 def list_designers(db: Session) -> list[User]:

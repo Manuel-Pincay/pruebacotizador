@@ -1,19 +1,25 @@
 {% extends 'layouts/base.html' %}
+{% from "components/catalog_select.html" import catalog_select %}
 {% block content %}
 
-<div class="max-w-6xl mx-auto">
-  <!-- HEADER -->
+{% set img = product_image_url(product.image, thumb=true) or product_image_url(product.image) %}
 
-  <div class="flex justify-between items-center mb-8">
-    <div>
-      <h1 class="text-3xl font-bold">Editar Producto</h1>
-
-      <p class="text-gray-500 mt-1">Modificar los datos del producto</p>
+<div class="max-w-6xl mx-auto pb-8">
+  <div class="mb-6 sm:mb-8">
+    <a href="/products" class="text-sm text-purple-600 hover:text-purple-800 inline-flex items-center gap-1 mb-2">
+      ← Volver a productos
+    </a>
+    <div class="rounded-2xl bg-gradient-to-br from-purple-700 via-purple-600 to-indigo-600 px-5 py-6 sm:px-7 sm:py-7 text-white shadow-lg shadow-purple-200/60">
+      <p class="text-purple-100 text-xs font-semibold uppercase tracking-wider mb-1">Catálogo e inventario</p>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Editar producto</h1>
+      <p class="text-purple-100/90 mt-1.5 text-sm max-w-xl">
+        Modifica los datos. La vista previa a la derecha se actualiza al escribir.
+      </p>
     </div>
   </div>
 
   {% if saved %}
-  <div class="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+  <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
     Cambios guardados correctamente.
   </div>
   {% endif %}
@@ -36,234 +42,405 @@
   </div>
   {% endif %}
 
-  <form action="/products/{{ product.id }}/edit" method="POST" enctype="multipart/form-data" class="space-y-6">
-    <!-- INFORMACION GENERAL -->
+  <form action="/products/{{ product.id }}/edit" method="POST" enctype="multipart/form-data" id="productForm" class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+    <div class="xl:col-span-8 space-y-5 min-w-0">
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h2 class="text-base font-semibold mb-3 text-gray-700">Información General</h2>
-
-      <div class="grid md:grid-cols-2 gap-3">
-        <div>
-          <label class="block mb-2"> Código </label>
-
-          <input type="text" name="code" value="{{ product.code }}" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
+      {# —— General —— #}
+      <section class="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3.5 bg-purple-50/80 border-b border-purple-100">
+          <span class="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center text-lg shrink-0">1</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Información general</h2>
+            <p class="text-xs text-slate-500">Código, nombre y clasificación</p>
+          </div>
         </div>
-
-        <div>
-          <label class="block mb-2"> Nombre Producto </label>
-
-          <input type="text" name="name" value="{{ product.name }}" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
+        <div class="p-5 grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Código *</label>
+            <input type="text" name="code" id="field_code" required value="{{ product.code or '' }}"
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 px-3.5 py-2.5 rounded-xl text-sm transition"
+              placeholder="Ej: CAT-001" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Nombre *</label>
+            <input type="text" name="name" id="field_name" required value="{{ product.name or '' }}"
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 px-3.5 py-2.5 rounded-xl text-sm transition"
+              placeholder="Nombre del producto" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Categoría</label>
+            {{ catalog_select("category", categories, "+ Agregar nueva categoría", "/product-settings/api/category", selected=product.category or '', extra_class="rounded-xl px-3.5 py-2.5 text-sm border-slate-200") }}
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Temática</label>
+            {{ catalog_select("theme", themes, "+ Agregar nueva temática", "/product-settings/api/theme", selected=product.theme or '', extra_class="rounded-xl px-3.5 py-2.5 text-sm border-slate-200") }}
+          </div>
         </div>
+      </section>
 
-        <div>
-          <label class="block mb-2"> Categoría </label>
-
-          <input
-            type="text"
-            name="category"
-            list="category-options"
-            value="{{ product.category or '' }}"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="category-options">
-            {% for category in categories %}
-            <option value="{{ category.name }}"></option>
-            {% endfor %}
-          </datalist>
+      {# —— Características —— #}
+      <section class="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3.5 bg-indigo-50/80 border-b border-indigo-100">
+          <span class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shrink-0">2</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Características</h2>
+            <p class="text-xs text-slate-500">Material, color, grosor y medidas</p>
+          </div>
         </div>
-
-        <div>
-          <label class="block mb-2"> Temática </label>
-
-          <input
-            type="text"
-            name="theme"
-            list="theme-options"
-            value="{{ product.theme or '' }}"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="theme-options">
-            {% for theme in themes %}
-            <option value="{{ theme.name }}"></option>
-            {% endfor %}
-          </datalist>
+        <div class="p-5 space-y-4">
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Material</label>
+              {{ catalog_select("material", materials, "+ Agregar nuevo material", "/product-settings/api/material", selected=product.material or '', extra_class="rounded-xl px-3.5 py-2.5 text-sm border-slate-200") }}
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Color</label>
+              <div class="flex items-center gap-2">
+                <span id="colorSwatch" class="w-9 h-9 rounded-xl border border-slate-200 bg-gray-100 shrink-0" title="Vista del color"></span>
+                <div class="flex-1 min-w-0">
+                  {{ catalog_select("color", colors, "+ Agregar nuevo color", "/product-settings/api/color", selected=product.color or '', extra_class="rounded-xl px-3.5 py-2.5 text-sm border-slate-200", id="field_color") }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Grosor</label>
+              {{ catalog_select("thickness", thicknesses, "+ Agregar nuevo grosor", "/product-settings/api/thickness", selected=product.thickness or '', extra_class="rounded-xl px-3.5 py-2.5 text-sm border-slate-200") }}
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Medida</label>
+              <input type="text" name="size" id="field_size" value="{{ product.size or '' }}" placeholder="Ej: 50x40, 30x10 o 20"
+                class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 px-3.5 py-2.5 rounded-xl text-sm transition" />
+              <p class="text-[11px] text-slate-400 mt-1">Una medida (20) o dos (50x40).</p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Unidad</label>
+              {{ catalog_select("size_unit", units, "+ Agregar nueva unidad", "/product-settings/api/unit", value_attr="abbreviation", label_attr="abbreviation", add_mode="unit", extra_class="rounded-xl px-3.5 py-2.5 text-sm border-slate-200") }}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      {# —— Inventario —— #}
+      <section class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3.5 bg-emerald-50/80 border-b border-emerald-100">
+          <span class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg shrink-0">3</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Inventario y costos</h2>
+            <p class="text-xs text-slate-500">Precios, stock y visibilidad</p>
+          </div>
+        </div>
+        <div class="p-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-emerald-800 mb-1.5">Costo *</label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-700/70 text-sm">$</span>
+              <input type="number" step="0.01" name="cost" id="field_cost" required value="{{ product.cost if product.cost is not none else '' }}"
+                class="w-full border border-emerald-200 bg-white focus:ring-2 focus:ring-emerald-200 pl-7 pr-3 py-2.5 rounded-xl text-sm" />
+            </div>
+          </div>
+          <div class="rounded-xl bg-violet-50/50 border border-violet-100 p-3">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-violet-800 mb-1.5">Precio *</label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-violet-700/70 text-sm">$</span>
+              <input type="number" step="0.01" name="price" id="field_price" required value="{{ product.price if product.price is not none else '' }}"
+                class="w-full border border-violet-200 bg-white focus:ring-2 focus:ring-violet-200 pl-7 pr-3 py-2.5 rounded-xl text-sm" />
+            </div>
+            <p id="marginHint" class="text-[11px] text-violet-700 mt-1.5 hidden"></p>
+          </div>
+          <div class="rounded-xl bg-sky-50/50 border border-sky-100 p-3">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-sky-800 mb-1.5">Stock</label>
+            <input type="number" name="stock" id="field_stock" value="{{ product.stock if product.stock is not none else 0 }}"
+              class="w-full border border-sky-200 bg-white focus:ring-2 focus:ring-sky-200 px-3.5 py-2.5 rounded-xl text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Personalizado</label>
+            <select name="custom" id="field_custom" class="w-full border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm bg-white">
+              <option value="no" {% if not product.custom %}selected{% endif %}>No</option>
+              <option value="yes" {% if product.custom %}selected{% endif %}>Sí</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Visible en tienda</label>
+            <select name="store_visible" id="field_store" class="w-full border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm bg-white">
+              <option value="no" {% if not product.store_visible %}selected{% endif %}>No</option>
+              <option value="yes" {% if product.store_visible %}selected{% endif %}>Sí</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Solo productos activos y marcados aparecen en la tienda pública.</p>
+          </div>
+        </div>
+      </section>
+
+      {# —— Imagen y descripción —— #}
+      <section class="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3.5 bg-amber-50/80 border-b border-amber-100">
+          <span class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shrink-0">4</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Imagen y descripción</h2>
+            <p class="text-xs text-slate-500">Foto del producto y texto comercial</p>
+          </div>
+        </div>
+        <div class="p-5 grid md:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Imagen</label>
+            <label for="imageInput" id="imageDrop"
+              class="flex flex-col items-center justify-center gap-2 min-h-[160px] rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50/40 hover:bg-amber-50 hover:border-amber-300 cursor-pointer transition p-4 text-center">
+              <img id="preview" src="{{ img or '' }}" alt="Vista previa"
+                class="{% if not img %}hidden {% endif %}w-28 h-28 object-cover rounded-xl border border-white shadow" />
+              <div id="imagePlaceholder" class="space-y-1 {% if img %}hidden{% endif %}">
+                <div class="text-2xl">📷</div>
+                <p class="text-sm font-medium text-slate-700">{{ 'Cambiar imagen' if img else 'Subir imagen' }}</p>
+                <p class="text-[11px] text-slate-400">JPG, PNG o WEBP</p>
+              </div>
+            </label>
+            <input type="file" name="image" id="imageInput" accept=".jpg,.jpeg,.png,.webp" class="sr-only" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Descripción</label>
+            <textarea name="description" id="field_description" rows="7"
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-amber-400 focus:ring-2 focus:ring-amber-200 p-3.5 rounded-xl text-sm transition resize-y"
+              placeholder="Descripción comercial… También puede usarse en la factura SRI.">{{ product.description or '' }}</textarea>
+          </div>
+        </div>
+      </section>
+
+      {% include "partials/products/sri_fields.html" %}
     </div>
 
-    <!-- CARACTERISTICAS -->
-
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h2 class="text-base font-semibold mb-3 text-gray-700">Características</h2>
-
-      <div class="grid md:grid-cols-2 gap-3">
-        <div>
-          <label class="block mb-2"> Material </label>
-
-          <input
-            type="text"
-            name="material"
-            list="material-options"
-            value="{{ product.material or '' }}"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="material-options">
-            {% for material in materials %}
-            <option value="{{ material.name }}"></option>
-            {% endfor %}
-          </datalist>
+    {# —— Vista previa + acciones (sticky) —— #}
+    <aside class="xl:col-span-4 xl:sticky xl:top-24 self-start space-y-3">
+      <div class="rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden">
+        <div class="px-4 py-3 bg-slate-900 text-white text-sm font-semibold flex items-center justify-between">
+          <span>Vista previa</span>
+          <span class="text-[10px] font-normal text-slate-300 uppercase tracking-wide">En vivo</span>
         </div>
-
-        <div>
-          <label class="block mb-2"> Color </label>
-
-          <input
-            type="text"
-            name="color"
-            list="color-options"
-            value="{{ product.color or '' }}"
-            placeholder="Escribir o elegir..."
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg"
-          />
-          <datalist id="color-options">
-            {% for color in colors %}
-            <option value="{{ color.name }}"></option>
-            {% endfor %}
-          </datalist>
-        </div>
-      </div>
-
-      <div class="grid md:grid-cols-3 gap-3 mt-3">
-        <div>
-          <label class="block mb-2"> Espesor </label>
-
-          <select name="thickness" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-            {% for thickness in thicknesses %}
-
-            <option value="{{ thickness.name }}" {% if thickness.name == product.thickness %}selected{% endif %}>{{ thickness.name }}</option>
-
-            {% endfor %}
-          </select>
-        </div>
-
-        <div>
-          <label class="block mb-2"> Medida </label>
-
-          <input type="text" name="size" value="{{ product.size }}" class="w-full border border-gray-200 px-3 py-2 rounded-lg" />
-        </div>
-
-        <div></div>
-      </div>
-    </div>
-
-    <!-- INVENTARIO Y COSTOS -->
-
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h2 class="text-base font-semibold mb-3 text-gray-700">Inventario y Costos</h2>
-
-      <div class="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
-        <div>
-          <label class="block mb-2"> Costo </label>
-
-          <input type="number" step="0.01" name="cost" value="{{ product.cost }}" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
-        </div>
-
-        <div>
-          <label class="block mb-2"> Precio </label>
-
-          <input type="number" step="0.01" name="price" value="{{ product.price }}" class="w-full border border-gray-200 px-3 py-2 rounded-lg" required />
-        </div>
-
-        <div>
-          <label class="block mb-2"> Stock </label>
-
-          <input type="number" name="stock" value="{{ product.stock }}" class="w-full border border-gray-200 px-3 py-2 rounded-lg" />
-        </div>
-
-        <div>
-          <label class="block mb-2"> Personalizado </label>
-
-          <select name="custom" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-            <option value="no" {% if not product.custom %}selected{% endif %}>No</option>
-            <option value="yes" {% if product.custom %}selected{% endif %}>Sí</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block mb-2"> Visible en tienda </label>
-
-          <select name="store_visible" class="w-full border border-gray-200 px-3 py-2 rounded-lg">
-            <option value="no" {% if not product.store_visible %}selected{% endif %}>No</option>
-            <option value="yes" {% if product.store_visible %}selected{% endif %}>Sí</option>
-          </select>
-          <p class="text-xs text-gray-400 mt-1">Solo productos activos y marcados aparecen en la tienda pública.</p>
+        <div class="p-4 space-y-4">
+          <div class="aspect-square rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden">
+            <img id="previewCardImg" src="{{ img or '' }}" alt=""
+              class="{% if not img %}hidden {% endif %}w-full h-full object-cover" />
+            <div id="previewCardPlaceholder" class="text-center text-slate-400 px-4 {% if img %}hidden{% endif %}">
+              <div class="text-3xl mb-1">📦</div>
+              <p class="text-xs">Sin imagen</p>
+            </div>
+          </div>
+          <div>
+            <p id="previewCode" class="text-xs font-mono text-purple-600 mb-0.5">{{ product.code or '—' }}</p>
+            <h3 id="previewName" class="text-lg font-bold text-slate-900 leading-snug">{{ product.name or 'Producto' }}</h3>
+            <p id="previewMeta" class="text-xs text-slate-500 mt-1">—</p>
+          </div>
+          <div class="flex flex-wrap gap-2 text-xs">
+            <span id="previewColorChip" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              <span id="previewColorDot" class="w-2.5 h-2.5 rounded-full bg-slate-300 border border-black/10"></span>
+              <span id="previewColorLabel">Sin color</span>
+            </span>
+            <span id="previewStockChip" class="px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-100">Stock {{ product.stock or 0 }}</span>
+            <span id="previewStoreChip" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Fuera de tienda</span>
+          </div>
+          <div class="rounded-xl bg-purple-50 border border-purple-100 px-3 py-3 flex items-end justify-between gap-2">
+            <div>
+              <p class="text-[10px] uppercase tracking-wide text-purple-600 font-semibold">Precio</p>
+              <p id="previewPrice" class="text-2xl font-bold text-purple-900">$0.00</p>
+            </div>
+            <div class="text-right">
+              <p class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Costo</p>
+              <p id="previewCost" class="text-sm font-medium text-slate-600">$0.00</p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- DETALLES -->
-
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h2 class="text-base font-semibold mb-3 text-gray-700">Detalles</h2>
-
-      {% set img = product_image_url(product.image, thumb=true) or product_image_url(product.image) %}
-      <div id="current_image_wrap" class="mb-4 {% if not img %}hidden{% endif %}">
-        <p class="text-xs font-medium text-gray-500 mb-2">Imagen actual</p>
-        <img id="current_image" src="{{ img or '' }}" alt="Imagen del producto"
-          class="w-32 h-32 object-cover rounded-xl border border-gray-200" />
+      <div class="flex flex-col sm:flex-row xl:flex-col gap-2">
+        <button type="submit" class="w-full px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold shadow-md shadow-purple-200">
+          Guardar cambios
+        </button>
+        <a href="/products" class="w-full text-center px-5 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50">
+          Cancelar
+        </a>
       </div>
-
-      <div class="mb-5">
-        <img id="new_image_preview" class="hidden w-32 h-32 object-cover rounded-xl border border-purple-200 mb-3" alt="Vista previa" />
-        <label class="block mb-2"> Cambiar Imagen </label>
-
-        <input type="file" name="image" id="imageInput" accept=".jpg,.jpeg,.png,.webp"
-            class="w-full border border-gray-200 px-3 py-2 rounded-lg" />
-        <p class="text-xs text-gray-400 mt-1">PNG, JPG o WEBP. Máx. 5 MB.</p>
-      </div>
-
-      <div>
-        <label class="block mb-2"> Descripción </label>
-
-        <textarea name="description" rows="5" class="w-full border border-gray-200 p-3 rounded-xl"
-          placeholder="Descripción comercial y texto en factura SRI">{{ product.description or '' }}</textarea>
-      </div>
-    </div>
-
-    {% include "partials/products/sri_fields.html" %}
-
-    <!-- BOTONES -->
-
-    <div class="flex justify-end gap-3">
-      <a href="/products" class="px-6 py-3 border border-gray-300 rounded-xl">Cancelar</a>
-
-      <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl">Guardar Cambios</button>
-    </div>
+    </aside>
   </form>
 </div>
 
+<script src="/static/js/catalog-select.js"></script>
+<script src="/static/js/color-swatch.js"></script>
 <script>
-  const imageInput = document.getElementById('imageInput');
-  const newPreview = document.getElementById('new_image_preview');
-  const currentWrap = document.getElementById('current_image_wrap');
+(function () {
+  const imageInput = document.getElementById("imageInput");
+  const preview = document.getElementById("preview");
+  const previewCardImg = document.getElementById("previewCardImg");
+  const previewCardPlaceholder = document.getElementById("previewCardPlaceholder");
+  const imagePlaceholder = document.getElementById("imagePlaceholder");
 
-  if (imageInput && newPreview) {
-    imageInput.addEventListener('change', function (e) {
-      const file = e.target.files[0];
-      if (!file) {
-        newPreview.src = '';
-        newPreview.classList.add('hidden');
-        if (currentWrap) currentWrap.classList.remove('hidden');
+  function money(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return "$0.00";
+    return "$" + v.toFixed(2);
+  }
+
+  function updatePreview() {
+    const name = document.getElementById("field_name")?.value?.trim() || "Producto";
+    const code = document.getElementById("field_code")?.value?.trim() || "—";
+    const cost = document.getElementById("field_cost")?.value;
+    const price = document.getElementById("field_price")?.value;
+    const stock = document.getElementById("field_stock")?.value || "0";
+    const store = document.getElementById("field_store")?.value === "yes";
+    const colorSelect = document.querySelector('select[name="color"]');
+    const color = colorSelect?.value || "";
+    const category = document.querySelector('select[name="category"]')?.value || "";
+    const material = document.querySelector('select[name="material"]')?.value || "";
+    const size = document.getElementById("field_size")?.value?.trim() || "";
+
+    document.getElementById("previewName").textContent = name;
+    document.getElementById("previewCode").textContent = code;
+    document.getElementById("previewPrice").textContent = money(price);
+    document.getElementById("previewCost").textContent = money(cost);
+    document.getElementById("previewStockChip").textContent = "Stock " + stock;
+    document.getElementById("previewStoreChip").textContent = store ? "Visible en tienda" : "Fuera de tienda";
+    document.getElementById("previewStoreChip").className = store
+      ? "px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-100 text-xs"
+      : "px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-xs";
+
+    const meta = [category, material, size].filter(Boolean).join(" · ") || "Completa categoría, material…";
+    document.getElementById("previewMeta").textContent = meta;
+
+    const css = window.ErpColorSwatch ? ErpColorSwatch.colorToCss(color) : null;
+    const swatch = document.getElementById("colorSwatch");
+    const dot = document.getElementById("previewColorDot");
+    document.getElementById("previewColorLabel").textContent = color || "Sin color";
+    if (css) {
+      swatch.style.backgroundColor = css;
+      swatch.style.borderStyle = "solid";
+      dot.style.backgroundColor = css;
+    } else {
+      swatch.style.backgroundColor = "#f3f4f6";
+      swatch.style.borderStyle = "dashed";
+      dot.style.backgroundColor = "#d1d5db";
+    }
+
+    const marginHint = document.getElementById("marginHint");
+    const c = parseFloat(cost);
+    const p = parseFloat(price);
+    if (Number.isFinite(c) && Number.isFinite(p) && c > 0) {
+      const margin = ((p - c) / c) * 100;
+      marginHint.textContent = "Margen aprox. " + margin.toFixed(1) + "%";
+      marginHint.classList.remove("hidden");
+    } else {
+      marginHint.classList.add("hidden");
+    }
+  }
+
+  imageInput?.addEventListener("change", function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    preview.src = url;
+    preview.classList.remove("hidden");
+    imagePlaceholder?.classList.add("hidden");
+    previewCardImg.src = url;
+    previewCardImg.classList.remove("hidden");
+    previewCardPlaceholder?.classList.add("hidden");
+  });
+
+  ["field_code", "field_name", "field_cost", "field_price", "field_stock", "field_size", "field_store", "field_custom"]
+    .forEach((id) => document.getElementById(id)?.addEventListener("input", updatePreview));
+  document.getElementById("field_store")?.addEventListener("change", updatePreview);
+  document.querySelectorAll(".catalog-select").forEach((sel) => {
+    sel.addEventListener("change", updatePreview);
+  });
+
+  document.querySelector("form")?.addEventListener("submit", function () {
+    document.querySelectorAll(".catalog-select").forEach(function (select) {
+      if (select.value === "__new__") select.value = "";
+    });
+  });
+
+  document.querySelectorAll(".catalog-select").forEach(function (select) {
+    let previousValue = select.value;
+
+    async function promptCatalogValue(selectEl) {
+      const addLabel = selectEl.dataset.addLabel || "Agregar nuevo";
+      if (selectEl.dataset.addMode === "unit") {
+        const result = await Swal.fire({
+          title: addLabel,
+          html:
+            '<input id="swal-unit-name" class="swal2-input" placeholder="Nombre (ej. Milímetros)">' +
+            '<input id="swal-unit-abbr" class="swal2-input" placeholder="Abreviatura (ej. mm)">',
+          showCancelButton: true,
+          confirmButtonText: "Guardar",
+          cancelButtonText: "Cancelar",
+          reverseButtons: true,
+          focusConfirm: false,
+          preConfirm: function () {
+            const name = document.getElementById("swal-unit-name").value.trim();
+            const abbreviation = document.getElementById("swal-unit-abbr").value.trim();
+            if (!name || !abbreviation) {
+              Swal.showValidationMessage("Completa nombre y abreviatura");
+              return false;
+            }
+            return { name: name, abbreviation: abbreviation };
+          },
+        });
+        if (!result.isConfirmed) return null;
+        return result.value;
+      }
+      const value = await ErpDialog.prompt(addLabel, {
+        title: addLabel,
+        placeholder: "Nombre...",
+        confirmText: "Guardar",
+        validator: function (inputValue) {
+          if (!inputValue || !inputValue.trim()) return "Ingresa un nombre";
+        },
+      });
+      if (!value) return null;
+      return { name: value.trim() };
+    }
+
+    select.addEventListener("change", async function () {
+      if (select.value !== "__new__") {
+        previousValue = select.value;
+        updatePreview();
         return;
       }
-      newPreview.src = URL.createObjectURL(file);
-      newPreview.classList.remove('hidden');
-      if (currentWrap) currentWrap.classList.add('hidden');
+      const apiUrl = select.dataset.apiUrl;
+      const newOption = select.querySelector('option[value="__new__"]');
+      const payload = await promptCatalogValue(select);
+      if (!payload) {
+        select.value = previousValue;
+        return;
+      }
+      const formData = new FormData();
+      Object.entries(payload).forEach(function ([key, value]) {
+        formData.append(key, value);
+      });
+      try {
+        const response = await fetch(apiUrl, { method: "POST", body: formData });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "No se pudo guardar");
+        const optionValue = data.value || data.name;
+        const optionLabel = data.label || data.name;
+        let option = Array.from(select.options).find(function (opt) {
+          return opt.value === optionValue;
+        });
+        if (!option) {
+          option = document.createElement("option");
+          option.value = optionValue;
+          option.textContent = optionLabel;
+          select.insertBefore(option, newOption);
+        }
+        select.value = optionValue;
+        previousValue = optionValue;
+        updatePreview();
+        ErpDialog.toast(data.created ? "Agregado correctamente" : "Ya existía, seleccionado");
+      } catch (error) {
+        select.value = previousValue;
+        ErpDialog.error(error.message || "No se pudo guardar");
+      }
     });
-  }
+  });
+
+  updatePreview();
+})();
 </script>
 
 {% endblock %}

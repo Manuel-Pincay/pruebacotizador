@@ -2,48 +2,35 @@
 {% from "components/catalog_select.html" import catalog_select %}
 
 {% block content %}
-
 <div class="mb-4">
-
     <a href="/design/orders" class="text-sm text-purple-700 hover:underline">← Volver a órdenes</a>
-
 </div>
 
-
-
 <div class="max-w-3xl mx-auto">
-
     <div class="mb-6">
-
         <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Orden {{ order.order_label }}</h1>
-
-        <p class="text-gray-500 mt-1">Complete los datos técnicos y envíe la orden a fabricación</p>
-
+        <p class="text-gray-500 mt-1">Complete productos, archivos de impresión y envíe a producción o despacho</p>
         {% if not can_edit %}
-
         <p class="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-
             Solo lectura. El diseñador asignado o un administrador pueden editar.
-
         </p>
-
         {% endif %}
-
     </div>
 
-
-
     {% if error %}
-
     <div class="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{{ error }}</div>
-
     {% endif %}
-
     {% if claimed %}
-    <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Orden asignada a ti. Ya puedes completar los datos de fabricación.</div>
+    <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Orden asignada a ti.</div>
     {% endif %}
     {% if claim_error %}
     <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ claim_error }}</div>
+    {% endif %}
+    {% if upload_ok %}
+    <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Archivo de impresión guardado.</div>
+    {% endif %}
+    {% if upload_error %}
+    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ upload_error }}</div>
     {% endif %}
     {% if can_claim %}
     <div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
@@ -55,343 +42,343 @@
     {% endif %}
 
     <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6">
-
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-
             <div><span class="text-gray-500">Cotización</span><div class="font-semibold">#{{ prefill.quotation_id }}</div></div>
-
             <div><span class="text-gray-500">Cliente</span><div class="font-semibold">{{ prefill.client_name }}</div></div>
-
             <div><span class="text-gray-500">Estado</span><div class="font-semibold">{{ order.status_label }}</div></div>
-
             <div><span class="text-gray-500">Asignado</span><div class="font-semibold">{{ order.assigned_to_name }}</div></div>
-
         </div>
-
     </div>
 
+    {# Archivos para imprimir (múltiples) #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 class="text-lg font-bold">Archivos para imprimir</h2>
+            <span class="text-sm text-gray-500">{{ designs_count or 0 }} / {{ max_designs or 20 }}</span>
+        </div>
+        {% if designs %}
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            {% for design in designs %}
+            <div class="relative group rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                <a href="{{ design.url }}" target="_blank" class="block w-full h-32 flex items-center justify-center p-2">
+                    <img src="{{ design.url }}" alt="Archivo {{ loop.index }}" class="max-w-full max-h-full object-contain" />
+                </a>
+                <span class="absolute top-2 left-2 text-[10px] font-medium bg-black/55 text-white px-1.5 py-0.5 rounded-md">{{ loop.index }}</span>
+                {% if can_edit %}
+                <form method="post" action="/design/orders/{{ order.id }}/designs/{{ design.id }}/delete"
+                      class="absolute top-2 right-2"
+                      onsubmit="return erpConfirmForm(event, '¿Eliminar este archivo?')">
+                    <button type="submit" class="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 text-white text-xs shadow">✕</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-400 text-sm mb-4">Sin archivos todavía. Suba 1, 2, 3… según necesite.</p>
+        {% endif %}
+        {% if can_edit and (designs_count or 0) < (max_designs or 20) %}
+        <form method="post" action="/design/orders/{{ order.id }}/designs" enctype="multipart/form-data" class="pt-3 border-t border-gray-100 space-y-3">
+            <input type="file" name="design_file" accept=".png,.jpg,.jpeg,.webp" required
+                   class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-50 file:text-purple-700" />
+            <button type="submit" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium">Guardar archivo</button>
+        </form>
+        {% endif %}
+    </div>
 
-
-    <form method="POST" action="/design/orders/{{ order.id }}" class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4 mb-6">
-
+    <form method="POST" action="/design/orders/{{ order.id }}" class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4 mb-6" id="designOrderForm">
         {% set readonly = not can_edit %}
 
-
-
         <div>
-
-            <label class="block text-sm font-medium text-gray-700 mb-1">Archivo final *</label>
-
-            <input type="text" name="file_name" {% if readonly %}readonly{% endif %}
-
-                   value="{{ order.file_name }}" placeholder="Ej: TOPPER_001.ai"
-
-                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono {% if readonly %}bg-gray-50{% endif %}" />
-
-        </div>
-
-
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1">Material</label>
-
-                <select name="material" {% if readonly %}disabled{% endif %} class="w-full border rounded-xl px-3 py-2.5 text-sm">
-
-                    <option value="">Seleccionar...</option>
-
-                    {% for material in materials %}
-
-                    <option value="{{ material }}" {% if order.material == material %}selected{% endif %}>{{ material }}</option>
-
-                    {% endfor %}
-
-                </select>
-
-                {% if readonly %}<input type="hidden" name="material" value="{{ order.material }}" />{% endif %}
-
+            <div class="flex items-center justify-between gap-2 mb-3">
+                <h2 class="text-base font-bold text-slate-800">Productos de la orden</h2>
+                <p class="text-xs text-gray-500">Inventario → va a envío. Producción → fabricación.</p>
             </div>
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1">Medida</label>
-
-                {% if readonly %}
-                <input type="text" name="size" readonly value="{{ order.size }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
-                {% else %}
-                {{ catalog_select(
-                    "size",
-                    sizes,
-                    "+ Agregar medida",
-                    "/product-settings/api/size",
-                    selected=order.size,
-                    extra_class="rounded-xl px-3 py-2.5 text-sm"
-                ) }}
-                {% endif %}
-
-            </div>
-
-        </div>
-
-
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
-
-                {% if readonly %}
-                <input type="text" name="usb_reference" readonly value="{{ order.usb_reference }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
-                {% else %}
-                {{ catalog_select(
-                    "usb_reference",
-                    usb_references,
-                    "+ Agregar USB",
-                    "/product-settings/api/usb",
-                    selected=order.usb_reference,
-                    extra_class="rounded-xl px-3 py-2.5 text-sm"
-                ) }}
-                {% endif %}
-
-            </div>
-
-            <div>
-
-                <label class="block text-sm font-medium text-gray-700 mb-1">Copias</label>
-
-                <input type="number" name="copies" min="1" {% if readonly %}readonly{% endif %}
-
-                       value="{{ order.copies }}" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
-
-            </div>
-
-        </div>
-
-
-
-        <div>
-
-            <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones diseño</label>
-
-            <textarea name="detail" rows="3" {% if readonly %}readonly{% endif %}
-
-                      class="w-full border rounded-xl px-3 py-2.5 text-sm">{{ order.detail }}</textarea>
-
-        </div>
-
-        {% if can_edit and not readonly %}
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
-            <p class="text-sm font-semibold text-emerald-900">Origen del material</p>
-            <div class="flex flex-col sm:flex-row gap-3 text-sm">
-                <label class="inline-flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="use_fabrication_materials" value="0" class="fab-source-radio"
-                        {% if not order.use_fabrication_materials %}checked{% endif %}>
-                    <span>Stock de producto terminado</span>
-                </label>
-                <label class="inline-flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="use_fabrication_materials" value="1" class="fab-source-radio"
-                        {% if order.use_fabrication_materials %}checked{% endif %}>
-                    <span>Usar material de fabricación</span>
-                </label>
-            </div>
-            <div id="fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
-                <div>
-                    <label class="block text-xs text-gray-600 mb-1">Materia prima *</label>
-                    <select name="raw_material_id" id="raw_material_id"
-                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
-                        <option value="">Cargando...</option>
-                    </select>
+            <div class="divide-y border border-gray-200 rounded-xl overflow-hidden">
+                {% for p in work_items %}
+                <div class="p-3 bg-white">
+                    <div class="flex items-start gap-3">
+                        <label class="mt-0.5 flex items-center gap-2 cursor-pointer shrink-0">
+                            <input type="hidden" name="done_item_{{ p.id }}" id="ord_done_{{ p.id }}" value="{{ '1' if p.design_item_done else '0' }}">
+                            <input type="checkbox" class="w-5 h-5 rounded border-gray-300 text-purple-700 fulfill-done"
+                                   {% if p.design_item_done %}checked{% endif %}
+                                   {% if readonly %}disabled{% endif %}
+                                   onchange="document.getElementById('ord_done_{{ p.id }}').value = this.checked ? '1' : '0'">
+                            <span class="text-xs font-semibold {% if p.design_item_done %}text-emerald-700{% else %}text-gray-500{% endif %}">Listo</span>
+                        </label>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold text-slate-900">{{ p.name }}</div>
+                            <div class="mt-1 text-xs text-gray-500">
+                                Cant. {{ p.quantity }}
+                                {% if p.measure and p.measure != '—' %} · {{ p.measure }}{% endif %}
+                                {% if p.stock is not none %} · Stock {{ p.stock }}{% endif %}
+                            </div>
+                            <div class="mt-2 flex flex-wrap gap-3 text-xs">
+                                <label class="inline-flex items-center gap-1.5">
+                                    <input type="radio" name="fulfill_item_{{ p.id }}" value="production" class="fulfill-mode"
+                                           {% if not p.fulfill_from_inventory %}checked{% endif %}
+                                           {% if readonly %}disabled{% endif %}>
+                                    Producción
+                                </label>
+                                <label class="inline-flex items-center gap-1.5">
+                                    <input type="radio" name="fulfill_item_{{ p.id }}" value="inventory" class="fulfill-mode"
+                                           {% if p.fulfill_from_inventory %}checked{% endif %}
+                                           {% if readonly %}disabled{% endif %}>
+                                    Inventario
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {% from "components/raw_material_qty.html" import raw_material_qty_field %}
-                {{ raw_material_qty_field(order.raw_material_qty if order.raw_material_qty is not none else '') }}
+                {% else %}
+                <div class="p-4 text-sm text-gray-400">No hay productos en esta orden.</div>
+                {% endfor %}
             </div>
         </div>
-        <script>
-        (function () {
-          const selectedId = {{ order.raw_material_id | tojson }};
-          const radios = document.querySelectorAll('.fab-source-radio');
-          const fields = document.getElementById('fab-raw-fields');
-          const sel = document.getElementById('raw_material_id');
-          const qtyInput = document.getElementById('raw_material_qty');
-          const materialSelect = document.querySelector('select[name="material"]');
-          const unitHint = document.getElementById('raw_material_unit_hint');
-          document.querySelectorAll('.raw-qty-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-              if (qtyInput) qtyInput.value = btn.dataset.qty;
-            });
-          });
-          qtyInput?.addEventListener('blur', () => {
-            if (!qtyInput.value) return;
-            qtyInput.value = String(qtyInput.value).replace(',', '.');
-          });
-          function toggleFields() {
-            const useFab = document.querySelector('.fab-source-radio:checked')?.value === '1';
-            fields?.classList.toggle('hidden', !useFab);
-            if (useFab) loadMaterials();
-          }
-          async function loadMaterials() {
-            if (!sel) return;
-            const designMat = materialSelect?.value || '';
-            sel.innerHTML = '<option value="">Cargando...</option>';
-            try {
-              const res = await fetch(`/inventory/api/materials?design_material=${encodeURIComponent(designMat)}`, {
-                credentials: 'same-origin', headers: { Accept: 'application/json' },
-              });
-              const data = await res.json();
-              sel.innerHTML = '<option value="">Seleccionar materia prima...</option>';
-              (data || []).forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m.id;
-                opt.dataset.unit = m.unit;
-                const stockLabel = Number(m.stock).toLocaleString('es-EC', { maximumFractionDigits: 3 });
-                opt.textContent = `${m.label} — ${stockLabel} ${m.unit}${m.is_low_stock ? ' ⚠ bajo' : ''}`;
-                if (selectedId && m.id == selectedId) opt.selected = true;
-                sel.appendChild(opt);
-              });
-              updateUnitHint();
-            } catch (_) {
-              sel.innerHTML = '<option value="">No se pudo cargar materia prima</option>';
-            }
-          }
-          function updateUnitHint() {
-            const opt = sel?.options[sel.selectedIndex];
-            if (!unitHint) return;
-            const unit = opt?.dataset?.unit || 'planchas';
-            if (unit === 'planchas') {
-              unitHint.innerHTML = 'Unidad: <strong>planchas</strong>. Decimales OK: 0.25 (1/4), 0.5 (media), 1 (completa).';
-            } else {
-              unitHint.innerHTML = 'Unidad: <strong>' + unit + '</strong>. Puede usar decimales (ej. 1.5).';
-            }
-          }
-          radios.forEach(r => r.addEventListener('change', toggleFields));
-          materialSelect?.addEventListener('change', () => {
-            if (document.querySelector('.fab-source-radio:checked')?.value === '1') loadMaterials();
-          });
-          sel?.addEventListener('change', updateUnitHint);
-          toggleFields();
-        })();
-        </script>
-        {% elif order.use_fabrication_materials %}
-        <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            Material de fabricación
-            {% if order.raw_material_label %} — {{ order.raw_material_label }}{% endif %}
-            {% if order.raw_material_qty %} ({{ order.raw_material_qty }}){% endif %}
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nota / observaciones</label>
+            <textarea name="detail" rows="3" {% if readonly %}readonly{% endif %}
+                      class="w-full border rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="Nota del pedido (siempre disponible)">{{ order.detail }}</textarea>
         </div>
-        {% endif %}
+
+        <div id="fab-fields" class="{% if not needs_fabrication %}hidden{% endif %} space-y-4">
+            <p class="text-sm font-semibold text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+                Datos de fabricación (solo productos de producción)
+            </p>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Archivo final *</label>
+                <input type="text" name="file_name" {% if readonly %}readonly{% endif %}
+                       value="{{ order.file_name }}" placeholder="Ej: TOPPER_001.ai"
+                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono {% if readonly %}bg-gray-50{% endif %}" />
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Material</label>
+                    <select name="material" {% if readonly %}disabled{% endif %} class="w-full border rounded-xl px-3 py-2.5 text-sm">
+                        <option value="">Seleccionar...</option>
+                        {% for material in materials %}
+                        <option value="{{ material }}" {% if order.material == material %}selected{% endif %}>{{ material }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if readonly %}<input type="hidden" name="material" value="{{ order.material }}" />{% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Medida</label>
+                    {% if readonly %}
+                    <input type="text" name="size" readonly value="{{ order.size }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
+                    {% else %}
+                    {{ catalog_select("size", sizes, "+ Agregar medida", "/product-settings/api/size", selected=order.size, extra_class="rounded-xl px-3 py-2.5 text-sm") }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
+                    {% if readonly %}
+                    <input type="text" name="usb_reference" readonly value="{{ order.usb_reference }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
+                    {% else %}
+                    {{ catalog_select("usb_reference", usb_references, "+ Agregar USB", "/product-settings/api/usb", selected=order.usb_reference, extra_class="rounded-xl px-3 py-2.5 text-sm") }}
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Copias</label>
+                    <input type="number" name="copies" min="1" {% if readonly %}readonly{% endif %}
+                           value="{{ order.copies }}" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
+                </div>
+            </div>
+
+            {% if can_edit and not readonly %}
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+                <p class="text-sm font-semibold text-emerald-900">Origen del material (producción)</p>
+                <div class="flex flex-col sm:flex-row gap-3 text-sm">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="use_fabrication_materials" value="0" class="fab-source-radio"
+                            {% if not order.use_fabrication_materials %}checked{% endif %}>
+                        <span>Stock de producto terminado</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="use_fabrication_materials" value="1" class="fab-source-radio"
+                            {% if order.use_fabrication_materials %}checked{% endif %}>
+                        <span>Usar material de fabricación</span>
+                    </label>
+                </div>
+                <div id="fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Materia prima *</label>
+                        <select name="raw_material_id" id="raw_material_id"
+                            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                            <option value="">Cargando...</option>
+                        </select>
+                    </div>
+                    {% from "components/raw_material_qty.html" import raw_material_qty_field %}
+                    {{ raw_material_qty_field(order.raw_material_qty if order.raw_material_qty is not none else '') }}
+                </div>
+            </div>
+            {% elif order.use_fabrication_materials %}
+            <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                Material de fabricación
+                {% if order.raw_material_label %} — {{ order.raw_material_label }}{% endif %}
+                {% if order.raw_material_qty %} ({{ order.raw_material_qty }}){% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div id="inventory-only-hint" class="{% if needs_fabrication %}hidden{% endif %} text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+            Todos los productos salen de inventario: no se pide fabricación. Al enviar, la orden pasa directo a <strong>Envío</strong> y se descuenta el stock.
+        </div>
 
         {% if can_reassign and designers %}
-
         <div>
-
             <label class="block text-sm font-medium text-gray-700 mb-1">Reasignar diseñador</label>
-
             <select name="assigned_to_user_id" class="w-full border rounded-xl px-3 py-2.5 text-sm">
-
                 <option value="">Sin asignar</option>
-
                 {% for designer in designers %}
-
                 <option value="{{ designer.id }}" {% if order.assigned_to == designer.id %}selected{% endif %}>
-
                     {{ designer.full_name or designer.username }}
-
                 </option>
-
                 {% endfor %}
-
             </select>
-
         </div>
-
         {% endif %}
 
-
-
         <div class="flex flex-wrap gap-3 pt-2">
-
             {% if can_edit %}
-
             <button type="submit" name="action" value="save" class="px-5 py-2.5 rounded-xl bg-purple-700 text-white text-sm font-medium hover:bg-purple-800">
-
-                Guardar datos
-
+                Guardar
             </button>
-
-            <button type="submit" name="action" value="approve" class="px-5 py-2.5 rounded-xl bg-green-700 text-white text-sm font-medium hover:bg-green-800">
-
-                Enviar a producción
-
+            <button type="submit" name="action" value="approve" id="approveBtn"
+                    class="px-5 py-2.5 rounded-xl bg-green-700 text-white text-sm font-medium hover:bg-green-800">
+                {% if needs_fabrication %}Enviar a producción{% else %}Enviar a despacho{% endif %}
             </button>
-
             {% endif %}
-
             <a href="/design/orders/{{ order.id }}/print" target="_blank"
-
                class="px-5 py-2.5 rounded-xl border border-gray-300 text-sm font-medium hover:bg-gray-50">
-
-                Imprimir hoja taller
-
+                Imprimir hoja
             </a>
-
             <a href="/production/{{ order.id }}"
-
                class="px-5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-sm font-medium hover:bg-indigo-100">
-
                 Ver en producción
-
             </a>
-
+            <a href="/design/shipping-today"
+               class="px-5 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-sm font-medium hover:bg-blue-100">
+                Envíos de hoy
+            </a>
         </div>
-
     </form>
 
-
-
     {% if history %}
-
     <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-
         <h2 class="text-lg font-bold mb-4">Historial de estados</h2>
-
         <div class="space-y-3">
-
             {% for entry in history %}
-
             <div class="flex flex-wrap justify-between gap-2 text-sm border-b border-gray-100 pb-2">
-
                 <div>
-
                     <span class="font-semibold text-purple-800">{{ entry.status_label }}</span>
-
                     {% if entry.notes %}<span class="text-gray-500"> — {{ entry.notes }}</span>{% endif %}
-
                 </div>
-
                 <div class="text-gray-400 text-xs">
-
                     {{ entry.created_at.strftime('%d/%m/%Y %H:%M') if entry.created_at else '' }}
-
                     · {{ entry.created_by_name }}
-
                 </div>
-
             </div>
-
             {% endfor %}
-
         </div>
-
     </div>
-
     {% endif %}
-
 </div>
 
 <script src="/static/js/catalog-select.js"></script>
+<script>
+(function () {
+  const fabFields = document.getElementById('fab-fields');
+  const invHint = document.getElementById('inventory-only-hint');
+  const approveBtn = document.getElementById('approveBtn');
 
+  function needsFabFromRadios() {
+    const modes = document.querySelectorAll('.fulfill-mode:checked');
+    if (!modes.length) return true;
+    return Array.from(modes).some(r => r.value === 'production');
+  }
+
+  function syncFabVisibility() {
+    const needs = needsFabFromRadios();
+    fabFields?.classList.toggle('hidden', !needs);
+    invHint?.classList.toggle('hidden', needs);
+    if (approveBtn) {
+      approveBtn.textContent = needs ? 'Enviar a producción' : 'Enviar a despacho';
+    }
+  }
+
+  document.querySelectorAll('.fulfill-mode').forEach(r => {
+    r.addEventListener('change', syncFabVisibility);
+  });
+  syncFabVisibility();
+
+  // Materia prima (solo si hay fabricación)
+  const selectedId = {{ order.raw_material_id | tojson }};
+  const radios = document.querySelectorAll('.fab-source-radio');
+  const rawFields = document.getElementById('fab-raw-fields');
+  const sel = document.getElementById('raw_material_id');
+  const qtyInput = document.getElementById('raw_material_qty');
+  const materialSelect = document.querySelector('select[name="material"]');
+  const unitHint = document.getElementById('raw_material_unit_hint');
+  document.querySelectorAll('.raw-qty-btn').forEach(btn => {
+    btn.addEventListener('click', () => { if (qtyInput) qtyInput.value = btn.dataset.qty; });
+  });
+  qtyInput?.addEventListener('blur', () => {
+    if (!qtyInput.value) return;
+    qtyInput.value = String(qtyInput.value).replace(',', '.');
+  });
+  function toggleRaw() {
+    const useFab = document.querySelector('.fab-source-radio:checked')?.value === '1';
+    rawFields?.classList.toggle('hidden', !useFab);
+    if (useFab) loadMaterials();
+  }
+  async function loadMaterials() {
+    if (!sel) return;
+    const designMat = materialSelect?.value || '';
+    sel.innerHTML = '<option value="">Cargando...</option>';
+    try {
+      const res = await fetch(`/inventory/api/materials?design_material=${encodeURIComponent(designMat)}`, {
+        credentials: 'same-origin', headers: { Accept: 'application/json' },
+      });
+      const data = await res.json();
+      sel.innerHTML = '<option value="">Seleccionar materia prima...</option>';
+      (data || []).forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.dataset.unit = m.unit;
+        const stockLabel = Number(m.stock).toLocaleString('es-EC', { maximumFractionDigits: 3 });
+        opt.textContent = `${m.label} — ${stockLabel} ${m.unit}${m.is_low_stock ? ' ⚠ bajo' : ''}`;
+        if (selectedId && m.id == selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      updateUnitHint();
+    } catch (_) {
+      sel.innerHTML = '<option value="">No se pudo cargar materia prima</option>';
+    }
+  }
+  function updateUnitHint() {
+    const opt = sel?.options[sel.selectedIndex];
+    if (!unitHint) return;
+    const unit = opt?.dataset?.unit || 'planchas';
+    if (unit === 'planchas') {
+      unitHint.innerHTML = 'Unidad: <strong>planchas</strong>. Decimales OK: 0.25 (1/4), 0.5 (media), 1 (completa).';
+    } else {
+      unitHint.innerHTML = 'Unidad: <strong>' + unit + '</strong>. Puede usar decimales (ej. 1.5).';
+    }
+  }
+  radios.forEach(r => r.addEventListener('change', toggleRaw));
+  materialSelect?.addEventListener('change', () => {
+    if (document.querySelector('.fab-source-radio:checked')?.value === '1') loadMaterials();
+  });
+  sel?.addEventListener('change', updateUnitHint);
+  toggleRaw();
+})();
+</script>
 {% endblock %}
-
-

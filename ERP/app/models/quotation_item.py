@@ -32,6 +32,9 @@ class QuotationItem(Base):
     unit_price = Column(Float)
     total = Column(Float)
     product_image = Column(String, nullable=True)
+    # Diseño: inventario (salta fabricación) vs producción
+    fulfill_from_inventory = Column(Boolean, default=False, nullable=False)
+    design_item_done = Column(Boolean, default=False, nullable=False)
     # RELACIÓN PRODUCTO
     product = relationship("Product")
     quotation = relationship(

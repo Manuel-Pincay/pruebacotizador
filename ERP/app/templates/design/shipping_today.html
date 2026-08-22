@@ -1,0 +1,97 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Envíos de hoy</h1>
+        <p class="text-gray-500 mt-1">Órdenes en despacho — imprima las del día y genere/guarde la guía</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="/design/pending?filter=envio" class="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium">← Diseños</a>
+        <a href="/shipments/" class="px-4 py-2 rounded-xl bg-blue-700 text-white text-sm font-medium hover:bg-blue-800">Guías guardadas</a>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 gap-4 mb-6 max-w-md">
+    <div class="rounded-2xl bg-white border border-blue-200 px-4 py-4 shadow-sm">
+        <div class="text-sm text-blue-800">Entrega hoy</div>
+        <div class="text-3xl font-bold text-blue-700">{{ today_rows|length }}</div>
+    </div>
+    <div class="rounded-2xl bg-white border border-gray-200 px-4 py-4 shadow-sm">
+        <div class="text-sm text-gray-500">Total en envío</div>
+        <div class="text-3xl font-bold text-slate-900">{{ total_envio }}</div>
+    </div>
+</div>
+
+{% macro shipping_table(rows, empty_msg) %}
+<div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[1000px] text-sm">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                    <th class="text-left p-3">Orden</th>
+                    <th class="text-left p-3">Cotización</th>
+                    <th class="text-left p-3">Cliente</th>
+                    <th class="text-left p-3">Productos</th>
+                    <th class="text-left p-3">Entrega</th>
+                    <th class="text-left p-3">Nota</th>
+                    <th class="text-left p-3">Guía</th>
+                    <th class="text-left p-3">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="border-t hover:bg-gray-50 {% if row.is_today %}bg-blue-50/40{% endif %}">
+                    <td class="p-3 font-bold text-purple-800">{{ row.order_label }}</td>
+                    <td class="p-3">#{{ row.quotation_id }}</td>
+                    <td class="p-3">{{ row.client_name }}</td>
+                    <td class="p-3">
+                        <ul class="space-y-0.5">
+                            {% for p in row.products %}
+                            <li>
+                                {{ p.name }} × {{ p.quantity }}
+                                {% if p.fulfill_from_inventory %}
+                                <span class="text-[10px] text-emerald-700">Inv.</span>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td class="p-3">{{ row.delivery_date.strftime('%d/%m/%Y') if row.delivery_date else '—' }}</td>
+                    <td class="p-3 text-xs text-gray-600 max-w-[180px] truncate" title="{{ row.notes }}">{{ row.notes or '—' }}</td>
+                    <td class="p-3">
+                        {% if row.guide_number %}
+                        <span class="font-semibold text-blue-700">{{ row.guide_number }}</span>
+                        {% else %}
+                        <span class="text-amber-700 text-xs">Sin guía</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-3 whitespace-nowrap">
+                        <a href="/design/orders/{{ row.order_id }}/print" target="_blank" class="text-slate-700 hover:underline font-medium mr-2">Imprimir</a>
+                        {% if row.shipment_id %}
+                        <a href="/shipments/{{ row.shipment_id }}/label?size=a4" class="text-blue-700 hover:underline font-medium mr-2">Ver guía</a>
+                        {% else %}
+                        <a href="/shipments/new/{{ row.quotation_id }}" class="text-blue-700 hover:underline font-medium mr-2">Crear guía</a>
+                        {% endif %}
+                        <a href="/production/{{ row.order_id }}" class="text-indigo-700 hover:underline font-medium">Producción</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="p-10 text-center text-gray-400">{{ empty_msg }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endmacro %}
+
+<h2 class="text-lg font-bold text-slate-900 mb-3">Para enviar hoy</h2>
+{{ shipping_table(today_rows, 'No hay pedidos con entrega hoy en estado Envío.') }}
+
+{% if other_rows %}
+<h2 class="text-lg font-bold text-slate-900 mb-3">Otros en envío</h2>
+{{ shipping_table(other_rows, '') }}
+{% endif %}
+{% endblock %}

@@ -123,7 +123,8 @@
                 <div id="product_parameters" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                     <div>
                         <label class="text-[10px] font-medium text-gray-400 uppercase tracking-wide" for="measure">Medida</label>
-                        <input type="text" id="measure" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 bg-gray-50" readonly />
+                        <input type="text" id="measure" placeholder="Ej: 50x40"
+                            class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs mt-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/30" />
                     </div>
                     <div>
                         <label class="text-[10px] font-medium text-gray-400 uppercase tracking-wide" for="theme">Forma</label>
@@ -303,7 +304,7 @@
         <div class="grid grid-cols-2 gap-4">
             <input id="custom_detail" placeholder="Detalle" class="border rounded-xl p-3" />
 
-            <input id="custom_measure" placeholder="Medida" class="border rounded-xl p-3" />
+            <input id="custom_measure" placeholder="Medida (ej: 50x40)" class="border rounded-xl p-3" />
 
             <input id="custom_color" placeholder="Color" class="border rounded-xl p-3" />
 
@@ -375,7 +376,7 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_measure">Medida</label>
-                <input id="new_cat_measure" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                <input id="new_cat_measure" type="text" placeholder="Ej: 50x40 o 30x10" class="w-full border rounded-xl p-3" />
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_material">Material</label>
@@ -561,6 +562,7 @@
     </div>
 </div>
 
+<script src="/static/js/color-swatch.js"></script>
 <script>
     // FUNCIONES CLIENTES
     function openClientModal() {
@@ -1404,8 +1406,7 @@
           <tr class="border-t bg-slate-50/70">
               <td class="p-4 text-gray-500">1</td>
               <td class="p-4" colspan="6">
-                  <div class="font-semibold text-slate-800">${item.detail || TRANSPORT_PRODUCT_NAME}</div>
-                  <div class="text-xs text-gray-500 mt-0.5">Servicio de envío</div>
+                  <div class="font-semibold text-slate-800">Servicio de transporte</div>
               </td>
               <td class="p-4">
                   <input
@@ -1469,9 +1470,10 @@
               </td>
 
               <td class="p-4">
-
-                  ${item.color || "-"}
-
+                  <span class="inline-flex items-center gap-2">
+                    ${window.ErpColorSwatch ? ErpColorSwatch.colorDotHtml(item.color) : ""}
+                    ${item.color || "-"}
+                  </span>
               </td>
 
               <td class="p-4">

@@ -18,7 +18,7 @@ from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
 from app.services.logo_types import logo_type_label, resolve_item_logo_type
 from app.services.transport_product_service import quotation_shipping_amount
-from app.utils.text_format import format_title_words
+from app.utils.text_format import format_product_size, format_title_words
 
 
 # ==========================================
@@ -569,7 +569,7 @@ def import_products(db, file_path):
             category=format_title_words(str(row[3] or "")),
             material=format_title_words(str(row[4] or "")),
             color=format_title_words(str(row[5] or "")),
-            size=row[6],
+            size=format_product_size(str(row[6] or "")),
             thickness=row[7],
             price=float(row[8] or 0),
             cost=float(row[9] or 0),

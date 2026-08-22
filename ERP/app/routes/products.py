@@ -32,7 +32,7 @@ from app.services.product_catalog_service import ensure_product_catalog_values
 from app.services.product_service import create_catalog_product_quick, product_to_search_payload
 from app.services.tax_service import default_tarifa_from_config
 from app.utils.sri_constants import TARIFAS_IVA_PRODUCTO, codigo_iva_from_tarifa
-from app.utils.text_format import format_title_words
+from app.utils.text_format import format_product_size, format_title_words
 from app.utils.dialog_response import dialog_message_response
 from app.utils.image_storage import (
     UploadValidationError,
@@ -56,9 +56,11 @@ PRODUCT_MANAGE_ROLES = ["admin", "ventas"]
 templates = Jinja2Templates(directory="app/templates")
 
 from app.utils.context import get_global_config
+from app.utils.color_swatch import color_to_css
 
 templates.env.globals["inject_global_config"] = get_global_config
 templates.env.globals["product_image_url"] = product_image_url
+templates.env.globals["color_to_css"] = color_to_css
 
 
 def _parse_sri_product_fields(
@@ -293,11 +295,7 @@ async def create_product(
     if isinstance(user, RedirectResponse):
         return user
 
-    formatted_size = ""
-
-    if size:
-
-        formatted_size = f"{size} {size_unit}"
+    formatted_size = format_product_size(size, size_unit)
 
     existing_product = db.query(Product).filter(Product.code == code).first()
 
@@ -501,11 +499,7 @@ async def update_product(
         # FORMAT SIZE
         # ==========================
 
-        formatted_size = size
-
-        if size and size_unit:
-
-            formatted_size = f"{size} {size_unit}"
+        formatted_size = format_product_size(size, size_unit)
 
         # ==========================
         # IMAGE

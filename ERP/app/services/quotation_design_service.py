@@ -4,7 +4,7 @@ from app.models.quotation import Quotation
 from app.models.quotation_design import QuotationDesign
 from app.utils.image_storage import delete_design_file, design_image_url, save_design_image
 
-MAX_QUOTATION_DESIGNS = 4
+MAX_QUOTATION_DESIGNS = 20
 
 
 class DesignLimitError(Exception):

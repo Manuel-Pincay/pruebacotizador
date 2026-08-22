@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 # Palabras que deben conservarse en mayúsculas (tallas, materiales, unidades).
 UPPERCASE_WORDS = frozenset({
     "xl", "xxl", "xs", "xxs", "sm", "md", "lg",
@@ -42,3 +44,18 @@ def format_title_words(value: str | None) -> str:
     if not text:
         return ""
     return " ".join(_title_word(word) for word in text.split())
+
+
+def format_product_size(size: str | None, unit: str | None = None) -> str:
+    """Normaliza medidas libres: '50 x 40', '50X40', '50×40 cm' -> '50x40' o '50x40 cm'."""
+    text = " ".join((size or "").split())
+    if not text:
+        return ""
+
+    text = re.sub(r"\s*[xX×]\s*", "x", text)
+    unit_text = (unit or "").strip()
+    if not unit_text:
+        return text
+    if text.lower().endswith(unit_text.lower()):
+        return text
+    return f"{text} {unit_text}".strip()

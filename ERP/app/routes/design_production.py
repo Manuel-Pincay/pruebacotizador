@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Form, Request
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
@@ -22,6 +24,7 @@ from app.services.design_catalog_service import list_design_sizes, list_usb_refe
 from app.services.design_service import list_designers
 from app.services.production_order_service import (
     DESIGN_MATERIALS,
+    apply_quotation_item_fulfillment,
     approve_design,
     assign_designer as assign_production_designer,
     build_history_list,
@@ -32,10 +35,25 @@ from app.services.production_order_service import (
     get_production_order,
     get_production_order_by_quotation,
     list_design_orders,
+    quotation_needs_fabrication,
     transition_status,
     update_design_fields,
+    work_items_payload,
+)
+from app.services.quotation_design_service import (
+    MAX_QUOTATION_DESIGNS,
+    DesignLimitError,
+    add_design_image,
+    delete_design_image,
+    sync_legacy_design_file,
 )
 from app.utils.context import get_global_config
+from app.utils.image_storage import (
+    UploadValidationError,
+    design_image_url,
+    read_upload_bytes,
+    validate_upload_filename,
+)
 
 router = APIRouter(tags=["design-production"])
 templates = Jinja2Templates(directory="app/templates")
@@ -61,6 +79,61 @@ def _load_item_for_access(db: Session, item_id: int) -> QuotationItem | None:
         .filter(QuotationItem.id == item_id)
         .first()
     )
+
+
+def _designs_payload(quotation: Quotation | None) -> list[dict]:
+    if not quotation:
+        return []
+    rows = []
+    for design in sorted(quotation.designs or [], key=lambda d: d.sort_order or 0):
+        url = design_image_url(design.filename)
+        if not url:
+            continue
+        rows.append({"id": design.id, "filename": design.filename, "url": url})
+    return rows
+
+
+def _order_form_context(
+    db: Session,
+    user,
+    order_model,
+    *,
+    error: str = "",
+    claimed: str = "",
+    claim_error: str = "",
+    upload_ok: str = "",
+    upload_error: str = "",
+):
+    client = order_model.quotation.client if order_model.quotation else None
+    order = build_order_dict(order_model, client_name=client.name if client else "—")
+    work_items = work_items_payload(order_model.quotation)
+    designs = _designs_payload(order_model.quotation)
+    return {
+        "user": user,
+        "prefill": {
+            "quotation_id": order["quotation_id"],
+            "client_name": order["client_name"],
+        },
+        "order": order,
+        "history": build_history_list(order_model),
+        "can_edit": can_edit_design_order(user, order_model),
+        "can_claim": can_self_assign_design_order(user, order_model),
+        "can_reassign": can_reassign_design_order(user),
+        "designers": list_designers(db) if is_design_admin(user) else [],
+        "materials": DESIGN_MATERIALS,
+        "sizes": list_design_sizes(db),
+        "usb_references": list_usb_references(db),
+        "work_items": work_items,
+        "needs_fabrication": quotation_needs_fabrication(order_model.quotation),
+        "designs": designs,
+        "designs_count": len(designs),
+        "max_designs": MAX_QUOTATION_DESIGNS,
+        "error": error,
+        "claimed": claimed,
+        "claim_error": claim_error,
+        "upload_ok": upload_ok,
+        "upload_error": upload_error,
+    }
 
 
 @router.get("/orders", response_class=HTMLResponse)
@@ -151,30 +224,22 @@ async def design_order_detail(order_id: int, request: Request, db: Session = Dep
     if not order_model or not can_view_design_order(user, order_model):
         return RedirectResponse(url="/design/orders", status_code=302)
 
-    client = order_model.quotation.client if order_model.quotation else None
-    order = build_order_dict(order_model, client_name=client.name if client else "—")
+    if order_model.quotation:
+        sync_legacy_design_file(db, order_model.quotation)
+        db.commit()
 
     return templates.TemplateResponse(
         request=request,
         name="design/order_form.html",
-        context={
-            "user": user,
-            "prefill": {
-                "quotation_id": order["quotation_id"],
-                "client_name": order["client_name"],
-            },
-            "order": order,
-            "history": build_history_list(order_model),
-            "can_edit": can_edit_design_order(user, order_model),
-            "can_claim": can_self_assign_design_order(user, order_model),
-            "can_reassign": can_reassign_design_order(user),
-            "designers": list_designers(db) if is_design_admin(user) else [],
-            "materials": DESIGN_MATERIALS,
-            "sizes": list_design_sizes(db),
-            "usb_references": list_usb_references(db),
-            "claimed": request.query_params.get("claimed", ""),
-            "claim_error": request.query_params.get("claim_error", ""),
-        },
+        context=_order_form_context(
+            db,
+            user,
+            order_model,
+            claimed=request.query_params.get("claimed", ""),
+            claim_error=request.query_params.get("claim_error", ""),
+            upload_ok=request.query_params.get("uploaded", ""),
+            upload_error=request.query_params.get("upload_error", ""),
+        ),
     )
 
 
@@ -203,32 +268,23 @@ async def design_order_save(
     if not order_model or not can_view_design_order(user, order_model):
         return RedirectResponse(url="/design/orders", status_code=302)
 
-    use_fab = str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
-    rm_id = int(raw_material_id) if str(raw_material_id or "").strip().isdigit() else None
+    form = await request.form()
+    if can_edit_design_order(user, order_model):
+        apply_quotation_item_fulfillment(order_model.quotation, form)
+
+    needs_fab = quotation_needs_fabrication(order_model.quotation)
+    use_fab = needs_fab and str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
+    rm_id = int(raw_material_id) if use_fab and str(raw_material_id or "").strip().isdigit() else None
     from app.services.raw_material_service import parse_raw_material_qty
 
     try:
         rm_qty = parse_raw_material_qty(raw_material_qty) if use_fab else None
     except ValueError as exc:
         order_model = get_production_order(db, order_id)
-        client = order_model.quotation.client if order_model and order_model.quotation else None
-        order = build_order_dict(order_model, client_name=client.name if client else "—") if order_model else {}
         return templates.TemplateResponse(
             request=request,
             name="design/order_form.html",
-            context={
-                "user": user,
-                "prefill": {"quotation_id": order.get("quotation_id"), "client_name": order.get("client_name")},
-                "order": order,
-                "history": build_history_list(order_model) if order_model else [],
-                "can_edit": True,
-                "can_reassign": can_reassign_design_order(user),
-                "designers": list_designers(db) if is_design_admin(user) else [],
-                "materials": DESIGN_MATERIALS,
-                "sizes": list_design_sizes(db),
-                "usb_references": list_usb_references(db),
-                "error": str(exc),
-            },
+            context=_order_form_context(db, user, order_model, error=str(exc)),
             status_code=400,
         )
 
@@ -239,50 +295,58 @@ async def design_order_save(
 
         if action == "approve":
             if not can_edit_design_order(user, order_model):
-                raise ValueError("Sin permiso para enviar a producción.")
-            update_design_fields(
-                db, order_model,
-                file_name=file_name, material=material, size=size,
-                usb_reference=usb_reference, notes=detail, copies=copies, user=user,
-                use_fabrication_materials=use_fab,
-                raw_material_id=rm_id,
-                raw_material_qty=rm_qty,
-            )
+                raise ValueError("Sin permiso para enviar la orden.")
+            if needs_fab:
+                update_design_fields(
+                    db, order_model,
+                    file_name=file_name, material=material, size=size,
+                    usb_reference=usb_reference, notes=detail, copies=copies, user=user,
+                    use_fabrication_materials=use_fab,
+                    raw_material_id=rm_id,
+                    raw_material_qty=rm_qty,
+                )
+            else:
+                # Solo nota: sin datos de fabricación
+                update_design_fields(
+                    db, order_model,
+                    notes=detail, copies=1, user=user,
+                    use_fabrication_materials=False,
+                )
             order_model = get_production_order(db, order_id) or order_model
             approve_design(
-                db, order_model, user=user,
-                use_fabrication_materials=use_fab,
-                raw_material_id=rm_id,
-                raw_material_qty=rm_qty,
+                db, order_model, user=user, notes=detail,
+                use_fabrication_materials=use_fab if needs_fab else False,
+                raw_material_id=rm_id if needs_fab else None,
+                raw_material_qty=rm_qty if needs_fab else None,
             )
+            if not needs_fab:
+                return RedirectResponse(
+                    url=f"/shipments/new/{order_model.quotation_id}" if order_model.quotation_id else f"/design/orders/{order_id}",
+                    status_code=302,
+                )
         elif can_edit_design_order(user, order_model):
-            update_design_fields(
-                db, order_model,
-                file_name=file_name, material=material, size=size,
-                usb_reference=usb_reference, notes=detail, copies=copies, user=user,
-                use_fabrication_materials=use_fab,
-                raw_material_id=rm_id,
-                raw_material_qty=rm_qty,
-            )
+            if needs_fab:
+                update_design_fields(
+                    db, order_model,
+                    file_name=file_name, material=material, size=size,
+                    usb_reference=usb_reference, notes=detail, copies=copies, user=user,
+                    use_fabrication_materials=use_fab,
+                    raw_material_id=rm_id,
+                    raw_material_qty=rm_qty,
+                )
+            else:
+                update_design_fields(
+                    db, order_model,
+                    notes=detail, copies=1, user=user,
+                    use_fabrication_materials=False,
+                )
+            db.commit()
     except ValueError as exc:
-        client = order_model.quotation.client if order_model.quotation else None
-        order = build_order_dict(order_model, client_name=client.name if client else "—")
+        order_model = get_production_order(db, order_id) or order_model
         return templates.TemplateResponse(
             request=request,
             name="design/order_form.html",
-            context={
-                "user": user,
-                "prefill": {"quotation_id": order["quotation_id"], "client_name": order["client_name"]},
-                "order": order,
-                "history": build_history_list(order_model),
-                "can_edit": True,
-                "can_reassign": can_reassign_design_order(user),
-                "designers": list_designers(db) if is_design_admin(user) else [],
-                "materials": DESIGN_MATERIALS,
-                "sizes": list_design_sizes(db),
-                "usb_references": list_usb_references(db),
-                "error": str(exc),
-            },
+            context=_order_form_context(db, user, order_model, error=str(exc)),
             status_code=400,
         )
 
@@ -321,3 +385,66 @@ async def design_order_print(order_id: int, request: Request, db: Session = Depe
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="orden_{order["order_label"]}.pdf"'},
     )
+
+
+@router.post("/orders/{order_id}/designs")
+async def design_order_upload_image(
+    order_id: int,
+    request: Request,
+    design_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    order_model = get_production_order(db, order_id)
+    if not order_model or not can_view_design_order(user, order_model):
+        return RedirectResponse(url="/design/orders", status_code=302)
+    if not can_edit_design_order(user, order_model):
+        return RedirectResponse(url=f"/design/orders/{order_id}", status_code=302)
+
+    quotation = order_model.quotation
+    if not quotation:
+        return RedirectResponse(url=f"/design/orders/{order_id}", status_code=302)
+
+    try:
+        sync_legacy_design_file(db, quotation)
+        validate_upload_filename(design_file.filename)
+        data = await read_upload_bytes(design_file, 10 * 1024 * 1024)
+        add_design_image(db, quotation, data)
+        db.commit()
+        return RedirectResponse(url=f"/design/orders/{order_id}?uploaded=1", status_code=302)
+    except (UploadValidationError, DesignLimitError, ValueError) as exc:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/design/orders/{order_id}?upload_error={quote(str(exc))}",
+            status_code=302,
+        )
+
+
+@router.post("/orders/{order_id}/designs/{design_id}/delete")
+async def design_order_delete_image(
+    order_id: int,
+    design_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    order_model = get_production_order(db, order_id)
+    if not order_model or not can_edit_design_order(user, order_model):
+        return RedirectResponse(url="/design/orders", status_code=302)
+
+    quotation = order_model.quotation
+    if not quotation:
+        return RedirectResponse(url=f"/design/orders/{order_id}", status_code=302)
+
+    try:
+        delete_design_image(db, quotation, design_id)
+        db.commit()
+    except ValueError:
+        db.rollback()
+    return RedirectResponse(url=f"/design/orders/{order_id}", status_code=302)

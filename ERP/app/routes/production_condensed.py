@@ -24,6 +24,7 @@ from app.services.condensed_service import (
     paginate_order_groups,
     update_quotation_tracking_status,
 )
+from app.utils.color_swatch import color_to_css
 from app.utils.context import get_global_config
 from app.utils.image_storage import design_image_url
 from app.utils.pagination import build_page_url
@@ -35,6 +36,7 @@ templates.env.globals["inject_global_config"] = get_global_config
 templates.env.globals["build_page_url"] = build_page_url
 templates.env.globals["design_image_url"] = design_image_url
 templates.env.globals["tracking_status_colors"] = TRACKING_STATUS_COLORS
+templates.env.globals["color_to_css"] = color_to_css
 
 CONDENSED_ROLES = ["admin", "ventas", "disenador"]
 CONDENSED_WRITE_ROLES = ["admin", "ventas"]

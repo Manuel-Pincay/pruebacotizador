@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.product import Product
 from app.services.product_catalog_service import ensure_product_catalog_values
 from app.utils.sri_constants import codigo_iva_from_tarifa
-from app.utils.text_format import format_title_words
+from app.utils.text_format import format_product_size, format_title_words
 
 
 def create_billable_product(
@@ -139,7 +139,7 @@ def create_catalog_product_quick(
         category=catalog["category"] or "General",
         material=catalog["material"],
         color=catalog["color"],
-        size=(size or "").strip(),
+        size=format_product_size(size),
         thickness=format_title_words(thickness) if thickness else "",
         theme=catalog["theme"],
         code=final_code,

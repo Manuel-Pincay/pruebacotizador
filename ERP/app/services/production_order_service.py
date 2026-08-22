@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.production_order import ProductionOrder
 from app.models.production_order_history import ProductionOrderHistory
 from app.models.quotation import Quotation
+from app.models.quotation_item import QuotationItem
 from app.models.user import User
 
 PRODUCTION_ORDER_STATUSES: list[tuple[str, str]] = [
@@ -103,34 +104,111 @@ def _user_label(user: User | None) -> str:
     return user.full_name or user.username or "—"
 
 
-def _deduct_inventory_for_quotation(db: Session, quotation: Quotation) -> None:
+def _work_quotation_items(quotation: Quotation):
+    from app.services.transport_product_service import is_transport_quotation_item
+
+    items = []
+    for item in quotation.items or []:
+        if is_transport_quotation_item(item):
+            continue
+        items.append(item)
+    return items
+
+
+def quotation_needs_fabrication(quotation: Quotation | None) -> bool:
+    """True si algún ítem de trabajo no sale de inventario terminado."""
+    if not quotation:
+        return True
+    items = _work_quotation_items(quotation)
+    if not items:
+        return False
+    return any(not bool(getattr(item, "fulfill_from_inventory", False)) for item in items)
+
+
+def work_items_payload(quotation: Quotation | None) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not quotation:
+        return rows
+    for item in _work_quotation_items(quotation):
+        product = item.product
+        name = (item.detail or "").strip() or (product.name if product else "—")
+        rows.append(
+            {
+                "id": item.id,
+                "name": name,
+                "quantity": item.quantity or 0,
+                "measure": item.measure or "—",
+                "theme": item.theme or "—",
+                "color": item.color or "—",
+                "product_id": item.product_id,
+                "stock": product.stock if product else None,
+                "fulfill_from_inventory": bool(getattr(item, "fulfill_from_inventory", False)),
+                "design_item_done": bool(getattr(item, "design_item_done", False)),
+            }
+        )
+    return rows
+
+
+def apply_quotation_item_fulfillment(quotation: Quotation | None, form_data) -> None:
+    """Lee fulfill_item_{id} y done_item_{id} del formulario."""
+    if not quotation:
+        return
+    for item in _work_quotation_items(quotation):
+        mode = str(form_data.get(f"fulfill_item_{item.id}") or "").strip().lower()
+        if mode in {"inventory", "inventario", "1", "true", "on"}:
+            item.fulfill_from_inventory = True
+        elif mode in {"production", "produccion", "0"}:
+            item.fulfill_from_inventory = False
+        done_raw = form_data.get(f"done_item_{item.id}")
+        if done_raw is not None:
+            item.design_item_done = str(done_raw).strip().lower() in {"1", "on", "true", "yes"}
+
+
+def _already_deducted_for_item(db: Session, quotation_id: int, item_id: int) -> bool:
+    from app.models.inventory_movement import InventoryMovement
+
+    marker = f"Cotización #{quotation_id} ítem {item_id} "
+    row = (
+        db.query(InventoryMovement.id)
+        .filter(InventoryMovement.reason.contains(marker))
+        .first()
+    )
+    return row is not None
+
+
+def _deduct_inventory_for_quotation(db: Session, quotation: Quotation, *, only_flagged: bool = True) -> None:
     from app.models.inventory_movement import InventoryMovement
     from app.models.product import Product
 
     if not quotation or not quotation.items:
         return
-    for item in quotation.items:
+    for item in _work_quotation_items(quotation):
+        if only_flagged and not bool(getattr(item, "fulfill_from_inventory", False)):
+            continue
         if not item.product_id:
+            continue
+        if _already_deducted_for_item(db, quotation.id, item.id):
             continue
         product = db.query(Product).filter(Product.id == item.product_id).first()
         if not product:
             continue
         previous_stock = product.stock or 0
-        new_stock = previous_stock - (item.quantity or 0)
+        qty = int(item.quantity or 0)
+        new_stock = previous_stock - qty
         if new_stock < 0:
             raise ValueError(
                 f"Stock insuficiente para {product.name}. "
-                f"Disponible: {previous_stock}, solicitado: {item.quantity}."
+                f"Disponible: {previous_stock}, solicitado: {qty}."
             )
         product.stock = new_stock
         db.add(
             InventoryMovement(
                 product_id=product.id,
                 movement_type="salida",
-                quantity=-item.quantity,
+                quantity=-qty,
                 previous_stock=previous_stock,
                 new_stock=new_stock,
-                reason=f"Cotización #{quotation.id} → Producción",
+                reason=f"Cotización #{quotation.id} ítem {item.id} producto {product.id} → Inventario diseño",
             )
         )
 
@@ -160,6 +238,9 @@ def can_transition(current: str | None, target: str) -> bool:
         return current_code != "entregado"
     if current_code == "cancelado":
         return False
+    # Inventario listo: diseño puede ir directo a envío (sin fabricación).
+    if current_code in DESIGN_PHASE_STATUSES and target_code == "envio":
+        return True
     try:
         return PRODUCTION_STATUS_SEQUENCE.index(target_code) == PRODUCTION_STATUS_SEQUENCE.index(current_code) + 1
     except ValueError:
@@ -200,7 +281,10 @@ def get_production_order(db: Session, order_id: int) -> ProductionOrder | None:
         db.query(ProductionOrder)
         .options(
             joinedload(ProductionOrder.quotation).joinedload(Quotation.client),
-            joinedload(ProductionOrder.quotation).joinedload(Quotation.items),
+            joinedload(ProductionOrder.quotation)
+            .joinedload(Quotation.items)
+            .joinedload(QuotationItem.product),
+            joinedload(ProductionOrder.quotation).joinedload(Quotation.designs),
             joinedload(ProductionOrder.history).joinedload(ProductionOrderHistory.author),
             joinedload(ProductionOrder.assignee),
             joinedload(ProductionOrder.design_completer),
@@ -248,19 +332,33 @@ def transition_status(
         order.started_at = now
     if target == "entregado":
         order.completed_at = now
-    if target == "produccion" and normalize_status(order.status) == "diseno":
-        validate_fabrication_data(order)
+
+    quotation = order.quotation
+    leaving_design = normalize_status(order.status) in DESIGN_PHASE_STATUSES and target in {
+        "produccion",
+        "envio",
+    }
+    if leaving_design:
+        if target == "produccion" and quotation_needs_fabrication(quotation):
+            validate_fabrication_data(order)
         order.design_completed_at = now
         order.design_completed_by = user.id if user else None
 
-    quotation = order.quotation
     if target == "produccion":
         if order.use_fabrication_materials:
             from app.services.raw_material_service import consume_for_production
 
             consume_for_production(db, order, user_id=user.id if user else None)
-        elif quotation:
-            _deduct_inventory_for_quotation(db, quotation)
+        if quotation:
+            # Ítems marcados inventario siempre se descuentan.
+            # Si no usa materia prima, también descuenta el resto (stock terminado).
+            _deduct_inventory_for_quotation(
+                db,
+                quotation,
+                only_flagged=bool(order.use_fabrication_materials),
+            )
+    elif target == "envio" and quotation:
+        _deduct_inventory_for_quotation(db, quotation, only_flagged=True)
 
     order.status = target
     order.updated_at = now
@@ -372,7 +470,18 @@ def approve_design(
     current = normalize_status(order.status)
     if current not in DESIGN_EDIT_STATUSES:
         raise ValueError("La orden no está en fase de diseño.")
-    validate_fabrication_data(order)
+
+    work_items = _work_quotation_items(order.quotation) if order.quotation else []
+    if work_items and not all(bool(getattr(item, "design_item_done", False)) for item in work_items):
+        raise ValueError("Marque cada producto como listo antes de enviar la orden.")
+
+    needs_fab = quotation_needs_fabrication(order.quotation)
+    if not needs_fab:
+        use_fabrication_materials = False
+        raw_material_id = None
+        raw_material_qty = None
+    if needs_fab:
+        validate_fabrication_data(order)
 
     if use_fabrication_materials is not None:
         from app.services.raw_material_service import set_fabrication_source
@@ -390,7 +499,7 @@ def approve_design(
         order = get_production_order(db, order.id) or order
 
     fab_note = ""
-    if order.use_fabrication_materials and order.raw_material_id:
+    if needs_fab and order.use_fabrication_materials and order.raw_material_id:
         from app.services.raw_material_service import get_raw_material
 
         rm = get_raw_material(db, order.raw_material_id)
@@ -400,12 +509,19 @@ def approve_design(
                 f"({float(order.raw_material_qty or 0):g} {rm.unit})."
             )
 
+    if needs_fab:
+        target = "produccion"
+        default_notes = "Datos de fabricación listos — pasa a producción."
+    else:
+        target = "envio"
+        default_notes = "Productos de inventario — pasa a envío (sin fabricación)."
+
     transition_status(
         db,
         order,
-        "produccion",
+        target,
         user=user,
-        notes=(notes or "Datos de fabricación listos — pasa a producción.") + fab_note,
+        notes=(notes or default_notes) + fab_note,
     )
     return get_production_order(db, order.id) or order
 

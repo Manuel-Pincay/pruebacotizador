@@ -3,6 +3,7 @@
 {% from "components/pagination.html" import render_pagination %}
 {% from "components/design_carousel.html" import design_carousel %}
 {% from "components/design_carousel_scripts.html" import design_carousel_scripts %}
+{% from "components/color_dot.html" import color_dot %}
 
 {% block content %}
 
@@ -202,7 +203,12 @@
                     <td class="p-3 font-medium text-slate-800">{{ row.product_name }}</td>
                     <td class="p-3">{{ row.measure }}</td>
                     <td class="p-3">{{ row.theme }}</td>
-                    <td class="p-3">{{ row.color }}</td>
+                    <td class="p-3">
+                        <span class="inline-flex items-center gap-2">
+                            {{ color_dot(row.color) }}
+                            <span>{{ row.color }}</span>
+                        </span>
+                    </td>
                     <td class="p-3">{{ 'Sí' if row.is_custom else 'No' }}</td>
                     {% if loop.first %}
                     <td class="p-3 align-top border-l border-gray-100 w-44" rowspan="{{ order.products_count }}"

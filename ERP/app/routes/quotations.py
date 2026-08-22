@@ -62,7 +62,8 @@ from app.services.quotation_design_service import (
     sync_legacy_design_file,
 )
 from app.utils.activity import log_activity
-from app.utils.text_format import format_title_words
+from app.utils.color_swatch import color_to_css
+from app.utils.text_format import format_product_size, format_title_words
 from app.utils.quotation_events import log_quotation_event
 from app.utils.notifications import notify_roles
 from app.utils.whatsapp import build_whatsapp_url, quotation_whatsapp_message
@@ -98,6 +99,7 @@ templates.env.globals["is_payment_receipt_pdf"] = is_payment_receipt_pdf
 templates.env.globals["is_payment_receipt_image"] = is_payment_receipt_image
 templates.env.globals["product_image_url"] = product_image_url
 templates.env.globals["is_shipping_item"] = is_shipping_item
+templates.env.globals["color_to_css"] = color_to_css
 register_logo_template_globals(templates.env)
 
 QUOTATION_ROLES = ["admin", "ventas"]
@@ -283,7 +285,7 @@ def _add_items_to_quotation(
                 product_id=product_id,
                 quantity=quantity,
                 detail=item.get("detail", ""),
-                measure=item.get("measure", ""),
+                measure=format_product_size(item.get("measure", "")),
                 theme=item.get("theme", ""),
                 color=item.get("color", ""),
                 logo=resolved_logo != LOGO_TYPE_SIN,
@@ -734,7 +736,7 @@ async def update_item(
     item.unit_price = unit_price
     item.total = compute_item_total(quantity, unit_price, item.item_discount)
     item.theme = theme
-    item.measure = measure
+    item.measure = format_product_size(measure)
     item.color = color
     item.logo_type = resolved_logo
     item.logo = resolved_logo != LOGO_TYPE_SIN
@@ -1756,6 +1758,7 @@ async def add_product_to_quotation(
 
     resolved_logo = normalize_logo_type(logo_type)
     line_discount = max(0.0, min(float(item_discount or 0), 100.0))
+    measure = format_product_size(measure)
     try:
         unit_custom_price = float(custom_price or 0)
     except (TypeError, ValueError):

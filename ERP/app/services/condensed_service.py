@@ -21,6 +21,11 @@ from app.services.production_order_service import (
     transition_status,
 )
 from app.services.quotation_design_service import get_design_urls, sync_legacy_design_file
+from app.services.transport_product_service import (
+    TRANSPORT_PRODUCT_CODE,
+    TRANSPORT_PRODUCT_NAME,
+    is_transport_quotation_item,
+)
 
 CONDENSED_QUOTATION_STATUSES = ["aprobada", "produccion", "en_produccion"]
 
@@ -79,6 +84,20 @@ def _product_name(item: QuotationItem) -> str:
     if item.product and item.product.name:
         return item.product.name
     return "—"
+
+
+def _exclude_transport_from_query(query):
+    """No listar el servicio de transporte como producto en condensados."""
+    return query.filter(
+        (Product.id.is_(None))
+        | (
+            (Product.code.is_(None) | (Product.code != TRANSPORT_PRODUCT_CODE))
+            & (Product.name.is_(None) | (Product.name != TRANSPORT_PRODUCT_NAME))
+        )
+    ).filter(
+        QuotationItem.detail.is_(None)
+        | (QuotationItem.detail != TRANSPORT_PRODUCT_NAME)
+    )
 
 
 def _apply_filters(
@@ -324,6 +343,8 @@ def build_condensed_query(
         )
     )
 
+    query = _exclude_transport_from_query(query)
+
     query = _apply_filters(
         query,
         db,
@@ -408,6 +429,8 @@ def build_order_groups(items: list[QuotationItem]) -> list[dict[str, Any]]:
     quotation_order: list[int] = []
 
     for item in items:
+        if is_transport_quotation_item(item):
+            continue
         qid = item.quotation_id
         if qid not in buckets:
             buckets[qid] = []
@@ -594,6 +617,7 @@ def get_order_detail(db: Session, quotation_id: int) -> dict[str, Any] | None:
                 "is_custom": _item_is_custom(item),
             }
             for item in sorted(quotation.items or [], key=lambda row: row.id or 0)
+            if not is_transport_quotation_item(item)
         ],
     }
 

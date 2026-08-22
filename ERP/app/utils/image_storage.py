@@ -42,7 +42,9 @@ LOGOS_DIR = Path("uploads/logos")
 PAYMENTS_DIR = Path("uploads/payments")
 STORE_SLIDES_DIR = Path("uploads/store/slides")
 
-ALLOWED_RECEIPT_EXTENSIONS = {"jpg", "jpeg", "png", "pdf"}
+ALLOWED_RECEIPT_EXTENSIONS = {"jpg", "jpeg", "jpe", "jfif", "jpge", "png", "webp", "pdf"}
+RECEIPT_JPEG_ALIASES = frozenset({"jpg", "jpeg", "jpe", "jfif", "jpge"})
+RECEIPT_IMAGE_EXTENSIONS = frozenset({"jpg", "jpeg", "jpe", "jfif", "jpge", "png", "webp"})
 MAX_STORE_SLIDE_BYTES = 5 * 1024 * 1024
 STORE_SLIDE_MAX_PX = 1920
 
@@ -400,12 +402,17 @@ def format_bytes(size: int) -> str:
 
 
 def _detect_receipt_mime(data: bytes) -> str:
+    if not data:
+        return ""
     if data[:4] == b"%PDF":
         return "application/pdf"
     if data[:3] == b"\xff\xd8\xff":
         return "image/jpeg"
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         return "image/png"
+    # WhatsApp / navegadores a menudo envían WEBP con nombre .jpg
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
     return ""
 
 
@@ -415,29 +422,73 @@ def validate_receipt_filename(filename: str | None) -> str:
         raise UploadValidationError("Nombre de archivo no válido.")
     if ext not in ALLOWED_RECEIPT_EXTENSIONS:
         raise UploadValidationError(
-            "Formato no permitido. Use JPG, JPEG, PNG o PDF."
+            "Formato no permitido. Use JPG, JPEG, PNG, WEBP o PDF."
         )
+    if ext in RECEIPT_JPEG_ALIASES:
+        return "jpeg"
     return ext
 
 
 def validate_receipt_content(ext: str, data: bytes) -> None:
+    """
+    Valida el comprobante priorizando el contenido real.
+    WhatsApp suele mandar .jpg/.jpeg/.jfif o WEBP disfrazado de JPG.
+    """
     mime = _detect_receipt_mime(data)
-    expected = {
-        "pdf": "application/pdf",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "png": "image/png",
-    }
-    if mime != expected.get(ext):
-        raise UploadValidationError(
-            "El contenido del archivo no coincide con su extensión."
-        )
+    normalized = "jpeg" if ext in RECEIPT_JPEG_ALIASES else (ext or "").lower()
+
+    if mime == "application/pdf":
+        if normalized != "pdf":
+            raise UploadValidationError(
+                "El archivo es PDF pero la extensión no coincide. Renómbrelo a .pdf o suba una imagen."
+            )
+        return
+
+    if mime in {"image/jpeg", "image/png", "image/webp"}:
+        # Contenido de imagen válido: aceptar aunque la extensión sea jpg/jpeg/jfif/webp
+        return
+
+    # Magic bytes desconocidos: intentar abrir con Pillow (JPEG atípicos de WS)
+    if normalized in RECEIPT_IMAGE_EXTENSIONS or normalized == "jpeg":
+        try:
+            _open_image(data)
+            return
+        except UploadValidationError as exc:
+            raise UploadValidationError(
+                "No se pudo leer la imagen del comprobante. "
+                "Pruebe JPG, PNG, WEBP o PDF (archivos de WhatsApp suelen funcionar)."
+            ) from exc
+
+    if normalized == "pdf":
+        raise UploadValidationError("El archivo no es un PDF válido.")
+
+    raise UploadValidationError(
+        "Formato de comprobante no reconocido. Use JPG, JPEG, PNG, WEBP o PDF."
+    )
+
+
+def normalize_receipt_ext_for_save(ext: str, data: bytes) -> str:
+    """Extensión efectiva según contenido (para guardar)."""
+    mime = _detect_receipt_mime(data)
+    if mime == "application/pdf":
+        return "pdf"
+    if mime == "image/png":
+        return "png"
+    if mime == "image/webp":
+        return "webp"
+    if mime == "image/jpeg":
+        return "jpeg"
+    normalized = "jpeg" if ext in RECEIPT_JPEG_ALIASES else (ext or "").lower()
+    if normalized in RECEIPT_IMAGE_EXTENSIONS or normalized == "jpeg":
+        return "jpeg" if normalized in RECEIPT_JPEG_ALIASES or normalized == "jpeg" else normalized
+    return normalized or "jpeg"
 
 
 def save_payment_receipt(data: bytes, ext: str) -> str:
     """Guarda comprobante de pago. Imágenes → WEBP; PDF sin modificar."""
     PAYMENTS_DIR.mkdir(parents=True, exist_ok=True)
-    if ext == "pdf":
+    effective = normalize_receipt_ext_for_save(ext, data)
+    if effective == "pdf":
         name = f"{uuid.uuid4()}.pdf"
         path = PAYMENTS_DIR / name
         path.write_bytes(data)

@@ -319,7 +319,7 @@ def build_products_table(items, config):
                         align="left",
                     ),
                     _pdf_cell_text("", cell["left"], align="left"),
-                    _pdf_cell_text("Servicio de envío", cell["left"], align="left"),
+                    _pdf_cell_text("", cell["left"], align="left"),
                     _pdf_cell_text("", cell["left"], align="left"),
                     _pdf_cell_text("", cell["center"], align="center"),
                     _pdf_cell_text("", cell["right"], align="right"),
