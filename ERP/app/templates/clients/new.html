@@ -4,87 +4,78 @@
 
 {% set f = form or {} %}
 
-<div class="w-full max-w-none">
-
-  <div class="flex flex-col sm:flex-row sm:flex-wrap sm:justify-between sm:items-start gap-4 mb-6 sm:mb-8">
-    <div>
-      <a href="/clients" class="inline-flex items-center gap-2 text-purple-700 hover:text-purple-800 font-medium mb-3">
-        ← Volver a Clientes
-      </a>
-      <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Nuevo Cliente</h1>
-      <p class="text-gray-500 mt-2 text-sm sm:text-base">Registra un cliente para cotizaciones y seguimiento comercial.</p>
-    </div>
-    <a href="/clients"
-      class="erp-full-mobile sm:w-auto text-center border border-purple-300 text-purple-700 px-5 py-3 rounded-xl hover:bg-purple-50 transition shrink-0">
-      Ver listado ({{ total_clients|default(0) }})
+<div class="max-w-6xl mx-auto pb-8">
+  <div class="mb-6 sm:mb-8">
+    <a href="/clients" class="text-sm text-purple-600 hover:text-purple-800 inline-flex items-center gap-1 mb-2">
+      ← Volver a clientes
     </a>
+    <div class="rounded-2xl bg-gradient-to-br from-purple-700 via-purple-600 to-indigo-600 px-5 py-6 sm:px-7 sm:py-7 text-white shadow-lg shadow-purple-200/60">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <p class="text-purple-100 text-xs font-semibold uppercase tracking-wider mb-1">Cartera comercial</p>
+          <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Nuevo cliente</h1>
+          <p class="text-purple-100/90 mt-1.5 text-sm max-w-xl">
+            Registra el contacto. La vista previa a la derecha se actualiza al escribir.
+          </p>
+        </div>
+        <a href="/clients"
+          class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-sm font-medium transition shrink-0">
+          {{ total_clients|default(0) }} registrados
+        </a>
+      </div>
+    </div>
   </div>
 
   {% if error %}
-  <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-800">
+  <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
     <p class="font-semibold">No se pudo guardar el cliente</p>
-    <p class="text-sm mt-1">{{ error }}</p>
+    <p class="mt-0.5">{{ error }}</p>
   </div>
   {% endif %}
 
-  <div class="grid grid-cols-12 gap-6">
+  <form action="/clients/new" method="POST" id="clientForm" class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+    <div class="xl:col-span-8 space-y-5 min-w-0">
 
-    <div class="col-span-12 xl:col-span-8">
-      <form action="/clients/new" method="POST" id="clientForm"
-        class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">👤</div>
+      {# —— Datos personales —— #}
+      <section class="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3.5 bg-purple-50/80 border-b border-purple-100">
+          <span class="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center text-lg shrink-0">1</span>
           <div>
-            <h3 class="font-bold text-lg text-purple-700">Datos personales</h3>
-            <p class="text-sm text-gray-500">Información principal del contacto</p>
+            <h2 class="text-base font-bold text-slate-900">Datos personales</h2>
+            <p class="text-xs text-slate-500">Contacto e identificación</p>
           </div>
         </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="p-5 grid md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-semibold mb-2" for="name">
-              Nombre <span class="text-red-500">*</span>
-            </label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="name">Nombre *</label>
             <input type="text" id="name" name="name" value="{{ f.get('name', '') }}" required autofocus
               placeholder="Ej. Juan Pérez"
-              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 px-3.5 py-2.5 rounded-xl text-sm transition" />
           </div>
-
           <div>
-            <label class="block text-sm font-semibold mb-2" for="phone">Teléfono</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="phone">Teléfono</label>
             <input type="tel" id="phone" name="phone" value="{{ f.get('phone', '') }}"
               placeholder="Ej. 099 123 4567"
-              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 px-3.5 py-2.5 rounded-xl text-sm transition" />
           </div>
-
           <div>
-            <label class="block text-sm font-semibold mb-2" for="email">Correo</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="email">Correo</label>
             <input type="email" id="email" name="email" value="{{ f.get('email', '') }}"
               placeholder="cliente@correo.com"
-              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
-            <p class="text-xs text-gray-500 mt-1">Correo principal para factura SRI.</p>
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 px-3.5 py-2.5 rounded-xl text-sm transition" />
+            <p class="text-[11px] text-slate-400 mt-1">Correo principal para factura SRI.</p>
           </div>
-
-          <div class="md:col-span-2">
-            <label class="block text-sm font-semibold mb-2" for="additional_emails">Correos adicionales</label>
-            <textarea id="additional_emails" name="additional_emails" rows="2"
-              placeholder="contabilidad@empresa.com"
-              class="w-full border border-gray-200 rounded-2xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">{{ f.get('additional_emails', '') }}</textarea>
-            <p class="text-xs text-gray-500 mt-1">Opcional. Reciben copia PDF+XML; no van al SRI.</p>
-          </div>
-
           <div>
-            <label class="block text-sm font-semibold mb-2" for="ruc_ci">RUC / Cédula</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="ruc_ci">RUC / Cédula</label>
             <input type="text" id="ruc_ci" name="ruc_ci" value="{{ f.get('ruc_ci', '') }}"
               placeholder="Opcional, debe ser único"
-              class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
-            <p class="text-xs text-gray-400 mt-1">Si lo ingresas, no puede repetirse en otro cliente.</p>
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 px-3.5 py-2.5 rounded-xl text-sm transition" />
+            <p class="text-[11px] text-slate-400 mt-1">Si lo ingresas, no puede repetirse.</p>
           </div>
-
           <div>
-            <label class="block text-sm font-semibold mb-2" for="tipo_identificacion">Tipo identificación SRI</label>
-            <select id="tipo_identificacion" name="tipo_identificacion" class="w-full border border-gray-200 rounded-2xl px-3 py-2">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="tipo_identificacion">Tipo identificación SRI</label>
+            <select id="tipo_identificacion" name="tipo_identificacion"
+              class="w-full border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm bg-white">
               {% set tid = f.get('tipo_identificacion', 'CEDULA') %}
               <option value="RUC" {% if tid == 'RUC' %}selected{% endif %}>RUC</option>
               <option value="CEDULA" {% if tid == 'CEDULA' %}selected{% endif %}>Cédula</option>
@@ -92,135 +83,135 @@
               <option value="CONSUMIDOR_FINAL" {% if tid == 'CONSUMIDOR_FINAL' %}selected{% endif %}>Consumidor final</option>
             </select>
           </div>
-        </div>
-
-        <div class="border-t mt-6 pt-6">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">🏢</div>
-            <div>
-              <h3 class="font-bold text-lg text-purple-700">Información comercial</h3>
-              <p class="text-sm text-gray-500">Datos empresariales y clasificación</p>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-semibold mb-2" for="company">Empresa</label>
-              <input type="text" id="company" name="company" value="{{ f.get('company', '') }}"
-                placeholder="Nombre comercial o razón social"
-                class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-semibold mb-2" for="client_type">
-                Tipo de cliente <span class="text-red-500">*</span>
-              </label>
-              <select id="client_type" name="client_type"
-                class="w-full border border-gray-200 rounded-2xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
-                {% set selected_type = f.get('client_type', 'minorista') %}
-                <option value="minorista" {% if selected_type == 'minorista' %}selected{% endif %}>Minorista</option>
-                <option value="mayorista" {% if selected_type == 'mayorista' %}selected{% endif %}>Mayorista</option>
-                <option value="frecuente" {% if selected_type == 'frecuente' %}selected{% endif %}>Frecuente</option>
-              </select>
-            </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="additional_emails">Correos adicionales</label>
+            <textarea id="additional_emails" name="additional_emails" rows="2"
+              placeholder="contabilidad@empresa.com"
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 p-3.5 rounded-xl text-sm transition resize-y">{{ f.get('additional_emails', '') }}</textarea>
+            <p class="text-[11px] text-slate-400 mt-1">Opcional. Reciben copia PDF+XML; no van al SRI.</p>
           </div>
         </div>
+      </section>
 
-        <div class="border-t mt-6 pt-6">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">📍</div>
-                <div>
-                  <h3 class="font-bold text-lg text-purple-700">Ubicación</h3>
-                  <p class="text-sm text-gray-500">Dirección de entrega o facturación</p>
-                </div>
-              </div>
-              <label class="block text-sm font-semibold mb-2" for="address">Dirección</label>
-              <textarea id="address" name="address" rows="5"
-                placeholder="Calle, número, ciudad, referencia…"
-                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition">{{ f.get('address', '') }}</textarea>
-            </div>
-
-            <div>
-              <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">📝</div>
-                <div>
-                  <h3 class="font-bold text-lg text-purple-700">Observaciones</h3>
-                  <p class="text-sm text-gray-500">Notas internas sobre el cliente</p>
-                </div>
-              </div>
-              <label class="block text-sm font-semibold mb-2" for="observations">Observaciones</label>
-              <textarea id="observations" name="observations" rows="5"
-                placeholder="Preferencias, horarios, contacto alterno…"
-                class="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 transition">{{ f.get('observations', '') }}</textarea>
-            </div>
+      {# —— Comercial —— #}
+      <section class="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3.5 bg-indigo-50/80 border-b border-indigo-100">
+          <span class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shrink-0">2</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Información comercial</h2>
+            <p class="text-xs text-slate-500">Empresa y clasificación</p>
           </div>
         </div>
-
-        <div class="mt-8 flex flex-wrap gap-4">
-          <button type="submit"
-            class="bg-purple-700 hover:bg-purple-800 text-white px-8 py-3 rounded-xl transition font-semibold">
-            Guardar Cliente
-          </button>
-          <a href="/clients" class="bg-gray-200 hover:bg-gray-300 px-8 py-3 rounded-xl transition">
-            Cancelar
-          </a>
+        <div class="p-5 grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="company">Empresa</label>
+            <input type="text" id="company" name="company" value="{{ f.get('company', '') }}"
+              placeholder="Nombre comercial o razón social"
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 px-3.5 py-2.5 rounded-xl text-sm transition" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="client_type">Tipo de cliente *</label>
+            <select id="client_type" name="client_type"
+              class="w-full border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm bg-white">
+              {% set selected_type = f.get('client_type', 'minorista') %}
+              <option value="minorista" {% if selected_type == 'minorista' %}selected{% endif %}>Minorista</option>
+              <option value="mayorista" {% if selected_type == 'mayorista' %}selected{% endif %}>Mayorista</option>
+              <option value="frecuente" {% if selected_type == 'frecuente' %}selected{% endif %}>Frecuente</option>
+            </select>
+          </div>
         </div>
+      </section>
 
-      </form>
+      {# —— Ubicación y notas —— #}
+      <section class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-3 px-5 py-3.5 bg-emerald-50/80 border-b border-emerald-100">
+          <span class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg shrink-0">3</span>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Ubicación y notas</h2>
+            <p class="text-xs text-slate-500">Dirección y observaciones internas</p>
+          </div>
+        </div>
+        <div class="p-5 grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="address">Dirección</label>
+            <textarea id="address" name="address" rows="5"
+              placeholder="Calle, número, ciudad, referencia…"
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 p-3.5 rounded-xl text-sm transition resize-y">{{ f.get('address', '') }}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5" for="observations">Observaciones</label>
+            <textarea id="observations" name="observations" rows="5"
+              placeholder="Preferencias, horarios, contacto alterno…"
+              class="w-full border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 p-3.5 rounded-xl text-sm transition resize-y">{{ f.get('observations', '') }}</textarea>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <div class="col-span-12 xl:col-span-4">
-      <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 lg:sticky lg:top-6">
-        <h3 class="text-lg font-bold mb-4">Vista previa</h3>
-
-        <div class="flex items-start gap-4 pb-5 border-b">
-          <div class="w-14 h-14 rounded-3xl bg-purple-100 flex items-center justify-center shrink-0">
-            <span class="text-2xl text-purple-600" id="previewInitials">?</span>
-          </div>
-          <div class="min-w-0">
-            <p class="font-bold text-xl text-gray-900 truncate" id="previewName">Nuevo cliente</p>
-            <span id="previewTypeBadge"
-              class="inline-block mt-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
-              Minorista
-            </span>
-            <p class="text-sm text-gray-500 mt-2 truncate" id="previewCompany">Sin empresa</p>
-          </div>
+    {# —— Vista previa + acciones —— #}
+    <aside class="xl:col-span-4 xl:sticky xl:top-24 self-start space-y-3">
+      <div class="rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden">
+        <div class="px-4 py-3 bg-slate-900 text-white text-sm font-semibold flex items-center justify-between">
+          <span>Vista previa</span>
+          <span class="text-[10px] font-normal text-slate-300 uppercase tracking-wide">En vivo</span>
         </div>
+        <div class="p-4 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center text-lg font-bold shrink-0 shadow-md shadow-purple-200">
+              <span id="previewInitials">?</span>
+            </div>
+            <div class="min-w-0">
+              <h3 id="previewName" class="text-lg font-bold text-slate-900 leading-snug truncate">Nuevo cliente</h3>
+              <p id="previewCompany" class="text-xs text-slate-500 mt-0.5 truncate">Sin empresa</p>
+              <span id="previewTypeBadge"
+                class="inline-block mt-2 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold border border-purple-100">
+                Minorista
+              </span>
+            </div>
+          </div>
 
-        <div class="py-4 space-y-3 text-sm text-gray-600 border-b">
-          <p class="flex items-center gap-2">
-            <span>📞</span>
-            <span id="previewPhone">Sin teléfono</span>
-          </p>
-          <p class="flex items-center gap-2">
-            <span>✉️</span>
-            <span id="previewEmail" class="truncate">Sin correo</span>
-          </p>
-          <p class="flex items-start gap-2">
-            <span class="shrink-0">📍</span>
-            <span id="previewAddress">Sin dirección</span>
-          </p>
-        </div>
+          <div class="space-y-2.5 text-sm text-slate-600 border-t border-slate-100 pt-4">
+            <p class="flex items-center gap-2 min-w-0">
+              <span class="w-7 h-7 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center text-xs shrink-0">☎</span>
+              <span id="previewPhone" class="truncate">Sin teléfono</span>
+            </p>
+            <p class="flex items-center gap-2 min-w-0">
+              <span class="w-7 h-7 rounded-lg bg-violet-50 text-violet-700 flex items-center justify-center text-xs shrink-0">✉</span>
+              <span id="previewEmail" class="truncate">Sin correo</span>
+            </p>
+            <p class="flex items-start gap-2">
+              <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs shrink-0">⌖</span>
+              <span id="previewAddress" class="text-xs leading-relaxed">Sin dirección</span>
+            </p>
+            <p class="flex items-center gap-2 min-w-0">
+              <span class="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">ID</span>
+              <span id="previewDoc" class="truncate text-xs">Sin documento</span>
+            </p>
+          </div>
 
-        <div class="pt-5">
-          <p class="text-sm font-semibold text-gray-700 mb-3">Antes de guardar</p>
-          <ul class="text-sm text-gray-500 space-y-2">
-            <li class="flex gap-2"><span class="text-purple-600">✓</span> El nombre es obligatorio</li>
-            <li class="flex gap-2"><span class="text-purple-600">✓</span> RUC/CI único si lo registras</li>
-            <li class="flex gap-2"><span class="text-purple-600">✓</span> Podrás crear cotizaciones después</li>
+          <div class="rounded-xl bg-purple-50 border border-purple-100 px-3 py-3">
+            <p class="text-[10px] uppercase tracking-wide text-purple-600 font-semibold">Clientes registrados</p>
+            <p class="text-2xl font-bold text-purple-900 mt-0.5">{{ total_clients|default(0) }}</p>
+          </div>
+
+          <ul class="text-[11px] text-slate-500 space-y-1.5">
+            <li class="flex gap-1.5"><span class="text-purple-600 font-bold">✓</span> El nombre es obligatorio</li>
+            <li class="flex gap-1.5"><span class="text-purple-600 font-bold">✓</span> RUC/CI único si lo registras</li>
+            <li class="flex gap-1.5"><span class="text-purple-600 font-bold">✓</span> Luego podrás crear cotizaciones</li>
           </ul>
         </div>
-
-        <div class="mt-6 rounded-2xl bg-purple-50 border border-purple-100 p-4 text-sm text-purple-800">
-          <p class="font-semibold">Clientes registrados</p>
-          <p class="text-2xl font-bold mt-1">{{ total_clients|default(0) }}</p>
-        </div>
       </div>
-    </div>
 
-  </div>
+      <div class="flex flex-col sm:flex-row xl:flex-col gap-2">
+        <button type="submit" class="w-full px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold shadow-md shadow-purple-200">
+          Guardar cliente
+        </button>
+        <a href="/clients" class="w-full text-center px-5 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50">
+          Cancelar
+        </a>
+      </div>
+    </aside>
+  </form>
 </div>
 
 <script>
@@ -229,6 +220,11 @@
     minorista: "Minorista",
     mayorista: "Mayorista",
     frecuente: "Frecuente",
+  };
+  var typeClasses = {
+    minorista: "inline-block mt-2 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold border border-purple-100",
+    mayorista: "inline-block mt-2 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-100",
+    frecuente: "inline-block mt-2 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100",
   };
 
   function initials(name) {
@@ -249,6 +245,7 @@
     var phone = document.getElementById("phone").value.trim();
     var email = document.getElementById("email").value.trim();
     var address = document.getElementById("address").value.trim();
+    var ruc = document.getElementById("ruc_ci").value.trim();
     var clientType = document.getElementById("client_type").value;
 
     document.getElementById("previewName").textContent = name || "Nuevo cliente";
@@ -257,10 +254,13 @@
     document.getElementById("previewPhone").textContent = placeholder(phone, "Sin teléfono");
     document.getElementById("previewEmail").textContent = placeholder(email, "Sin correo");
     document.getElementById("previewAddress").textContent = placeholder(address, "Sin dirección");
-    document.getElementById("previewTypeBadge").textContent = typeLabels[clientType] || clientType;
+    document.getElementById("previewDoc").textContent = placeholder(ruc, "Sin documento");
+    var badge = document.getElementById("previewTypeBadge");
+    badge.textContent = typeLabels[clientType] || clientType;
+    badge.className = typeClasses[clientType] || typeClasses.minorista;
   }
 
-  ["name", "company", "phone", "email", "address", "client_type"].forEach(function (id) {
+  ["name", "company", "phone", "email", "address", "ruc_ci", "client_type"].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) {
       el.addEventListener("input", syncPreview);
