@@ -574,9 +574,9 @@
 
 {% from "shipments/_label_card.html" import label_card %}
 {% set logo_src = logo_image_url(label.company_logo) if label.company_logo else none %}
-{% set barcode_value = label.guide_number or ('COT-' ~ label.quotation_id) %}
+{% set barcode_value = label.guide_number or ('COT-' ~ (label.quotation_id or label.shipment_id or '0')) %}
 {% set priority_label = label.carrier if label.carrier else 'ENVÍO PRIORITARIO' %}
-{% set back_url = '/shipments/quotations' %}
+{% set back_url = '/shipments/' if label.shipment_id and not label.quotation_id else '/shipments/quotations' %}
 
 <div class="modal-overlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="labelModalTitle">
@@ -584,7 +584,10 @@
             <div class="modal-title-row">
                 <div>
                     <h1 class="modal-title" id="labelModalTitle">Vista previa de etiqueta</h1>
-                    <p class="modal-subtitle">Guía {{ label.guide_number }} · Cotización #{{ label.quotation_id }}</p>
+                    <p class="modal-subtitle">
+                      Guía {{ label.guide_number }}
+                      {% if label.quotation_id %} · Cotización #{{ label.quotation_id }}{% else %} · Sin cotización{% endif %}
+                    </p>
                 </div>
                 <button type="button" class="btn-close" onclick="closeLabelModal()" title="Cerrar" aria-label="Cerrar">×</button>
             </div>
@@ -615,14 +618,21 @@
                 <div class="control-group">
                     <label>Formato</label>
                     <div class="size-toggle">
+                        {% if label.shipment_id %}
+                        <a href="/shipments/{{ label.shipment_id }}/label?size=a4"
+                           class="{% if label.print_size == 'a4' %}active{% endif %}">A4</a>
+                        <a href="/shipments/{{ label.shipment_id }}/label?size=a5"
+                           class="{% if label.print_size == 'a5' %}active{% endif %}">A5</a>
+                        {% elif label.quotation_id %}
                         <a href="/shipments/quotation/{{ label.quotation_id }}/label?size=a4"
                            class="{% if label.print_size == 'a4' %}active{% endif %}">A4</a>
                         <a href="/shipments/quotation/{{ label.quotation_id }}/label?size=a5"
                            class="{% if label.print_size == 'a5' %}active{% endif %}">A5</a>
+                        {% endif %}
                     </div>
                 </div>
 
-                {% if label.is_draft %}
+                {% if label.is_draft and label.quotation_id %}
                 <a href="/shipments/new/{{ label.quotation_id }}" class="btn">Registrar guía</a>
                 {% elif label.shipment_id %}
                 <a href="/shipments/{{ label.shipment_id }}/edit" class="btn">Editar destinatario</a>
@@ -688,7 +698,7 @@
     var barcodeValue = {{ barcode_value|tojson }};
     var printSize = {{ label.print_size|tojson }};
     var backUrl = {{ back_url|tojson }};
-    var guideTitle = {{ (label.guide_number or ('COT-' ~ label.quotation_id))|tojson }};
+    var guideTitle = {{ (label.guide_number or ('COT-' ~ (label.quotation_id or label.shipment_id or 0)))|tojson }};
 
     function renderIcons(root) {
         if (typeof lucide === "undefined" || typeof lucide.createIcons !== "function") return;

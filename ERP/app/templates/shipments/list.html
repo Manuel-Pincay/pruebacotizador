@@ -1,149 +1,263 @@
 {% extends 'layouts/base.html' %}
+{% from "components/pagination.html" import render_pagination %}
 
 {% block content %}
 
 <div class="erp-page-header flex flex-wrap items-center justify-between gap-4">
-    <div>
-        <h1 class="erp-page-title">Guías de Envío</h1>
-        <p class="text-gray-500 mt-2">Despacho y etiquetas logísticas</p>
-    </div>
+  <div>
+    <h1 class="erp-page-title text-slate-900">Guías de envío</h1>
+    <p class="text-slate-500 mt-2">Despacho y etiquetas · una guía por cotización</p>
+  </div>
+  <div class="flex flex-col sm:flex-row gap-2 shrink-0">
     <a href="/shipments/quotations"
-        class="bg-purple-700 hover:bg-purple-800 text-white px-5 py-2.5 rounded-xl text-sm font-medium">
-        + Guía desde cotización
+      class="erp-full-mobile sm:w-auto text-center border border-purple-300 text-purple-700 px-5 py-3 rounded-xl hover:bg-purple-50 transition text-sm font-medium">
+      Todas las cotizaciones
     </a>
+    <a href="/shipments/new"
+      class="erp-full-mobile sm:w-auto text-center bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition text-sm font-medium">
+      + Nueva guía
+    </a>
+  </div>
 </div>
 
 {% if flash_deleted %}
-<div class="mb-4 rounded-xl bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm">
-    Guía eliminada correctamente.
+<div class="mb-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+  Guía eliminada correctamente.
+</div>
+{% endif %}
+{% if flash_saved %}
+<div class="mb-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+  Guía guardada.
 </div>
 {% endif %}
 {% if flash_error == 'clave_admin_incorrecta' %}
-<div class="mb-4 rounded-xl bg-red-50 border border-red-200 text-red-800 px-4 py-3 text-sm">
-    Clave de administrador incorrecta. No se eliminó la guía.
+<div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-sm">
+  Clave de administrador incorrecta. No se eliminó la guía.
 </div>
 {% endif %}
 
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+  <a href="/shipments/?view=pendientes" class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 border-amber-500 hover:bg-amber-50/40 transition">
+    <p class="text-xs sm:text-sm text-gray-500">Pendientes de guía</p>
+    <h2 class="text-2xl sm:text-3xl font-bold mt-1 text-slate-900">{{ stats_pending|default(0) }}</h2>
+  </a>
+  <a href="/shipments/?view=registradas" class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 border-purple-600 hover:bg-purple-50/40 transition">
+    <p class="text-xs sm:text-sm text-gray-500">Guías registradas</p>
+    <h2 class="text-2xl sm:text-3xl font-bold mt-1 text-slate-900">{{ stats_registered|default(0) }}</h2>
+  </a>
+  <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 border-slate-400">
+    <p class="text-xs sm:text-sm text-gray-500">Con cotización</p>
+    <h2 class="text-2xl sm:text-3xl font-bold mt-1 text-slate-900">{{ stats_with_quote|default(0) }}</h2>
+  </div>
+  <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-l-4 border-indigo-500">
+    <p class="text-xs sm:text-sm text-gray-500">Sin cotización</p>
+    <h2 class="text-2xl sm:text-3xl font-bold mt-1 text-slate-900">{{ stats_without_quote|default(0) }}</h2>
+  </div>
+</div>
+
+<div class="flex flex-wrap gap-2 mb-5">
+  <a href="/shipments/?view=pendientes"
+    class="px-4 py-2 rounded-xl text-sm font-medium transition {% if view == 'pendientes' %}bg-amber-500 text-white{% else %}bg-white border border-gray-200 text-slate-700 hover:bg-slate-50{% endif %}">
+    Pendientes{% if stats_pending %} ({{ stats_pending }}){% endif %}
+  </a>
+  <a href="/shipments/?view=registradas"
+    class="px-4 py-2 rounded-xl text-sm font-medium transition {% if view == 'registradas' %}bg-purple-600 text-white{% else %}bg-white border border-gray-200 text-slate-700 hover:bg-slate-50{% endif %}">
+    Registradas{% if stats_registered %} ({{ stats_registered }}){% endif %}
+  </a>
+</div>
+
 <div class="bg-white rounded-2xl shadow overflow-hidden">
-    <div class="erp-table-wrap">
-        <table class="erp-table">
-            <thead class="bg-gray-100">
-                <tr>
-                    <th class="text-left p-4">Guía</th>
-                    <th class="text-left p-4">Cotización</th>
-                    <th class="text-left p-4">Estado cot.</th>
-                    <th class="text-left p-4">Estado prod.</th>
-                    <th class="text-left p-4">Cliente</th>
-                    <th class="text-left p-4">Cédula</th>
-                    <th class="text-left p-4">Destino</th>
-                    <th class="text-left p-4">Transportadora</th>
-                    <th class="text-left p-4">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for shipment in shipments %}
-                {% set q = shipment.quotation %}
-                <tr class="border-t hover:bg-gray-50">
-                    <td class="p-4 font-bold text-purple-700">{{ shipment.guide_number }}</td>
-                    <td class="p-4">#{{ shipment.quotation_id }}</td>
-                    <td class="p-4 text-xs">
-                        {% if q %}
-                        <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 font-medium capitalize">
-                            {{ q.status }}
-                        </span>
-                        {% else %}—{% endif %}
-                    </td>
-                    <td class="p-4 text-xs">
-                        {% if q and q.production_order %}
-                        <span class="inline-flex px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium capitalize">
-                            {{ q.production_order.status }}
-                        </span>
-                        {% else %}
-                        <span class="text-gray-400">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="p-4">{{ shipment.customer_name }}</td>
-                    <td class="p-4 text-sm">{{ shipment.customer_id_number or '—' }}</td>
-                    <td class="p-4">{{ shipment.destination_city or '—' }}</td>
-                    <td class="p-4">{{ shipment.carrier or '—' }}</td>
-                    <td class="p-4">
-                        <div class="flex flex-wrap gap-2">
-                            <a href="/shipments/{{ shipment.id }}/edit"
-                                class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-lg text-xs font-medium">
-                                Editar
-                            </a>
-                            <a href="/shipments/{{ shipment.id }}/label?size=a4"
-                                class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
-                                Etiqueta
-                            </a>
-                            <button type="button"
-                                class="bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-medium"
-                                onclick="openDeleteModal({{ shipment.id }}, '{{ shipment.guide_number }}')">
-                                Eliminar
-                            </button>
-                        </div>
-                    </td>
-                </tr>
+  <div class="erp-table-wrap">
+    <table class="erp-table">
+      <thead class="bg-gray-100">
+        {% if view == 'pendientes' %}
+        <tr>
+          <th class="text-left p-4">Cotización</th>
+          <th class="text-left p-4">Cliente</th>
+          <th class="text-left p-4">Estado cot.</th>
+          <th class="text-left p-4">Estado prod.</th>
+          <th class="text-left p-4">Acciones</th>
+        </tr>
+        {% else %}
+        <tr>
+          <th class="text-left p-4">Guía</th>
+          <th class="text-left p-4">Origen</th>
+          <th class="text-left p-4">Cliente</th>
+          <th class="text-left p-4">Destino</th>
+          <th class="text-left p-4">Transportadora</th>
+          <th class="text-left p-4">Estados</th>
+          <th class="text-left p-4">Acciones</th>
+        </tr>
+        {% endif %}
+      </thead>
+      <tbody>
+        {% if view == 'pendientes' %}
+          {% for row in rows %}
+          <tr class="border-t hover:bg-amber-50/40">
+            <td class="p-4">
+              <a href="/quotations/{{ row.quotation_id }}" class="font-bold text-slate-900 hover:text-purple-700">#{{ row.quotation_id }}</a>
+              <p class="text-xs text-amber-700 mt-0.5 font-medium">Sin guía</p>
+            </td>
+            <td class="p-4">
+              <p class="font-medium text-slate-900">{{ row.client_name }}</p>
+              <p class="text-xs text-gray-400 mt-0.5">{{ row.client_doc or '—' }}</p>
+            </td>
+            <td class="p-4">
+              <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 text-xs font-medium">
+                {{ row.quotation_status_label }}
+              </span>
+            </td>
+            <td class="p-4">
+              <span class="inline-flex px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                {{ row.production_status_label }}
+              </span>
+            </td>
+            <td class="p-4">
+              <div class="flex flex-wrap gap-2">
+                <a href="/shipments/quotation/{{ row.quotation_id }}/label?size=a4"
+                  class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-lg text-xs font-medium">
+                  Vista previa
+                </a>
+                <a href="/shipments/new/{{ row.quotation_id }}"
+                  class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                  Generar guía
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="p-12 text-center text-gray-400">
+              No hay cotizaciones pendientes de guía.
+              <a href="/shipments/?view=registradas" class="text-purple-700 font-medium hover:underline ml-1">Ver registradas</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          {% for row in rows %}
+          <tr class="border-t hover:bg-gray-50">
+            <td class="p-4">
+              <a href="/shipments/{{ row.shipment_id }}/label?size=a4" class="font-bold text-purple-700 hover:underline">
+                {{ row.guide_number }}
+              </a>
+              {% if row.created_at %}
+              <p class="text-xs text-gray-400 mt-0.5">{{ row.created_at.strftime('%d/%m/%Y') }}</p>
+              {% endif %}
+            </td>
+            <td class="p-4">
+              {% if row.quotation_id %}
+              <a href="/quotations/{{ row.quotation_id }}" class="font-medium text-slate-800 hover:text-purple-700">#{{ row.quotation_id }}</a>
+              <p class="text-xs text-gray-400">Cotización</p>
+              {% else %}
+              <span class="inline-flex px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">Manual</span>
+              {% endif %}
+            </td>
+            <td class="p-4">
+              <p class="font-medium text-slate-900">{{ row.customer_name }}</p>
+              <p class="text-xs text-gray-400 mt-0.5">{{ row.customer_id_number or '—' }}</p>
+            </td>
+            <td class="p-4">
+              <p class="text-slate-800">{{ row.destination_city or '—' }}</p>
+              <p class="text-xs text-gray-400 max-w-[180px] truncate" title="{{ row.destination_address }}">
+                {{ row.destination_address or '' }}
+              </p>
+            </td>
+            <td class="p-4 text-slate-700">{{ row.carrier or '—' }}</td>
+            <td class="p-4">
+              <div class="flex flex-col gap-1 items-start">
+                {% if row.quotation_id %}
+                <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 text-xs font-medium">
+                  {{ row.quotation_status_label }}
+                </span>
+                <span class="inline-flex px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                  {{ row.production_status_label }}
+                </span>
                 {% else %}
-                <tr>
-                    <td colspan="9" class="p-10 text-center text-gray-400">
-                        No hay guías. <a href="/shipments/quotations" class="text-purple-700 hover:underline">Crear desde cotización aprobada</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                <span class="text-gray-400 text-sm">—</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="p-4">
+              <div class="flex flex-wrap gap-2">
+                <a href="/shipments/{{ row.shipment_id }}/edit"
+                  class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-lg text-xs font-medium">
+                  Editar
+                </a>
+                <a href="/shipments/{{ row.shipment_id }}/label?size=a4"
+                  class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                  Etiqueta
+                </a>
+                <button type="button"
+                  class="bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  onclick="openDeleteModal({{ row.shipment_id }}, '{{ row.guide_number }}')">
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="p-12 text-center text-gray-400">
+              No hay guías registradas.
+              <a href="/shipments/?view=pendientes" class="text-purple-700 font-medium hover:underline ml-1">Ver pendientes</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {{ render_pagination(page, pages, total, "/shipments/", filter_params) }}
 </div>
 
 <div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h3 class="text-lg font-bold text-slate-900 mb-2">Eliminar guía</h3>
-        <p class="text-sm text-gray-600 mb-4">
-            Se eliminará la guía <strong id="delete-guide-label"></strong>.
-            Ingrese la clave de administrador para confirmar.
-        </p>
-        <form method="POST" id="delete-form" class="space-y-4">
-            <input type="password" name="admin_password" required autocomplete="off"
-                placeholder="Clave de administrador"
-                class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-red-400" />
-            <div class="flex gap-3 justify-end">
-                <button type="button" onclick="closeDeleteModal()"
-                    class="px-4 py-2 rounded-xl border border-gray-300 text-sm font-medium hover:bg-gray-50">
-                    Cancelar
-                </button>
-                <button type="submit"
-                    class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium">
-                    Eliminar guía
-                </button>
-            </div>
-        </form>
-    </div>
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+    <h3 class="text-lg font-bold text-slate-900 mb-2">Eliminar guía</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Se eliminará la guía <strong id="delete-guide-label"></strong>.
+      Ingrese la clave de administrador para confirmar.
+    </p>
+    <form method="POST" id="delete-form" class="space-y-4">
+      <input type="password" name="admin_password" required autocomplete="off"
+        placeholder="Clave de administrador"
+        class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-red-400" />
+      <div class="flex gap-3 justify-end">
+        <button type="button" onclick="closeDeleteModal()"
+          class="px-4 py-2 rounded-xl border border-gray-300 text-sm font-medium hover:bg-gray-50">
+          Cancelar
+        </button>
+        <button type="submit"
+          class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium">
+          Eliminar guía
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
 function openDeleteModal(id, guideNumber) {
-    document.getElementById('delete-guide-label').textContent = guideNumber;
-    document.getElementById('delete-form').action = '/shipments/' + id + '/delete';
-    document.getElementById('delete-modal').classList.remove('hidden');
-    document.querySelector('#delete-form input[name="admin_password"]').focus();
+  document.getElementById('delete-guide-label').textContent = guideNumber;
+  document.getElementById('delete-form').action = '/shipments/' + id + '/delete';
+  document.getElementById('delete-modal').classList.remove('hidden');
+  document.querySelector('#delete-form input[name="admin_password"]').focus();
 }
 function closeDeleteModal() {
-    document.getElementById('delete-modal').classList.add('hidden');
-    document.getElementById('delete-form').reset();
+  document.getElementById('delete-modal').classList.add('hidden');
+  document.getElementById('delete-form').reset();
 }
 document.getElementById('delete-modal').addEventListener('click', function (e) {
-    if (e.target === this) closeDeleteModal();
+  if (e.target === this) closeDeleteModal();
 });
 </script>
 
 {% if open_label %}
 <script>
 (function () {
-    var id = {{ open_label | int }};
-    var size = {{ open_size | tojson }};
-    window.location.href = '/shipments/' + id + '/label?size=' + encodeURIComponent(size);
-
+  var id = {{ open_label | int }};
+  var size = {{ open_size | tojson }};
+  window.location.href = '/shipments/' + id + '/label?size=' + encodeURIComponent(size);
 })();
 </script>
 {% endif %}

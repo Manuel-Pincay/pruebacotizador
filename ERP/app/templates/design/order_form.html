@@ -1,15 +1,22 @@
 {% extends 'layouts/base.html' %}
 {% from "components/catalog_select.html" import catalog_select %}
 
+{% block title %}Orden {{ order.order_label }} · Diseño · Cot. #{{ prefill.quotation_id }}{% endblock %}
+
 {% block content %}
 <div class="mb-4">
     <a href="/design/orders" class="text-sm text-purple-700 hover:underline">← Volver a órdenes</a>
 </div>
 
-<div class="max-w-3xl mx-auto">
+<div class="w-full pb-8">
     <div class="mb-6">
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+            <span class="inline-flex items-center rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-purple-800">Diseño</span>
+            <span class="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{{ order.order_label }}</span>
+            <span class="text-xs text-slate-500">Cot. #{{ prefill.quotation_id }}</span>
+        </div>
         <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Orden {{ order.order_label }}</h1>
-        <p class="text-gray-500 mt-1">Complete productos, archivos de impresión y envíe a producción o despacho</p>
+        <p class="text-gray-500 mt-1">Marque productos, indique el nombre del archivo en USB y pase a producción o envío</p>
         {% if not can_edit %}
         <p class="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
             Solo lectura. El diseñador asignado o un administrador pueden editar.
@@ -26,12 +33,6 @@
     {% if claim_error %}
     <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ claim_error }}</div>
     {% endif %}
-    {% if upload_ok %}
-    <div class="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm">Archivo de impresión guardado.</div>
-    {% endif %}
-    {% if upload_error %}
-    <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm">{{ upload_error }}</div>
-    {% endif %}
     {% if can_claim %}
     <div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
         <p class="text-sm text-amber-900 mb-3">Esta orden no tiene diseñador. Tómala para trabajarla de inmediato.</p>
@@ -41,64 +42,27 @@
     </div>
     {% endif %}
 
-    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><span class="text-gray-500">Cotización</span><div class="font-semibold">#{{ prefill.quotation_id }}</div></div>
-            <div><span class="text-gray-500">Cliente</span><div class="font-semibold">{{ prefill.client_name }}</div></div>
-            <div><span class="text-gray-500">Estado</span><div class="font-semibold">{{ order.status_label }}</div></div>
-            <div><span class="text-gray-500">Asignado</span><div class="font-semibold">{{ order.assigned_to_name }}</div></div>
-        </div>
-    </div>
-
-    {# Archivos para imprimir (múltiples) #}
-    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 class="text-lg font-bold">Archivos para imprimir</h2>
-            <span class="text-sm text-gray-500">{{ designs_count or 0 }} / {{ max_designs or 20 }}</span>
-        </div>
-        {% if designs %}
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-            {% for design in designs %}
-            <div class="relative group rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
-                <a href="{{ design.url }}" target="_blank" class="block w-full h-32 flex items-center justify-center p-2">
-                    <img src="{{ design.url }}" alt="Archivo {{ loop.index }}" class="max-w-full max-h-full object-contain" />
-                </a>
-                <span class="absolute top-2 left-2 text-[10px] font-medium bg-black/55 text-white px-1.5 py-0.5 rounded-md">{{ loop.index }}</span>
-                {% if can_edit %}
-                <form method="post" action="/design/orders/{{ order.id }}/designs/{{ design.id }}/delete"
-                      class="absolute top-2 right-2"
-                      onsubmit="return erpConfirmForm(event, '¿Eliminar este archivo?')">
-                    <button type="submit" class="w-7 h-7 rounded-lg bg-red-500/90 hover:bg-red-600 text-white text-xs shadow">✕</button>
-                </form>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-gray-400 text-sm mb-4">Sin archivos todavía. Suba 1, 2, 3… según necesite.</p>
-        {% endif %}
-        {% if can_edit and (designs_count or 0) < (max_designs or 20) %}
-        <form method="post" action="/design/orders/{{ order.id }}/designs" enctype="multipart/form-data" class="pt-3 border-t border-gray-100 space-y-3">
-            <input type="file" name="design_file" accept=".png,.jpg,.jpeg,.webp" required
-                   class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-50 file:text-purple-700" />
-            <button type="submit" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium">Guardar archivo</button>
-        </form>
-        {% endif %}
-    </div>
-
-    <form method="POST" action="/design/orders/{{ order.id }}" class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4 mb-6" id="designOrderForm">
+    <form method="POST" action="/design/orders/{{ order.id }}" id="designOrderForm">
         {% set readonly = not can_edit %}
 
-        <div>
-            <div class="flex items-center justify-between gap-2 mb-3">
-                <h2 class="text-base font-bold text-slate-800">Productos de la orden</h2>
-                <p class="text-xs text-gray-500">Inventario → va a envío. Producción → fabricación.</p>
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <div class="xl:col-span-8 space-y-5 min-w-0">
+        {# —— Paso 1: productos —— #}
+        <section class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-purple-600">Paso 1</p>
+                    <h2 class="text-base font-bold text-slate-800">Productos</h2>
+                </div>
+                <p class="text-xs text-slate-500 max-w-xs text-right">
+                    <strong>Usar inventario</strong> → envío · <strong>Fabricar</strong> → producción
+                </p>
             </div>
             <div class="divide-y border border-gray-200 rounded-xl overflow-hidden">
                 {% for p in work_items %}
-                <div class="p-3 bg-white">
-                    <div class="flex items-start gap-3">
-                        <label class="mt-0.5 flex items-center gap-2 cursor-pointer shrink-0">
+                <div class="p-4 bg-white">
+                    <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+                        <label class="flex items-center gap-2 cursor-pointer shrink-0">
                             <input type="hidden" name="done_item_{{ p.id }}" id="ord_done_{{ p.id }}" value="{{ '1' if p.design_item_done else '0' }}">
                             <input type="checkbox" class="w-5 h-5 rounded border-gray-300 text-purple-700 fulfill-done"
                                    {% if p.design_item_done %}checked{% endif %}
@@ -113,20 +77,20 @@
                                 {% if p.measure and p.measure != '—' %} · {{ p.measure }}{% endif %}
                                 {% if p.stock is not none %} · Stock {{ p.stock }}{% endif %}
                             </div>
-                            <div class="mt-2 flex flex-wrap gap-3 text-xs">
-                                <label class="inline-flex items-center gap-1.5">
-                                    <input type="radio" name="fulfill_item_{{ p.id }}" value="production" class="fulfill-mode"
-                                           {% if not p.fulfill_from_inventory %}checked{% endif %}
-                                           {% if readonly %}disabled{% endif %}>
-                                    Producción
-                                </label>
-                                <label class="inline-flex items-center gap-1.5">
-                                    <input type="radio" name="fulfill_item_{{ p.id }}" value="inventory" class="fulfill-mode"
-                                           {% if p.fulfill_from_inventory %}checked{% endif %}
-                                           {% if readonly %}disabled{% endif %}>
-                                    Inventario
-                                </label>
-                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-xs sm:shrink-0" role="group" aria-label="Origen del producto">
+                            <label class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 cursor-pointer has-[:checked]:border-slate-400 has-[:checked]:bg-slate-50">
+                                <input type="radio" name="fulfill_item_{{ p.id }}" value="production" class="fulfill-mode"
+                                       {% if not p.fulfill_from_inventory %}checked{% endif %}
+                                       {% if readonly %}disabled{% endif %}>
+                                <span class="font-medium text-slate-700">Fabricar</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 cursor-pointer has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50">
+                                <input type="radio" name="fulfill_item_{{ p.id }}" value="inventory" class="fulfill-mode"
+                                       {% if p.fulfill_from_inventory %}checked{% endif %}
+                                       {% if readonly %}disabled{% endif %}>
+                                <span class="font-medium text-emerald-800">Usar inventario</span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -134,79 +98,102 @@
                 <div class="p-4 text-sm text-gray-400">No hay productos en esta orden.</div>
                 {% endfor %}
             </div>
-        </div>
+        </section>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nota / observaciones</label>
-            <textarea name="detail" rows="3" {% if readonly %}readonly{% endif %}
-                      class="w-full border rounded-xl px-3 py-2.5 text-sm"
-                      placeholder="Nota del pedido (siempre disponible)">{{ order.detail }}</textarea>
-        </div>
-
-        <div id="fab-fields" class="{% if not needs_fabrication %}hidden{% endif %} space-y-4">
-            <p class="text-sm font-semibold text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
-                Datos de fabricación (solo productos de producción)
-            </p>
-
+        {# —— Paso 2 dinámico —— #}
+        <section id="fab-fields" class="{% if not needs_fabrication %}hidden{% endif %} bg-white rounded-2xl border border-indigo-100 p-5 shadow-sm space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Archivo final *</label>
-                <input type="text" name="file_name" {% if readonly %}readonly{% endif %}
-                       value="{{ order.file_name }}" placeholder="Ej: TOPPER_001.ai"
-                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono {% if readonly %}bg-gray-50{% endif %}" />
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">Paso 2</p>
+                <h2 class="text-base font-bold text-slate-800">Datos para fabricar</h2>
+                <p class="text-xs text-slate-500 mt-1">El archivo físico va por USB. Aquí solo anota el nombre y el USB.</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Material</label>
-                    <select name="material" {% if readonly %}disabled{% endif %} class="w-full border rounded-xl px-3 py-2.5 text-sm">
-                        <option value="">Seleccionar...</option>
-                        {% for material in materials %}
-                        <option value="{{ material }}" {% if order.material == material %}selected{% endif %}>{{ material }}</option>
-                        {% endfor %}
-                    </select>
-                    {% if readonly %}<input type="hidden" name="material" value="{{ order.material }}" />{% endif %}
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Medida</label>
-                    {% if readonly %}
-                    <input type="text" name="size" readonly value="{{ order.size }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
-                    {% else %}
-                    {{ catalog_select("size", sizes, "+ Agregar medida", "/product-settings/api/size", selected=order.size, extra_class="rounded-xl px-3 py-2.5 text-sm") }}
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
-                    {% if readonly %}
-                    <input type="text" name="usb_reference" readonly value="{{ order.usb_reference }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
-                    {% else %}
-                    {{ catalog_select("usb_reference", usb_references, "+ Agregar USB", "/product-settings/api/usb", selected=order.usb_reference, extra_class="rounded-xl px-3 py-2.5 text-sm") }}
-                    {% endif %}
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Copias</label>
-                    <input type="number" name="copies" min="1" {% if readonly %}readonly{% endif %}
-                           value="{{ order.copies }}" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
+            <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-4">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="lg:col-span-2">
+                        <label class="block text-sm font-semibold text-slate-800 mb-1">Archivos en USB *</label>
+                        <div id="file-names-list" class="space-y-2">
+                            {% set saved_names = order.file_names if order.file_names else [] %}
+                            {% if readonly and saved_names %}
+                                {% for fname in saved_names %}
+                                <div class="file-name-row flex gap-2 items-center">
+                                    <input type="text" name="file_names" value="{{ fname }}" readonly
+                                           class="file-name-input w-full border border-indigo-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm font-mono" />
+                                </div>
+                                {% endfor %}
+                            {% elif readonly %}
+                                <p class="text-sm text-slate-400">Sin archivos registrados.</p>
+                            {% else %}
+                                {% if saved_names %}
+                                    {% for fname in saved_names %}
+                                    <div class="file-name-row flex gap-2 items-center">
+                                        <input type="text" name="file_names" value="{{ fname }}"
+                                               placeholder="Ej: TOPPER_001.ai"
+                                               class="file-name-input w-full border border-indigo-200 bg-white rounded-xl px-3.5 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
+                                        <button type="button" class="file-name-remove shrink-0 w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 {% if loop.first and saved_names|length <= 1 %}hidden{% endif %}" title="Quitar archivo" aria-label="Quitar archivo">×</button>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="file-name-row flex gap-2 items-center">
+                                        <input type="text" name="file_names" value=""
+                                               placeholder="Ej: TOPPER_001.ai"
+                                               class="file-name-input w-full border border-indigo-200 bg-white rounded-xl px-3.5 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
+                                        <button type="button" class="file-name-remove shrink-0 w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 hidden" title="Quitar archivo" aria-label="Quitar archivo">×</button>
+                                    </div>
+                                {% endif %}
+                                <button type="button" id="add-file-name"
+                                        class="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900">
+                                    + Agregar otro archivo
+                                </button>
+                            {% endif %}
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-2">Un nombre por archivo físico en el USB. No se sube al sistema.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
+                        {% if readonly %}
+                        <input type="text" name="usb_reference" readonly value="{{ order.usb_reference }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
+                        {% else %}
+                        {{ catalog_select("usb_reference", usb_references, "+ Agregar USB", "/product-settings/api/usb", selected=order.usb_reference, extra_class="rounded-xl px-3 py-2.5 text-sm") }}
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Copias</label>
+                        <input type="number" name="copies" min="1" {% if readonly %}readonly{% endif %}
+                               value="{{ order.copies or 1 }}" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Material</label>
+                        <select name="material" {% if readonly %}disabled{% endif %} class="w-full border rounded-xl px-3 py-2.5 text-sm">
+                            <option value="">Seleccionar...</option>
+                            {% for material in materials %}
+                            <option value="{{ material }}" {% if order.material == material %}selected{% endif %}>{{ material }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if readonly %}<input type="hidden" name="material" value="{{ order.material }}" />{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Medida</label>
+                        {% if readonly %}
+                        <input type="text" name="size" readonly value="{{ order.size }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
+                        {% else %}
+                        {{ catalog_select("size", sizes, "+ Agregar medida", "/product-settings/api/size", selected=order.size, extra_class="rounded-xl px-3 py-2.5 text-sm") }}
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
             {% if can_edit and not readonly %}
-            <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
-                <p class="text-sm font-semibold text-emerald-900">Origen del material (producción)</p>
-                <div class="flex flex-col sm:flex-row gap-3 text-sm">
-                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="use_fabrication_materials" value="0" class="fab-source-radio"
-                            {% if not order.use_fabrication_materials %}checked{% endif %}>
-                        <span>Stock de producto terminado</span>
-                    </label>
-                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="use_fabrication_materials" value="1" class="fab-source-radio"
-                            {% if order.use_fabrication_materials %}checked{% endif %}>
-                        <span>Usar material de fabricación</span>
-                    </label>
-                </div>
+            <input type="hidden" name="use_fabrication_materials" id="use_fabrication_materials" value="{{ '1' if order.use_fabrication_materials else '0' }}">
+            <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+                <label class="inline-flex items-start gap-2.5 cursor-pointer text-sm">
+                    <input type="checkbox" id="fab_raw_toggle" class="mt-0.5 rounded border-gray-300 text-purple-700"
+                        {% if order.use_fabrication_materials %}checked{% endif %}>
+                    <span>
+                        <span class="font-semibold text-slate-800">Descontar materia prima (opcional)</span>
+                        <span class="block text-xs text-slate-500 mt-0.5">Solo si consume material de stock de fabricación.</span>
+                    </span>
+                </label>
                 <div id="fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
                     <div>
                         <label class="block text-xs text-gray-600 mb-1">Materia prima *</label>
@@ -221,58 +208,87 @@
             </div>
             {% elif order.use_fabrication_materials %}
             <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                Material de fabricación
+                Materia prima
                 {% if order.raw_material_label %} — {{ order.raw_material_label }}{% endif %}
                 {% if order.raw_material_qty %} ({{ order.raw_material_qty }}){% endif %}
             </div>
             {% endif %}
+        </section>
+
+        <div id="inventory-only-hint" class="{% if needs_fabrication %}hidden{% endif %} rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Paso 2</p>
+            <p class="text-sm text-emerald-900 font-medium mt-0.5">Todo sale de inventario</p>
+            <p class="text-xs text-emerald-800/90 mt-1">No hace falta archivo ni datos de fabricación. Al continuar, la orden va directo a <strong>envío</strong> y se descuenta el stock.</p>
         </div>
 
-        <div id="inventory-only-hint" class="{% if needs_fabrication %}hidden{% endif %} text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
-            Todos los productos salen de inventario: no se pide fabricación. Al enviar, la orden pasa directo a <strong>Envío</strong> y se descuenta el stock.
-        </div>
+        {# —— Nota —— #}
+        <section class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nota / observaciones</label>
+            <textarea name="detail" rows="3" {% if readonly %}readonly{% endif %}
+                      class="w-full border rounded-xl px-3 py-2.5 text-sm"
+                      placeholder="Nota del pedido (opcional)">{{ order.detail }}</textarea>
+        </section>
+            </div>
 
-        {% if can_reassign and designers %}
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Reasignar diseñador</label>
-            <select name="assigned_to_user_id" class="w-full border rounded-xl px-3 py-2.5 text-sm">
-                <option value="">Sin asignar</option>
-                {% for designer in designers %}
-                <option value="{{ designer.id }}" {% if order.assigned_to == designer.id %}selected{% endif %}>
-                    {{ designer.full_name or designer.username }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
+            {# —— Panel lateral —— #}
+            <aside class="xl:col-span-4 xl:sticky xl:top-24 self-start space-y-4">
+                <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-3">Resumen</p>
+                    <dl class="space-y-3 text-sm">
+                        <div><dt class="text-gray-500">Cotización</dt><dd class="font-semibold text-slate-900">#{{ prefill.quotation_id }}</dd></div>
+                        <div><dt class="text-gray-500">Cliente</dt><dd class="font-semibold text-slate-900">{{ prefill.client_name }}</dd></div>
+                        <div><dt class="text-gray-500">Estado</dt><dd class="font-semibold text-slate-900">{{ order.status_label }}</dd></div>
+                        <div><dt class="text-gray-500">Asignado</dt><dd class="font-semibold text-slate-900">{{ order.assigned_to_name }}</dd></div>
+                    </dl>
+                </div>
 
-        <div class="flex flex-wrap gap-3 pt-2">
-            {% if can_edit %}
-            <button type="submit" name="action" value="save" class="px-5 py-2.5 rounded-xl bg-purple-700 text-white text-sm font-medium hover:bg-purple-800">
-                Guardar
-            </button>
-            <button type="submit" name="action" value="approve" id="approveBtn"
-                    class="px-5 py-2.5 rounded-xl bg-green-700 text-white text-sm font-medium hover:bg-green-800">
-                {% if needs_fabrication %}Enviar a producción{% else %}Enviar a despacho{% endif %}
-            </button>
-            {% endif %}
-            <a href="/design/orders/{{ order.id }}/print" target="_blank"
-               class="px-5 py-2.5 rounded-xl border border-gray-300 text-sm font-medium hover:bg-gray-50">
-                Imprimir hoja
-            </a>
-            <a href="/production/{{ order.id }}"
-               class="px-5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-sm font-medium hover:bg-indigo-100">
-                Ver en producción
-            </a>
-            <a href="/design/shipping-today"
-               class="px-5 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-sm font-medium hover:bg-blue-100">
-                Envíos de hoy
-            </a>
+                <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                    <p id="flowSummary" class="text-sm text-slate-600"></p>
+                </div>
+
+                {% if can_reassign and designers %}
+                <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reasignar diseñador</label>
+                    <select name="assigned_to_user_id" class="w-full border rounded-xl px-3 py-2.5 text-sm">
+                        <option value="">Sin asignar</option>
+                        {% for designer in designers %}
+                        <option value="{{ designer.id }}" {% if order.assigned_to == designer.id %}selected{% endif %}>
+                            {{ designer.full_name or designer.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-2">
+                    {% if can_edit %}
+                    <button type="submit" name="action" value="save" class="w-full px-5 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-800 text-sm font-medium hover:bg-purple-100">
+                        Guardar avance
+                    </button>
+                    <button type="submit" name="action" value="approve" id="approveBtn"
+                            class="w-full px-5 py-3 rounded-xl bg-green-700 text-white text-sm font-semibold hover:bg-green-800 shadow-sm">
+                        {% if needs_fabrication %}Pasar a producción{% else %}Pasar a envío{% endif %}
+                    </button>
+                    {% endif %}
+                    <a href="/design/orders/{{ order.id }}/print" target="_blank"
+                       class="block w-full text-center px-5 py-2.5 rounded-xl border border-gray-300 text-sm font-medium hover:bg-gray-50">
+                        Imprimir hoja
+                    </a>
+                    <a href="/production/{{ order.id }}"
+                       class="block w-full text-center px-5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 text-sm font-medium hover:bg-indigo-100">
+                        Ver en producción
+                    </a>
+                    <a href="/design/shipping-today"
+                       class="block w-full text-center px-5 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-sm font-medium hover:bg-blue-100">
+                        Envíos de hoy
+                    </a>
+                </div>
+            </aside>
         </div>
     </form>
 
     {% if history %}
-    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mt-6">
         <h2 class="text-lg font-bold mb-4">Historial de estados</h2>
         <div class="space-y-3">
             {% for entry in history %}
@@ -298,6 +314,61 @@
   const fabFields = document.getElementById('fab-fields');
   const invHint = document.getElementById('inventory-only-hint');
   const approveBtn = document.getElementById('approveBtn');
+  const flowSummary = document.getElementById('flowSummary');
+  const fileNamesList = document.getElementById('file-names-list');
+  const addFileBtn = document.getElementById('add-file-name');
+
+  function fileNameInputs() {
+    return Array.from(document.querySelectorAll('#file-names-list .file-name-input'));
+  }
+
+  function syncFileRemoveButtons() {
+    const rows = document.querySelectorAll('#file-names-list .file-name-row');
+    rows.forEach(row => {
+      const btn = row.querySelector('.file-name-remove');
+      if (!btn) return;
+      btn.classList.toggle('hidden', rows.length <= 1);
+    });
+  }
+
+  function syncFileRequired(needs) {
+    fileNameInputs().forEach((input, idx) => {
+      if (needs && idx === 0) input.setAttribute('required', 'required');
+      else input.removeAttribute('required');
+    });
+  }
+
+  function addFileRow(value = '') {
+    if (!fileNamesList) return;
+    const row = document.createElement('div');
+    row.className = 'file-name-row flex gap-2 items-center';
+    row.innerHTML = `
+      <input type="text" name="file_names" value="${value.replace(/"/g, '&quot;')}"
+             placeholder="Ej: TOPPER_001.ai"
+             class="file-name-input w-full border border-indigo-200 bg-white rounded-xl px-3.5 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
+      <button type="button" class="file-name-remove shrink-0 w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Quitar archivo" aria-label="Quitar archivo">×</button>
+    `;
+    fileNamesList.insertBefore(row, addFileBtn);
+    row.querySelector('.file-name-remove')?.addEventListener('click', () => {
+      row.remove();
+      syncFileRemoveButtons();
+      syncFileRequired(needsFabFromRadios());
+    });
+    syncFileRemoveButtons();
+    syncFileRequired(needsFabFromRadios());
+    row.querySelector('.file-name-input')?.focus();
+  }
+
+  addFileBtn?.addEventListener('click', () => addFileRow());
+  document.querySelectorAll('#file-names-list .file-name-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.file-name-row')?.remove();
+      if (!document.querySelector('#file-names-list .file-name-row')) addFileRow();
+      syncFileRemoveButtons();
+      syncFileRequired(needsFabFromRadios());
+    });
+  });
+  syncFileRemoveButtons();
 
   function needsFabFromRadios() {
     const modes = document.querySelectorAll('.fulfill-mode:checked');
@@ -309,8 +380,17 @@
     const needs = needsFabFromRadios();
     fabFields?.classList.toggle('hidden', !needs);
     invHint?.classList.toggle('hidden', needs);
+    if (fileNamesList) syncFileRequired(needs);
     if (approveBtn) {
-      approveBtn.textContent = needs ? 'Enviar a producción' : 'Enviar a despacho';
+      approveBtn.textContent = needs ? 'Pasar a producción' : 'Pasar a envío';
+      approveBtn.className = needs
+        ? 'w-full px-5 py-3 rounded-xl bg-green-700 text-white text-sm font-semibold hover:bg-green-800 shadow-sm'
+        : 'w-full px-5 py-3 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow-sm';
+    }
+    if (flowSummary) {
+      flowSummary.textContent = needs
+        ? 'Hay productos para fabricar: anote los archivos en USB y pase a producción.'
+        : 'Todo es inventario: no se pide archivo. Al confirmar, la orden pasa a envío.';
     }
   }
 
@@ -319,9 +399,9 @@
   });
   syncFabVisibility();
 
-  // Materia prima (solo si hay fabricación)
   const selectedId = {{ order.raw_material_id | tojson }};
-  const radios = document.querySelectorAll('.fab-source-radio');
+  const rawToggle = document.getElementById('fab_raw_toggle');
+  const useFabHidden = document.getElementById('use_fabrication_materials');
   const rawFields = document.getElementById('fab-raw-fields');
   const sel = document.getElementById('raw_material_id');
   const qtyInput = document.getElementById('raw_material_qty');
@@ -335,7 +415,8 @@
     qtyInput.value = String(qtyInput.value).replace(',', '.');
   });
   function toggleRaw() {
-    const useFab = document.querySelector('.fab-source-radio:checked')?.value === '1';
+    const useFab = !!rawToggle?.checked;
+    if (useFabHidden) useFabHidden.value = useFab ? '1' : '0';
     rawFields?.classList.toggle('hidden', !useFab);
     if (useFab) loadMaterials();
   }
@@ -373,9 +454,9 @@
       unitHint.innerHTML = 'Unidad: <strong>' + unit + '</strong>. Puede usar decimales (ej. 1.5).';
     }
   }
-  radios.forEach(r => r.addEventListener('change', toggleRaw));
+  rawToggle?.addEventListener('change', toggleRaw);
   materialSelect?.addEventListener('change', () => {
-    if (document.querySelector('.fab-source-radio:checked')?.value === '1') loadMaterials();
+    if (rawToggle?.checked) loadMaterials();
   });
   sel?.addEventListener('change', updateUnitHint);
   toggleRaw();

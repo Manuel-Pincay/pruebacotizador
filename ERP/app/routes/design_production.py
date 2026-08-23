@@ -34,6 +34,7 @@ from app.services.production_order_service import (
     export_design_sheet_pdf,
     get_production_order,
     get_production_order_by_quotation,
+    join_design_file_names,
     list_design_orders,
     quotation_needs_fabrication,
     transition_status,
@@ -247,7 +248,6 @@ async def design_order_detail(order_id: int, request: Request, db: Session = Dep
 async def design_order_save(
     order_id: int,
     request: Request,
-    file_name: str = Form(""),
     material: str = Form(""),
     size: str = Form(""),
     usb_reference: str = Form(""),
@@ -269,6 +269,7 @@ async def design_order_save(
         return RedirectResponse(url="/design/orders", status_code=302)
 
     form = await request.form()
+    file_name = join_design_file_names(form.getlist("file_names"))
     if can_edit_design_order(user, order_model):
         apply_quotation_item_fulfillment(order_model.quotation, form)
 

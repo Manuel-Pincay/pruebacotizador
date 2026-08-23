@@ -45,6 +45,7 @@ if errorlevel 1 (
 
 :: ── 3. Base de datos MySQL (crear si no existe + migraciones) ─
 echo [3/4] Preparando base de datos MySQL...
+echo       (aplica migraciones Alembic automaticamente, p.ej. guias de envio)
 "%PYTHON%" scripts\ensure_database.py
 if errorlevel 1 (
     echo.

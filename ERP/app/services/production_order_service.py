@@ -67,9 +67,37 @@ PRODUCTION_STATUS_COLORS = {
 }
 
 
+def parse_design_file_names(value: str | None) -> list[str]:
+    """Separa nombres de archivo guardados en una sola columna (uno por línea)."""
+    if not value or not str(value).strip():
+        return []
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    names: list[str] = []
+    for line in text.split("\n"):
+        part = line.strip()
+        if part:
+            names.append(part)
+    return names
+
+
+def join_design_file_names(names: list[str]) -> str:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        part = (name or "").strip()
+        if part and part not in seen:
+            seen.add(part)
+            cleaned.append(part)
+    return "\n".join(cleaned)
+
+
+def format_design_file_names_display(value: str | None) -> str:
+    return ", ".join(parse_design_file_names(value))
+
+
 def fabrication_data_complete(order: ProductionOrder) -> bool:
     return bool(
-        (order.design_file_name or "").strip()
+        parse_design_file_names(order.design_file_name)
         and (order.design_material or "").strip()
         and (order.design_size or "").strip()
         and (order.design_copies or 0) > 0
@@ -78,7 +106,7 @@ def fabrication_data_complete(order: ProductionOrder) -> bool:
 
 def validate_fabrication_data(order: ProductionOrder) -> None:
     missing = []
-    if not (order.design_file_name or "").strip():
+    if not parse_design_file_names(order.design_file_name):
         missing.append("archivo")
     if not (order.design_material or "").strip():
         missing.append("material")
@@ -412,7 +440,7 @@ def update_design_fields(
     db: Session,
     order: ProductionOrder,
     *,
-    file_name: str = "",
+    file_name: str | None = None,
     material: str = "",
     size: str = "",
     usb_reference: str = "",
@@ -426,8 +454,8 @@ def update_design_fields(
     if material and material not in DESIGN_MATERIALS:
         raise ValueError("Material no válido.")
 
-    if file_name:
-        order.design_file_name = file_name.strip()
+    if file_name is not None:
+        order.design_file_name = join_design_file_names(parse_design_file_names(file_name)) or None
     if material:
         order.design_material = material
     if size:
@@ -672,12 +700,15 @@ def list_design_orders(
 
 def build_order_dict(order: ProductionOrder, *, client_name: str = "—") -> dict[str, Any]:
     status = normalize_status(order.status)
+    file_names = parse_design_file_names(order.design_file_name)
     return {
         "id": order.id,
         "order_label": f"OP-{order.id:04d}",
         "quotation_id": order.quotation_id,
         "client_name": client_name,
+        "file_names": file_names,
         "file_name": order.design_file_name or "",
+        "file_name_display": format_design_file_names_display(order.design_file_name),
         "material": order.design_material or "",
         "size": order.design_size or "",
         "usb_reference": order.design_usb_reference or "",
@@ -743,7 +774,7 @@ def export_design_sheet_pdf(order_dict: dict[str, Any]) -> BytesIO:
          Paragraph("<b>Medida</b>", cell_center), Paragraph("<b>USB</b>", cell_center),
          Paragraph("<b>Cant.</b>", cell_center), Paragraph("<b>Cliente</b>", cell_center)],
         [
-            Paragraph(order_dict.get("file_name") or "—", cell),
+            Paragraph("<br/>".join(parse_design_file_names(order_dict.get("file_name"))) or "—", cell),
             Paragraph(order_dict.get("material") or "—", cell_center),
             Paragraph(order_dict.get("size") or "—", cell_center),
             Paragraph(order_dict.get("usb_reference") or "—", cell_center),

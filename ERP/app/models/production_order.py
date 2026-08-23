@@ -27,7 +27,7 @@ class ProductionOrder(Base):
     observations = Column(String)
     notes = Column(String)
 
-    design_file_name = Column(String(255))
+    design_file_name = Column(Text)
     design_material = Column(String(50))
     design_size = Column(String(100))
     design_usb_reference = Column(String(100))

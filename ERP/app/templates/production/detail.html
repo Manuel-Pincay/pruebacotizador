@@ -524,7 +524,11 @@
             <div class="p-5">
                 {% if fabrication.file_name or fabrication.material %}
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                    <div><dt class="text-gray-500">Archivo</dt><dd class="font-mono font-semibold text-slate-900 mt-0.5">{{ fabrication.file_name or '—' }}</dd></div>
+                    <div><dt class="text-gray-500">Archivo{% if fabrication.file_names|length > 1 %}s{% endif %}</dt><dd class="font-mono font-semibold text-slate-900 mt-0.5">
+                        {% if fabrication.file_names %}
+                            {% for f in fabrication.file_names %}<div>{{ f }}</div>{% endfor %}
+                        {% else %}—{% endif %}
+                    </dd></div>
                     <div><dt class="text-gray-500">Material</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.material or '—' }}</dd></div>
                     <div><dt class="text-gray-500">Medida</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.size or '—' }}</dd></div>
                     <div><dt class="text-gray-500">USB</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.usb_reference or '—' }}</dd></div>

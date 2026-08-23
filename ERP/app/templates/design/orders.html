@@ -50,7 +50,7 @@
                         <a href="/quotations/{{ row.quotation_id }}" class="text-purple-700 hover:underline font-medium">#{{ row.quotation_id }}</a>
                     </td>
                     <td class="p-3">{{ row.client_name }}</td>
-                    <td class="p-3 font-mono text-xs">{{ row.file_name }}</td>
+                    <td class="p-3 font-mono text-xs">{{ row.file_name_display or '—' }}</td>
                     <td class="p-3">{{ row.material }}</td>
                     <td class="p-3">{{ row.size }}</td>
                     <td class="p-3">{{ row.usb_reference or '—' }}</td>

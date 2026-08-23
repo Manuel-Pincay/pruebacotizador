@@ -382,9 +382,11 @@ async def design_detail_page(
             "claim_error": request.query_params.get("claim_error", ""),
             "upload_ok": request.query_params.get("uploaded", ""),
             "upload_error": request.query_params.get("upload_error", ""),
-
+            "needs_fabrication": any(
+                not bool(p.get("fulfill_from_inventory"))
+                for p in (detail.get("products") or [])
+            ) if (detail.get("products") or []) else True,
         },
-
     )
 
 

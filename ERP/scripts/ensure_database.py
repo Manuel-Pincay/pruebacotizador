@@ -128,6 +128,7 @@ def run_migrations(params: dict) -> None:
             detail = (stamp.stderr or stamp.stdout or "").strip()
             raise RuntimeError(f"No se pudo sincronizar Alembic:\n{detail}")
 
+    _log("  → Aplicando migraciones pendientes (alembic upgrade head)...")
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=str(ROOT),
@@ -153,6 +154,12 @@ def run_migrations(params: dict) -> None:
                 return
         raise RuntimeError(f"No se pudieron aplicar migraciones Alembic:\n{detail}")
 
+    new_version = _get_alembic_version(params) or "head"
+    if version and version != new_version:
+        _log(f"  [OK] Migraciones aplicadas: {version} → {new_version}")
+    else:
+        _log(f"  [OK] Esquema al día (revisión: {new_version})")
+
 
 def ensure_database(*, verbose: bool = True) -> tuple[bool, str]:
     """
@@ -174,8 +181,6 @@ def ensure_database(*, verbose: bool = True) -> tuple[bool, str]:
         if verbose:
             _log(f"  [OK] Base de datos '{params['database']}' encontrada")
         run_migrations(params)
-        if verbose:
-            _log("  [OK] Migraciones Alembic aplicadas")
         return True, f"MySQL listo ({params['host']}:{params['port']}/{params['database']})"
 
     except Exception as exc:
@@ -190,8 +195,6 @@ def ensure_database(*, verbose: bool = True) -> tuple[bool, str]:
                 if verbose:
                     _log(f"  [OK] Base '{params['database']}' creada")
                 run_migrations(params)
-                if verbose:
-                    _log("  [OK] Migraciones Alembic aplicadas")
                 return True, f"Base '{params['database']}' creada y migrada"
             except Exception as create_exc:
                 return False, f"No se pudo crear la base de datos: {create_exc}"

@@ -907,7 +907,11 @@ async def quotation_detail(
 
     events = []
     whatsapp_url = None
+    shipment = None
     if quotation:
+        from app.services.shipment_service import get_latest_shipment
+
+        shipment = get_latest_shipment(db, quotation.id)
         events = (
             db.query(QuotationEvent)
             .options(joinedload(QuotationEvent.user))
@@ -932,6 +936,7 @@ async def quotation_detail(
         context={
             "quotation": quotation,
             "user": user,
+            "shipment": shipment,
             "design_urls": get_design_urls(quotation) if quotation else [],
             "max_designs": MAX_QUOTATION_DESIGNS,
             "designs_count": len(quotation.designs) if quotation else 0,

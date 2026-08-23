@@ -6,10 +6,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>
-      {{ global_config.config.company_name if global_config.config else "SISTEMA
-      ERP" }} ERP
-    </title>
+    <title>{% block title %}{{ global_config.config.company_name if global_config.config else "SISTEMA ERP" }} ERP{% endblock %}</title>
     {% if global_config.logo_url %}
     <link rel="icon" type="image/png" href="{{ global_config.logo_url }}" sizes="100x100 128x128">
     {% endif %}

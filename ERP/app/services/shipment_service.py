@@ -122,6 +122,7 @@ def quotation_can_have_guide(quotation: Quotation | None) -> bool:
 
 
 def get_latest_shipment(db: Session, quotation_id: int) -> Shipment | None:
+    """Devuelve la única guía de la cotización (si existe)."""
     return (
         db.query(Shipment)
         .filter(Shipment.quotation_id == quotation_id)
@@ -130,17 +131,57 @@ def get_latest_shipment(db: Session, quotation_id: int) -> Shipment | None:
     )
 
 
+def shipment_form_url(db: Session, quotation_id: int) -> str:
+    """URL para crear o editar la guía de una cotización (1:1)."""
+    existing = get_latest_shipment(db, quotation_id)
+    if existing:
+        return f"/shipments/{existing.id}/edit"
+    return f"/shipments/new/{quotation_id}"
+
+
+def next_guide_number(db: Session) -> str:
+    shipment_count = db.query(Shipment).count()
+    return f"G-{shipment_count + 1:05d}"
+
+
+def apply_shipment_fields(
+    shipment: Shipment,
+    *,
+    customer_name: str,
+    customer_id_number: str,
+    customer_phone: str,
+    destination_city: str,
+    destination_address: str,
+    carrier: str,
+    boxes: int,
+    notes: str,
+) -> None:
+    shipment.customer_name = customer_name.strip()
+    shipment.customer_id_number = customer_id_number.strip() or None
+    shipment.customer_phone = customer_phone.strip()
+    shipment.destination_city = destination_city.strip()
+    shipment.destination_address = destination_address.strip()
+    shipment.carrier = carrier.strip()
+    shipment.boxes = boxes
+    shipment.notes = notes.strip() or None
+
+
 def build_label_context(
     *,
     shipment: Shipment | None,
-    quotation: Quotation,
+    quotation: Quotation | None,
     client: Client | None,
     config: CompanyConfig | None,
     size: str = "a4",
 ) -> dict[str, Any]:
-    """Arma datos para la plantilla de guía (con o sin registro Shipment)."""
+    """Arma datos para la plantilla de guía (con o sin cotización / registro)."""
     size_norm = "a5" if (size or "").lower() == "a5" else "a4"
     sender = get_sender_from_config(config)
+
+    if not client and shipment is not None and getattr(shipment, "client", None):
+        client = shipment.client
+    if not client and quotation is not None:
+        client = quotation.client
 
     if shipment:
         guide_number = shipment.guide_number or f"G-{shipment.id:05d}"
@@ -154,7 +195,7 @@ def build_label_context(
         notes = shipment.notes or ""
         created_at = shipment.created_at
         shipment_id = shipment.id
-    else:
+    elif quotation is not None:
         guide_number = f"COT-{quotation.id:05d}"
         customer_name = client.name if client else "—"
         customer_phone = client.phone if client else ""
@@ -166,10 +207,32 @@ def build_label_context(
         notes = ""
         created_at = quotation.created_at
         shipment_id = None
+    else:
+        guide_number = "—"
+        customer_name = client.name if client else "—"
+        customer_phone = client.phone if client else ""
+        customer_id = client.ruc_ci if client else ""
+        destination_city = ""
+        destination_address = client.address if client else ""
+        carrier = ""
+        boxes = 1
+        notes = ""
+        created_at = None
+        shipment_id = None
+
+    if quotation is not None:
+        status_block = quotation_internal_status(quotation)
+    else:
+        status_block = {
+            "quotation_status": "",
+            "quotation_status_label": "Sin cotización",
+            "production_status": "",
+            "production_status_label": "—",
+        }
 
     return {
         "guide_number": guide_number,
-        "quotation_id": quotation.id,
+        "quotation_id": quotation.id if quotation else None,
         "shipment_id": shipment_id,
         "customer_name": customer_name,
         "customer_phone": customer_phone,
@@ -186,7 +249,7 @@ def build_label_context(
         "print_size": size_norm,
         "is_draft": shipment is None,
         "colors": get_guide_colors(config),
-        **quotation_internal_status(quotation),
+        **status_block,
     }
 
 
@@ -216,3 +279,77 @@ def list_quotations_for_guides(db: Session) -> list[dict[str, Any]]:
             **internal,
         })
     return result
+
+
+def _guide_eligible_quotations_query(db: Session):
+    return (
+        db.query(Quotation)
+        .options(
+            joinedload(Quotation.client),
+            joinedload(Quotation.production_order),
+        )
+        .filter(Quotation.status.in_(list(GUIDE_QUOTATION_STATUSES)))
+    )
+
+
+def pending_guide_quotations_query(db: Session):
+    """Cotizaciones elegibles que aún no tienen guía registrada."""
+    from sqlalchemy import exists
+
+    has_shipment = exists().where(Shipment.quotation_id == Quotation.id)
+    return (
+        _guide_eligible_quotations_query(db)
+        .filter(~has_shipment)
+        .order_by(Quotation.id.desc())
+    )
+
+
+def count_pending_guide_quotations(db: Session) -> int:
+    return pending_guide_quotations_query(db).count()
+
+
+def serialize_pending_quotation(q: Quotation) -> dict[str, Any]:
+    client = q.client
+    internal = quotation_internal_status(q)
+    return {
+        "kind": "pending",
+        "quotation_id": q.id,
+        "client_name": client.name if client else "—",
+        "client_doc": client.ruc_ci if client else "",
+        "destination_hint": (client.address or "") if client else "",
+        "status": q.status,
+        **internal,
+    }
+
+
+def serialize_shipment_row(shipment: Shipment) -> dict[str, Any]:
+    q = shipment.quotation
+    client = None
+    if q and q.client:
+        client = q.client
+    elif shipment.client:
+        client = shipment.client
+    internal = quotation_internal_status(q) if q else {
+        "quotation_status": "",
+        "quotation_status_label": "Sin cotización",
+        "production_status": "",
+        "production_status_label": "—",
+    }
+    return {
+        "kind": "registered",
+        "shipment_id": shipment.id,
+        "guide_number": shipment.guide_number,
+        "quotation_id": shipment.quotation_id,
+        "customer_name": shipment.customer_name or (client.name if client else "—"),
+        "customer_id_number": shipment.customer_id_number or (client.ruc_ci if client else ""),
+        "destination_city": shipment.destination_city or "",
+        "destination_address": shipment.destination_address or "",
+        "carrier": shipment.carrier or "",
+        "created_at": shipment.created_at,
+        "is_manual": shipment.quotation_id is None,
+        **internal,
+        "quotation_status_raw": q.status if q else "",
+        "production_status_raw": (
+            q.production_order.status if q and q.production_order else ""
+        ),
+    }

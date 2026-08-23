@@ -19,9 +19,20 @@ class Shipment(Base):
         primary_key=True
     )
 
+    # Una sola guía por cotización (índice único en DB; NULL = guía sin cotización)
     quotation_id = Column(
         Integer,
-        ForeignKey("quotations.id")
+        ForeignKey("quotations.id"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    client_id = Column(
+        Integer,
+        ForeignKey("clients.id"),
+        nullable=True,
+        index=True,
     )
 
     guide_number = Column(String)
@@ -58,3 +69,4 @@ class Shipment(Base):
     )
 
     quotation = relationship("Quotation", back_populates="shipments")
+    client = relationship("Client")
