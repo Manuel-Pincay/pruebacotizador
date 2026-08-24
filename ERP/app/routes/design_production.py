@@ -23,6 +23,7 @@ from app.models.quotation_item import QuotationItem
 from app.services.design_catalog_service import list_design_sizes, list_usb_references
 from app.services.design_service import list_designers
 from app.services.production_order_service import (
+    DESIGN_EDIT_STATUSES,
     DESIGN_MATERIALS,
     apply_quotation_item_fulfillment,
     approve_design,
@@ -36,6 +37,7 @@ from app.services.production_order_service import (
     get_production_order_by_quotation,
     join_design_file_names,
     list_design_orders,
+    normalize_status,
     quotation_needs_fabrication,
     transition_status,
     update_design_fields,
@@ -109,6 +111,8 @@ def _order_form_context(
     order = build_order_dict(order_model, client_name=client.name if client else "—")
     work_items = work_items_payload(order_model.quotation)
     designs = _designs_payload(order_model.quotation)
+    can_edit = can_edit_design_order(user, order_model)
+    status = normalize_status(order_model.status)
     return {
         "user": user,
         "prefill": {
@@ -117,7 +121,8 @@ def _order_form_context(
         },
         "order": order,
         "history": build_history_list(order_model),
-        "can_edit": can_edit_design_order(user, order_model),
+        "can_edit": can_edit,
+        "can_approve": can_edit and status in DESIGN_EDIT_STATUSES,
         "can_claim": can_self_assign_design_order(user, order_model),
         "can_reassign": can_reassign_design_order(user),
         "designers": list_designers(db) if is_design_admin(user) else [],
@@ -134,6 +139,7 @@ def _order_form_context(
         "claim_error": claim_error,
         "upload_ok": upload_ok,
         "upload_error": upload_error,
+        "passed": "",
     }
 
 
@@ -229,18 +235,20 @@ async def design_order_detail(order_id: int, request: Request, db: Session = Dep
         sync_legacy_design_file(db, order_model.quotation)
         db.commit()
 
+    ctx = _order_form_context(
+        db,
+        user,
+        order_model,
+        claimed=request.query_params.get("claimed", ""),
+        claim_error=request.query_params.get("claim_error", ""),
+        upload_ok=request.query_params.get("uploaded", ""),
+        upload_error=request.query_params.get("upload_error", ""),
+    )
+    ctx["passed"] = request.query_params.get("passed", "")
     return templates.TemplateResponse(
         request=request,
         name="design/order_form.html",
-        context=_order_form_context(
-            db,
-            user,
-            order_model,
-            claimed=request.query_params.get("claimed", ""),
-            claim_error=request.query_params.get("claim_error", ""),
-            upload_ok=request.query_params.get("uploaded", ""),
-            upload_error=request.query_params.get("upload_error", ""),
-        ),
+        context=ctx,
     )
 
 
@@ -321,10 +329,16 @@ async def design_order_save(
                 raw_material_qty=rm_qty if needs_fab else None,
             )
             if not needs_fab:
-                return RedirectResponse(
-                    url=f"/shipments/new/{order_model.quotation_id}" if order_model.quotation_id else f"/design/orders/{order_id}",
-                    status_code=302,
+                ship_url = (
+                    f"/shipments/new/{order_model.quotation_id}?passed=shipping"
+                    if order_model.quotation_id
+                    else f"/design/orders/{order_id}?passed=shipping"
                 )
+                return RedirectResponse(url=ship_url, status_code=302)
+            return RedirectResponse(
+                url=f"/design/orders/{order_id}?passed=production",
+                status_code=302,
+            )
         elif can_edit_design_order(user, order_model):
             if needs_fab:
                 update_design_fields(
@@ -380,7 +394,8 @@ async def design_order_print(order_id: int, request: Request, db: Session = Depe
 
     client = order_model.quotation.client if order_model.quotation else None
     order = build_order_dict(order_model, client_name=client.name if client else "—")
-    pdf_buffer = export_design_sheet_pdf(order)
+    products = work_items_payload(order_model.quotation)
+    pdf_buffer = export_design_sheet_pdf(order, products=products)
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",

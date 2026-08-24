@@ -757,18 +757,71 @@ class _NumberedCanvas(canvas.Canvas):
         canvas.Canvas.save(self)
 
 
-def export_design_sheet_pdf(order_dict: dict[str, Any]) -> BytesIO:
+def export_design_sheet_pdf(order_dict: dict[str, Any], products: list[dict[str, Any]] | None = None) -> BytesIO:
     margin = 8 * mm
     page_width, _ = A4
     usable = page_width - 2 * margin
     cell = ParagraphStyle("Cell", fontName="Helvetica", fontSize=6, leading=7, alignment=TA_LEFT)
     cell_center = ParagraphStyle("CellC", parent=cell, alignment=TA_CENTER)
     title = ParagraphStyle("Title", fontName="Helvetica-Bold", fontSize=8, leading=9, alignment=TA_LEFT)
+    section = ParagraphStyle("Section", fontName="Helvetica-Bold", fontSize=7, leading=8, alignment=TA_LEFT)
 
     header = (
         f"<b>ORDEN DE PRODUCCIÓN {order_dict['order_label']}</b> | "
         f"Cot. #{order_dict.get('quotation_id')}"
     )
+
+    story: list[Any] = [Paragraph(header, title), Spacer(1, 2 * mm)]
+
+    items = products if products is not None else list(order_dict.get("products") or [])
+    to_fabricate = [p for p in items if not p.get("fulfill_from_inventory")]
+    from_inventory = [p for p in items if p.get("fulfill_from_inventory")]
+    product_rows = to_fabricate or items
+
+    if product_rows:
+        story.append(Paragraph("<b>PRODUCTOS A FABRICAR</b>", section))
+        story.append(Spacer(1, 1 * mm))
+        prod_data = [
+            [
+                Paragraph("<b>Producto</b>", cell_center),
+                Paragraph("<b>Cant.</b>", cell_center),
+                Paragraph("<b>Medida</b>", cell_center),
+                Paragraph("<b>Tema</b>", cell_center),
+                Paragraph("<b>Color</b>", cell_center),
+                Paragraph("<b>Origen</b>", cell_center),
+            ]
+        ]
+        for p in product_rows:
+            origin = "Inventario" if p.get("fulfill_from_inventory") else "Fabricar"
+            prod_data.append(
+                [
+                    Paragraph(str(p.get("name") or "—")[:40], cell),
+                    Paragraph(str(p.get("quantity") or 0), cell_center),
+                    Paragraph(str(p.get("measure") or "—")[:16], cell_center),
+                    Paragraph(str(p.get("theme") or "—")[:16], cell_center),
+                    Paragraph(str(p.get("color") or "—")[:12], cell_center),
+                    Paragraph(origin, cell_center),
+                ]
+            )
+        prod_table = Table(prod_data, colWidths=[usable * r for r in [0.34, 0.08, 0.14, 0.16, 0.12, 0.16]])
+        prod_table.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ("FONTSIZE", (0, 0), (-1, -1), 6),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E0E7FF")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        story.extend([prod_table, Spacer(1, 3 * mm)])
+
+        if to_fabricate and from_inventory:
+            inv_lines = ", ".join(
+                f"{p.get('name') or '—'} (x{p.get('quantity') or 0})" for p in from_inventory
+            )
+            story.append(Paragraph(f"<b>Inventario:</b> {inv_lines}", cell))
+            story.append(Spacer(1, 2 * mm))
+
+    story.append(Paragraph("<b>DATOS DE FABRICACIÓN</b>", section))
+    story.append(Spacer(1, 1 * mm))
+
     table_data = [
         [Paragraph("<b>Archivo</b>", cell_center), Paragraph("<b>Material</b>", cell_center),
          Paragraph("<b>Medida</b>", cell_center), Paragraph("<b>USB</b>", cell_center),
@@ -786,15 +839,20 @@ def export_design_sheet_pdf(order_dict: dict[str, Any]) -> BytesIO:
         table_data.append([Paragraph(f"<b>Obs:</b> {order_dict['detail']}", cell), "", "", "", "", ""])
 
     table = Table(table_data, colWidths=[usable * r for r in [0.28, 0.12, 0.12, 0.12, 0.08, 0.28]])
-    table.setStyle(TableStyle([
+    style_cmds = [
         ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
         ("FONTSIZE", (0, 0), (-1, -1), 6),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F3F4F6")),
-    ]))
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]
+    if order_dict.get("detail"):
+        style_cmds.append(("SPAN", (0, -1), (-1, -1)))
+    table.setStyle(TableStyle(style_cmds))
+    story.append(table)
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=margin, rightMargin=margin,
                             topMargin=margin, bottomMargin=10 * mm, canvasmaker=_NumberedCanvas)
-    doc.build([Paragraph(header, title), Spacer(1, 2 * mm), table])
+    doc.build(story)
     buffer.seek(0)
     return buffer

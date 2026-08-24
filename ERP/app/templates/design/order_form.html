@@ -265,6 +265,8 @@
                     <button type="submit" name="action" value="save" class="w-full px-5 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-800 text-sm font-medium hover:bg-purple-100">
                         Guardar avance
                     </button>
+                    {% endif %}
+                    {% if can_approve %}
                     <button type="submit" name="action" value="approve" id="approveBtn"
                             class="w-full px-5 py-3 rounded-xl bg-green-700 text-white text-sm font-semibold hover:bg-green-800 shadow-sm">
                         {% if needs_fabrication %}Pasar a producción{% else %}Pasar a envío{% endif %}
@@ -460,6 +462,126 @@
   });
   sel?.addEventListener('change', updateUnitHint);
   toggleRaw();
+
+  const form = document.getElementById('designOrderForm');
+  const serverError = {{ error|tojson }};
+  const passed = {{ (passed or '')|tojson }};
+  const claimOk = {{ (claimed or '')|tojson }};
+  const claimErr = {{ (claim_error or '')|tojson }};
+
+  function cleanUrlFlash() {
+    try {
+      const url = new URL(window.location.href);
+      ['passed', 'claimed', 'claim_error', 'uploaded', 'upload_error'].forEach(k => url.searchParams.delete(k));
+      window.history.replaceState({}, '', url.pathname + (url.search || '') + url.hash);
+    } catch (_) {}
+  }
+
+  if (typeof ErpDialog !== 'undefined') {
+    if (serverError) {
+      ErpDialog.error(serverError, 'No se pudo continuar');
+    } else if (passed === 'production') {
+      ErpDialog.success('La orden ya pasó a producción.', 'Pasó a producción');
+      cleanUrlFlash();
+    } else if (passed === 'shipping') {
+      ErpDialog.success('La orden pasó a envío.', 'Listo');
+      cleanUrlFlash();
+    } else if (claimOk) {
+      ErpDialog.success('Orden asignada a ti.', 'Asignada');
+      cleanUrlFlash();
+    } else if (claimErr) {
+      ErpDialog.error(claimErr, 'No se pudo asignar');
+      cleanUrlFlash();
+    }
+  }
+
+  function missingFabFields() {
+    const missing = [];
+    const files = fileNameInputs().map(i => (i.value || '').trim()).filter(Boolean);
+    if (!files.length) missing.push('archivo(s) en USB');
+    const material = (document.querySelector('select[name="material"]')?.value || '').trim();
+    const size = (document.querySelector('select[name="size"]')?.value
+      || document.querySelector('input[name="size"]')?.value || '').trim();
+    const copies = Number(document.querySelector('input[name="copies"]')?.value || 0);
+    if (!material) missing.push('material');
+    if (!size) missing.push('medida');
+    if (!copies || copies < 1) missing.push('copias');
+    return missing;
+  }
+
+  function rawMaterialIncomplete() {
+    if (!rawToggle?.checked) return null;
+    const rmId = (sel?.value || '').trim();
+    const qty = (qtyInput?.value || '').trim();
+    if (!rmId && !qty) return 'Marcó descontar materia prima, pero falta seleccionar la materia prima y la cantidad.';
+    if (!rmId) return 'Marcó descontar materia prima, pero falta seleccionar la materia prima.';
+    if (!qty) return 'Marcó descontar materia prima, pero falta indicar la cantidad.';
+    return null;
+  }
+
+  async function validateBeforeApprove() {
+    if (!needsFabFromRadios()) return true;
+
+    const missing = missingFabFields();
+    if (missing.length) {
+      if (typeof ErpDialog !== 'undefined') {
+        await ErpDialog.warning(
+          'Complete los datos para fabricar: ' + missing.join(', ') + '.',
+          'Datos incompletos'
+        );
+      } else {
+        alert('Complete los datos para fabricar: ' + missing.join(', ') + '.');
+      }
+      return false;
+    }
+
+    const rawErr = rawMaterialIncomplete();
+    if (rawErr) {
+      if (typeof ErpDialog !== 'undefined') {
+        await ErpDialog.warning(rawErr, 'Materia prima incompleta');
+      } else {
+        alert(rawErr);
+      }
+      return false;
+    }
+
+    if (!rawToggle?.checked) {
+      if (typeof ErpDialog !== 'undefined') {
+        const ok = await ErpDialog.confirm(
+          'No marcó “Descontar materia prima”. Si el trabajo consume material de fabricación, complete ese dato antes de pasar a producción.',
+          {
+            title: 'Datos de fabricación',
+            confirmText: 'Continuar sin descontar',
+            cancelText: 'Completar ahora',
+            icon: 'warning',
+          }
+        );
+        if (!ok) {
+          document.getElementById('fab_raw_toggle')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  form?.addEventListener('submit', async (e) => {
+    const submitter = e.submitter;
+    if (!submitter || submitter.getAttribute('name') !== 'action' || submitter.value !== 'approve') {
+      return;
+    }
+    e.preventDefault();
+    const ok = await validateBeforeApprove();
+    if (!ok) return;
+
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'approve';
+    form.appendChild(actionInput);
+    form.submit();
+  });
 })();
 </script>
 {% endblock %}

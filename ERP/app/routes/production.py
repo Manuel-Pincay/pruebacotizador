@@ -62,6 +62,7 @@ from app.services.production_order_service import (
     resolve_selected_fabricator_id,
     apply_designer_assignment,
     apply_fabricator_assignment,
+    work_items_payload,
 )
 from app.services.kanban_service import (
     KPI_KEYS,
@@ -980,7 +981,7 @@ async def print_fabrication(order_id: int, request: Request, db: Session = Depen
     client = order.quotation.client if order.quotation else None
     data = build_order_dict(order, client_name=client.name if client else "—")
     from fastapi.responses import StreamingResponse
-    pdf = export_design_sheet_pdf(data)
+    pdf = export_design_sheet_pdf(data, products=work_items_payload(order.quotation))
     return StreamingResponse(
         pdf,
         media_type="application/pdf",

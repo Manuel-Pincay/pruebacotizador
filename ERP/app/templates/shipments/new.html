@@ -5,6 +5,19 @@
 {% set is_standalone = standalone|default(false) %}
 {% set back_url = '/shipments/' if edit_mode or is_standalone else '/shipments/quotations' %}
 
+<script>
+(function () {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('passed') === 'shipping' && typeof ErpDialog !== 'undefined') {
+      ErpDialog.success('La orden pasó a envío. Ahora puede registrar la guía.', 'Pasó a envío');
+      params.delete('passed');
+      const q = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+    }
+  } catch (_) {}
+})();
+</script>
 <div class="max-w-5xl mx-auto pb-8">
   <div class="mb-6 sm:mb-8">
     <a href="{{ back_url }}" class="text-sm text-purple-600 hover:text-purple-800 inline-flex items-center gap-1 mb-2">
