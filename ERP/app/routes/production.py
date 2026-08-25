@@ -84,6 +84,7 @@ from app.services.kanban_service import (
 from app.auth.design_permissions import can_edit_fabrication_data, can_view_design_order
 
 PRODUCTION_DETAIL_ROLES = ["admin", "produccion", "disenador"]
+PRODUCTION_CALENDAR_ROLES = ["admin", "produccion", "ventas", "disenador"]
 
 router = APIRouter(
     prefix="/production",
@@ -519,7 +520,7 @@ async def production_calendar(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    user = role_required(request, ["admin", "produccion"])
+    user = role_required(request, PRODUCTION_CALENDAR_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 

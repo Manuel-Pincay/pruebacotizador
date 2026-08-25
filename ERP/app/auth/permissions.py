@@ -35,12 +35,12 @@ ROLE_PERMISSIONS = {
     },
     ROLE_VENTAS: {
         "dashboard", "clients", "products_read", "products", "quotations", "sales_tracking",
-        "production_condensed", "fabrication_condensed",
+        "production_condensed", "fabrication_condensed", "production_calendar",
         "shipments",
         "billing", "billing_view", "billing_create", "billing_emit",
     },
     ROLE_PRODUCCION: {
-        "dashboard", "production", "fabrication_condensed",
+        "dashboard", "production", "fabrication_condensed", "production_calendar",
     },
     ROLE_DISENADOR: {
         "design_dashboard",
@@ -48,6 +48,7 @@ ROLE_PERMISSIONS = {
         "design_orders",
         "production_condensed",
         "fabrication_condensed",
+        "production_calendar",
         "shipments",
         "profile",
     },

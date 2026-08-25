@@ -608,6 +608,10 @@ lucide.createIcons();
             <span>🖨️</span>
             <span>Condensado Fabricación</span>
           </a>
+          <a href="/production/calendar" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/calendar') }}">
+            <span>🗓️</span>
+            <span>Calendario</span>
+          </a>
 
           {% elif current_role == 'ventas' %}
           {% set catalog_menu_open = nav_path.startswith('/clients') or nav_path.startswith('/products') %}
@@ -635,6 +639,10 @@ lucide.createIcons();
             <span>🖨️</span>
             <span>Condensado fabricación</span>
           </a>
+          <a href="/production/calendar" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/production/calendar') }}">
+            <span>🗓️</span>
+            <span>Calendario de producción</span>
+          </a>
           <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">
             <span>🚚</span>
             <span>Guías de envío</span>
@@ -643,7 +651,7 @@ lucide.createIcons();
           {{ catalog_submenu('catalogMenuVentas') }}
 
           {% elif current_role == 'disenador' %}
-          {% set design_prod_open = nav_path.startswith('/design') or nav_path.startswith('/production/condensed') or nav_path.startswith('/production/fabrication-condensed') %}
+          {% set design_prod_open = nav_path.startswith('/design') or nav_path.startswith('/production/condensed') or nav_path.startswith('/production/fabrication-condensed') or nav_path.startswith('/production/calendar') %}
           {{ nav_section('Inicio') }}
           <a href="/design/dashboard" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/design/dashboard') }}">
             <span>🎨</span>
@@ -668,6 +676,7 @@ lucide.createIcons();
               <a href="/design/orders" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/design/orders') }}">🖨️ Datos de fabricación</a>
               <a href="/production/condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/condensed') }}">📋 Condensado</a>
               <a href="/production/fabrication-condensed" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/fabrication-condensed') }}">🖨️ Condensado fabricación</a>
+              <a href="/production/calendar" class="sidebar-submenu-link block px-4 py-2 rounded-lg hover:bg-purple-700{{ sub_active('/production/calendar') }}">🗓️ Calendario</a>
             </div>
           </div>
           <a href="/shipments" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-700 transition{{ nav_active('/shipments') }}">

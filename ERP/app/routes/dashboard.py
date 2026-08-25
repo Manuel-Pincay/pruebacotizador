@@ -199,6 +199,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
             {"title": "Nuevo Cliente", "url": "/clients/new", "icon": "👤"},
             {"title": "Nueva Cotización", "url": "/quotations/new", "icon": "📄"},
             {"title": "Seguimiento", "url": "/quotations/tracking", "icon": "📈"},
+            {"title": "Calendario", "url": "/production/calendar", "icon": "📅"},
             {"title": "Clientes", "url": "/clients", "icon": "👥"},
         ]
     elif role == "produccion":
