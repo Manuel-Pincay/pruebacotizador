@@ -26,6 +26,17 @@ def _require_admin_reports(request: Request):
     return role_required(request, ["admin"])
 
 
+# Cotizaciones ya aceptadas (no borradores pendiente / canceladas / vencidas).
+RECEIVABLE_QUOTATION_STATUSES = (
+    "aprobada",
+    "produccion",
+    "enviada",
+    "enviado",
+    "entregada",
+    "entregado",
+)
+
+
 @router.get("/receivables", response_class=HTMLResponse)
 async def receivables_report(request: Request, db: Session = Depends(get_db)):
     user = _require_reports(request)
@@ -35,7 +46,7 @@ async def receivables_report(request: Request, db: Session = Depends(get_db)):
     quotations = (
         db.query(Quotation)
         .options(joinedload(Quotation.client), joinedload(Quotation.payments))
-        .filter(~Quotation.status.in_(["cancelada", "vencida"]))
+        .filter(Quotation.status.in_(RECEIVABLE_QUOTATION_STATUSES))
         .order_by(Quotation.created_at.desc())
         .all()
     )
@@ -45,6 +56,9 @@ async def receivables_report(request: Request, db: Session = Depends(get_db)):
     by_client: dict[int, dict] = {}
 
     for q in quotations:
+        # Solo falta de abono: sin pago o abono parcial (saldo > 0).
+        if (q.payment_status or "") == "pagada":
+            continue
         pending = float(q.pending_balance or 0)
         if pending <= 0.01:
             continue
