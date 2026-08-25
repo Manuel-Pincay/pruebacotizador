@@ -15,6 +15,11 @@ from app.database import get_db
 from app.models.client import Client
 from app.models.company_config import CompanyConfig
 from app.models.product import Product
+from app.models.productcategory import ProductCategory
+from app.models.productcolor import ProductColor
+from app.models.productmaterial import ProductMaterial
+from app.models.producttheme import ProductTheme
+from app.models.productthickness import ProductThickness
 from app.models.production_order import ProductionOrder
 from app.models.quotation import Quotation
 from app.models.quotation_item import QuotationItem
@@ -350,6 +355,16 @@ def _quotation_counts(db: Session) -> dict:
     }
 
 
+def _quotation_form_catalog(db: Session) -> dict:
+    return {
+        "categories": db.query(ProductCategory).order_by(ProductCategory.name.asc()).all(),
+        "materials": db.query(ProductMaterial).order_by(ProductMaterial.name.asc()).all(),
+        "colors": db.query(ProductColor).order_by(ProductColor.name.asc()).all(),
+        "themes": db.query(ProductTheme).order_by(ProductTheme.name.asc()).all(),
+        "thicknesses": db.query(ProductThickness).order_by(ProductThickness.name.asc()).all(),
+    }
+
+
 @router.get("/new", response_class=HTMLResponse)
 async def new_quotation(request: Request, db: Session = Depends(get_db)):
     user = _require_quotation_access(request)
@@ -372,6 +387,7 @@ async def new_quotation(request: Request, db: Session = Depends(get_db)):
             "user": user,
             "transport_product_id": transport.id,
             "transport_product_name": TRANSPORT_PRODUCT_NAME,
+            **_quotation_form_catalog(db),
         },
     )
 
@@ -1411,6 +1427,7 @@ async def edit_quotation_page(
             "user": user,
             "transport_product_id": transport.id,
             "transport_product_name": TRANSPORT_PRODUCT_NAME,
+            **_quotation_form_catalog(db),
         },
     )
 

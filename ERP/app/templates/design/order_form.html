@@ -1,5 +1,8 @@
 {% extends 'layouts/base.html' %}
 {% from "components/catalog_select.html" import catalog_select %}
+{% from "components/file_specs_fields.html" import file_specs_editor %}
+{% from "components/design_carousel_scripts.html" import design_carousel_scripts %}
+{% from "components/fabrication_edit_modal.html" import fabrication_edit_modal %}
 
 {% block title %}Orden {{ order.order_label }} · Diseño · Cot. #{{ prefill.quotation_id }}{% endblock %}
 
@@ -35,13 +38,18 @@
     {% endif %}
     {% if can_claim %}
     <div class="mb-4 p-4 rounded-xl bg-amber-50 border border-amber-200">
-        <p class="text-sm text-amber-900 mb-3">Esta orden no tiene diseñador. Tómala para trabajarla de inmediato.</p>
+        <p class="text-sm text-amber-900 mb-3">Opcional: márchate como responsable. Otros diseñadores igual pueden editar y avanzar esta orden.</p>
         <form method="post" action="/design/orders/{{ order.id }}/claim">
-            <button type="submit" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold">Asignarme esta orden</button>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold">Ser responsable</button>
         </form>
     </div>
     {% endif %}
 
+    {% if can_edit %}
+    <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-900">
+        <strong>Colaborativo:</strong> varios diseñadores pueden trabajar esta orden a la vez. Marca productos listos, anota archivos USB y pásala a producción cuando esté completa.
+    </div>
+    {% endif %}
     <form method="POST" action="/design/orders/{{ order.id }}" id="designOrderForm">
         {% set readonly = not can_edit %}
 
@@ -62,7 +70,16 @@
                 {% for p in work_items %}
                 <div class="p-4 bg-white">
                     <div class="flex flex-col sm:flex-row sm:items-start gap-3">
-                        <label class="flex items-center gap-2 cursor-pointer shrink-0">
+                        <div class="flex items-start gap-3 min-w-0 flex-1">
+                            {% if p.image_thumb_url %}
+                            <button type="button" onclick="openDesignPreview('{{ p.image_url }}')"
+                                    class="shrink-0 rounded-lg border border-slate-200 overflow-hidden hover:ring-2 hover:ring-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                                    title="Ver imagen en grande">
+                                <img src="{{ p.image_thumb_url }}" alt="{{ p.name }}"
+                                     class="w-14 h-14 sm:w-16 sm:h-16 object-cover bg-slate-50" />
+                            </button>
+                            {% endif %}
+                            <label class="flex items-center gap-2 cursor-pointer shrink-0">
                             <input type="hidden" name="done_item_{{ p.id }}" id="ord_done_{{ p.id }}" value="{{ '1' if p.design_item_done else '0' }}">
                             <input type="checkbox" class="w-5 h-5 rounded border-gray-300 text-purple-700 fulfill-done"
                                    {% if p.design_item_done %}checked{% endif %}
@@ -75,8 +92,11 @@
                             <div class="mt-1 text-xs text-gray-500">
                                 Cant. {{ p.quantity }}
                                 {% if p.measure and p.measure != '—' %} · {{ p.measure }}{% endif %}
+                                {% if p.theme and p.theme != '—' %} · Forma {{ p.theme }}{% endif %}
+                                {% if p.color and p.color != '—' %} · {{ p.color }}{% endif %}
                                 {% if p.stock is not none %} · Stock {{ p.stock }}{% endif %}
                             </div>
+                        </div>
                         </div>
                         <div class="flex flex-wrap gap-2 text-xs sm:shrink-0" role="group" aria-label="Origen del producto">
                             <label class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 cursor-pointer has-[:checked]:border-slate-400 has-[:checked]:bg-slate-50">
@@ -109,46 +129,9 @@
             </div>
 
             <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-4">
+                {{ file_specs_editor(order.file_specs, materials, sizes, readonly=readonly) }}
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div class="lg:col-span-2">
-                        <label class="block text-sm font-semibold text-slate-800 mb-1">Archivos en USB *</label>
-                        <div id="file-names-list" class="space-y-2">
-                            {% set saved_names = order.file_names if order.file_names else [] %}
-                            {% if readonly and saved_names %}
-                                {% for fname in saved_names %}
-                                <div class="file-name-row flex gap-2 items-center">
-                                    <input type="text" name="file_names" value="{{ fname }}" readonly
-                                           class="file-name-input w-full border border-indigo-200 bg-gray-50 rounded-xl px-3.5 py-2.5 text-sm font-mono" />
-                                </div>
-                                {% endfor %}
-                            {% elif readonly %}
-                                <p class="text-sm text-slate-400">Sin archivos registrados.</p>
-                            {% else %}
-                                {% if saved_names %}
-                                    {% for fname in saved_names %}
-                                    <div class="file-name-row flex gap-2 items-center">
-                                        <input type="text" name="file_names" value="{{ fname }}"
-                                               placeholder="Ej: TOPPER_001.ai"
-                                               class="file-name-input w-full border border-indigo-200 bg-white rounded-xl px-3.5 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
-                                        <button type="button" class="file-name-remove shrink-0 w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 {% if loop.first and saved_names|length <= 1 %}hidden{% endif %}" title="Quitar archivo" aria-label="Quitar archivo">×</button>
-                                    </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="file-name-row flex gap-2 items-center">
-                                        <input type="text" name="file_names" value=""
-                                               placeholder="Ej: TOPPER_001.ai"
-                                               class="file-name-input w-full border border-indigo-200 bg-white rounded-xl px-3.5 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
-                                        <button type="button" class="file-name-remove shrink-0 w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 hidden" title="Quitar archivo" aria-label="Quitar archivo">×</button>
-                                    </div>
-                                {% endif %}
-                                <button type="button" id="add-file-name"
-                                        class="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900">
-                                    + Agregar otro archivo
-                                </button>
-                            {% endif %}
-                        </div>
-                        <p class="text-[11px] text-slate-500 mt-2">Un nombre por archivo físico en el USB. No se sube al sistema.</p>
-                    </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
                         {% if readonly %}
@@ -161,24 +144,6 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">Copias</label>
                         <input type="number" name="copies" min="1" {% if readonly %}readonly{% endif %}
                                value="{{ order.copies or 1 }}" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Material</label>
-                        <select name="material" {% if readonly %}disabled{% endif %} class="w-full border rounded-xl px-3 py-2.5 text-sm">
-                            <option value="">Seleccionar...</option>
-                            {% for material in materials %}
-                            <option value="{{ material }}" {% if order.material == material %}selected{% endif %}>{{ material }}</option>
-                            {% endfor %}
-                        </select>
-                        {% if readonly %}<input type="hidden" name="material" value="{{ order.material }}" />{% endif %}
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Medida</label>
-                        {% if readonly %}
-                        <input type="text" name="size" readonly value="{{ order.size }}" class="w-full border rounded-xl px-3 py-2.5 text-sm bg-gray-50" />
-                        {% else %}
-                        {{ catalog_select("size", sizes, "+ Agregar medida", "/product-settings/api/size", selected=order.size, extra_class="rounded-xl px-3 py-2.5 text-sm") }}
-                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -195,22 +160,15 @@
                     </span>
                 </label>
                 <div id="fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
-                    <div>
-                        <label class="block text-xs text-gray-600 mb-1">Materia prima *</label>
-                        <select name="raw_material_id" id="raw_material_id"
-                            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
-                            <option value="">Cargando...</option>
-                        </select>
-                    </div>
-                    {% from "components/raw_material_qty.html" import raw_material_qty_field %}
-                    {{ raw_material_qty_field(order.raw_material_qty if order.raw_material_qty is not none else '') }}
+                    {% from "components/raw_material_rows.html" import raw_material_rows %}
+                    {{ raw_material_rows(order.raw_material_items, id_prefix='') }}
                 </div>
             </div>
             {% elif order.use_fabrication_materials %}
             <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                 Materia prima
-                {% if order.raw_material_label %} — {{ order.raw_material_label }}{% endif %}
-                {% if order.raw_material_qty %} ({{ order.raw_material_qty }}){% endif %}
+                {% from "components/raw_material_rows.html" import raw_material_rows_readonly %}
+                <div class="mt-1">{{ raw_material_rows_readonly(order.raw_material_items) }}</div>
             </div>
             {% endif %}
         </section>
@@ -272,6 +230,12 @@
                         {% if needs_fabrication %}Pasar a producción{% else %}Pasar a envío{% endif %}
                     </button>
                     {% endif %}
+                    {% if can_edit_fabrication and needs_fabrication and not can_edit %}
+                    <button type="button" onclick="openFabricationEditModal()"
+                            class="w-full px-5 py-2.5 rounded-xl border border-indigo-300 bg-indigo-50 text-indigo-800 text-sm font-semibold hover:bg-indigo-100">
+                        Editar orden de producción
+                    </button>
+                    {% endif %}
                     <a href="/design/orders/{{ order.id }}/print" target="_blank"
                        class="block w-full text-center px-5 py-2.5 rounded-xl border border-gray-300 text-sm font-medium hover:bg-gray-50">
                         Imprimir hoja
@@ -310,67 +274,108 @@
     {% endif %}
 </div>
 
+{% if can_edit_fabrication and needs_fabrication and not can_edit %}
+{{ fabrication_edit_modal(order.id, order, materials, sizes, usb_references) }}
+{% endif %}
+
+<div id="designPreviewModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[70] p-4" onclick="closeDesignPreview()">
+    <div class="max-w-5xl max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
+        <img id="designPreviewImage" src="" alt="Producto ampliado" class="max-w-full rounded-2xl shadow-2xl" />
+    </div>
+</div>
+
+{{ design_carousel_scripts() }}
 <script src="/static/js/catalog-select.js"></script>
+<script src="/static/js/raw-material-rows.js"></script>
 <script>
 (function () {
   const fabFields = document.getElementById('fab-fields');
   const invHint = document.getElementById('inventory-only-hint');
   const approveBtn = document.getElementById('approveBtn');
   const flowSummary = document.getElementById('flowSummary');
-  const fileNamesList = document.getElementById('file-names-list');
-  const addFileBtn = document.getElementById('add-file-name');
+  const fileSpecsList = document.getElementById('file-specs-list');
+  const addFileSpecBtn = document.getElementById('add-file-spec');
 
-  function fileNameInputs() {
-    return Array.from(document.querySelectorAll('#file-names-list .file-name-input'));
+  function fileSpecRows() {
+    return Array.from(document.querySelectorAll('#file-specs-list .file-spec-row'));
   }
 
-  function syncFileRemoveButtons() {
-    const rows = document.querySelectorAll('#file-names-list .file-name-row');
+  function syncFileSpecRemoveButtons() {
+    const rows = fileSpecRows();
     rows.forEach(row => {
-      const btn = row.querySelector('.file-name-remove');
+      const btn = row.querySelector('.file-spec-remove');
       if (!btn) return;
       btn.classList.toggle('hidden', rows.length <= 1);
     });
   }
 
-  function syncFileRequired(needs) {
-    fileNameInputs().forEach((input, idx) => {
-      if (needs && idx === 0) input.setAttribute('required', 'required');
-      else input.removeAttribute('required');
+  function syncFileSpecRequired(needs) {
+    const rows = fileSpecRows();
+    rows.forEach((row, idx) => {
+      const nameInput = row.querySelector('.file-spec-name');
+      const matInput = row.querySelector('.file-spec-material');
+      const sizeInput = row.querySelector('.file-spec-size');
+      if (needs && idx === 0) {
+        nameInput?.setAttribute('required', 'required');
+        matInput?.setAttribute('required', 'required');
+        sizeInput?.setAttribute('required', 'required');
+      } else {
+        nameInput?.removeAttribute('required');
+        matInput?.removeAttribute('required');
+        sizeInput?.removeAttribute('required');
+      }
     });
   }
 
-  function addFileRow(value = '') {
-    if (!fileNamesList) return;
-    const row = document.createElement('div');
-    row.className = 'file-name-row flex gap-2 items-center';
+  function addFileSpecRow(values = {}) {
+    if (!fileSpecsList) return;
+    const row = document.createElement('tr');
+    row.className = 'file-spec-row';
+    const esc = (v) => String(v || '').replace(/"/g, '&quot;');
     row.innerHTML = `
-      <input type="text" name="file_names" value="${value.replace(/"/g, '&quot;')}"
-             placeholder="Ej: TOPPER_001.ai"
-             class="file-name-input w-full border border-indigo-200 bg-white rounded-xl px-3.5 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
-      <button type="button" class="file-name-remove shrink-0 w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Quitar archivo" aria-label="Quitar archivo">×</button>
+      <td class="px-3 py-2 align-top">
+        <input type="text" name="spec_file_name" value="${esc(values.file_name)}"
+               placeholder="Ej: bases.ai"
+               class="file-spec-name w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
+      </td>
+      <td class="px-3 py-2 align-top">
+        <input type="text" name="spec_material" value="${esc(values.material)}"
+               list="material-suggestions"
+               placeholder="Ej: MDF + Vinil negro 1m"
+               class="file-spec-material w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+      </td>
+      <td class="px-3 py-2 align-top">
+        <input type="text" name="spec_size" value="${esc(values.size)}"
+               list="size-suggestions"
+               placeholder="Ej: 120x90"
+               class="file-spec-size w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+      </td>
+      <td class="px-2 py-2 align-top text-center">
+        <button type="button" class="file-spec-remove w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Quitar fila" aria-label="Quitar fila">×</button>
+      </td>
     `;
-    fileNamesList.insertBefore(row, addFileBtn);
-    row.querySelector('.file-name-remove')?.addEventListener('click', () => {
+    fileSpecsList.appendChild(row);
+    row.querySelector('.file-spec-remove')?.addEventListener('click', () => {
       row.remove();
-      syncFileRemoveButtons();
-      syncFileRequired(needsFabFromRadios());
+      if (!fileSpecRows().length) addFileSpecRow();
+      syncFileSpecRemoveButtons();
+      syncFileSpecRequired(needsFabFromRadios());
     });
-    syncFileRemoveButtons();
-    syncFileRequired(needsFabFromRadios());
-    row.querySelector('.file-name-input')?.focus();
+    syncFileSpecRemoveButtons();
+    syncFileSpecRequired(needsFabFromRadios());
+    row.querySelector('.file-spec-name')?.focus();
   }
 
-  addFileBtn?.addEventListener('click', () => addFileRow());
-  document.querySelectorAll('#file-names-list .file-name-remove').forEach(btn => {
+  addFileSpecBtn?.addEventListener('click', () => addFileSpecRow());
+  document.querySelectorAll('#file-specs-list .file-spec-remove').forEach(btn => {
     btn.addEventListener('click', () => {
-      btn.closest('.file-name-row')?.remove();
-      if (!document.querySelector('#file-names-list .file-name-row')) addFileRow();
-      syncFileRemoveButtons();
-      syncFileRequired(needsFabFromRadios());
+      btn.closest('.file-spec-row')?.remove();
+      if (!fileSpecRows().length) addFileSpecRow();
+      syncFileSpecRemoveButtons();
+      syncFileSpecRequired(needsFabFromRadios());
     });
   });
-  syncFileRemoveButtons();
+  syncFileSpecRemoveButtons();
 
   function needsFabFromRadios() {
     const modes = document.querySelectorAll('.fulfill-mode:checked');
@@ -382,7 +387,7 @@
     const needs = needsFabFromRadios();
     fabFields?.classList.toggle('hidden', !needs);
     invHint?.classList.toggle('hidden', needs);
-    if (fileNamesList) syncFileRequired(needs);
+    if (fileSpecsList) syncFileSpecRequired(needs);
     if (approveBtn) {
       approveBtn.textContent = needs ? 'Pasar a producción' : 'Pasar a envío';
       approveBtn.className = needs
@@ -401,66 +406,23 @@
   });
   syncFabVisibility();
 
-  const selectedId = {{ order.raw_material_id | tojson }};
   const rawToggle = document.getElementById('fab_raw_toggle');
   const useFabHidden = document.getElementById('use_fabrication_materials');
   const rawFields = document.getElementById('fab-raw-fields');
-  const sel = document.getElementById('raw_material_id');
-  const qtyInput = document.getElementById('raw_material_qty');
-  const materialSelect = document.querySelector('select[name="material"]');
-  const unitHint = document.getElementById('raw_material_unit_hint');
-  document.querySelectorAll('.raw-qty-btn').forEach(btn => {
-    btn.addEventListener('click', () => { if (qtyInput) qtyInput.value = btn.dataset.qty; });
-  });
-  qtyInput?.addEventListener('blur', () => {
-    if (!qtyInput.value) return;
-    qtyInput.value = String(qtyInput.value).replace(',', '.');
-  });
+  if (rawFields) initRawMaterialRows(rawFields);
+
   function toggleRaw() {
     const useFab = !!rawToggle?.checked;
     if (useFabHidden) useFabHidden.value = useFab ? '1' : '0';
     rawFields?.classList.toggle('hidden', !useFab);
-    if (useFab) loadMaterials();
-  }
-  async function loadMaterials() {
-    if (!sel) return;
-    const designMat = materialSelect?.value || '';
-    sel.innerHTML = '<option value="">Cargando...</option>';
-    try {
-      const res = await fetch(`/inventory/api/materials?design_material=${encodeURIComponent(designMat)}`, {
-        credentials: 'same-origin', headers: { Accept: 'application/json' },
-      });
-      const data = await res.json();
-      sel.innerHTML = '<option value="">Seleccionar materia prima...</option>';
-      (data || []).forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.dataset.unit = m.unit;
-        const stockLabel = Number(m.stock).toLocaleString('es-EC', { maximumFractionDigits: 3 });
-        opt.textContent = `${m.label} — ${stockLabel} ${m.unit}${m.is_low_stock ? ' ⚠ bajo' : ''}`;
-        if (selectedId && m.id == selectedId) opt.selected = true;
-        sel.appendChild(opt);
-      });
-      updateUnitHint();
-    } catch (_) {
-      sel.innerHTML = '<option value="">No se pudo cargar materia prima</option>';
-    }
-  }
-  function updateUnitHint() {
-    const opt = sel?.options[sel.selectedIndex];
-    if (!unitHint) return;
-    const unit = opt?.dataset?.unit || 'planchas';
-    if (unit === 'planchas') {
-      unitHint.innerHTML = 'Unidad: <strong>planchas</strong>. Decimales OK: 0.25 (1/4), 0.5 (media), 1 (completa).';
-    } else {
-      unitHint.innerHTML = 'Unidad: <strong>' + unit + '</strong>. Puede usar decimales (ej. 1.5).';
-    }
+    if (useFab) rawFields?.reloadRawMaterials?.();
   }
   rawToggle?.addEventListener('change', toggleRaw);
-  materialSelect?.addEventListener('change', () => {
-    if (rawToggle?.checked) loadMaterials();
+  document.querySelectorAll('.file-spec-material').forEach(input => {
+    input.addEventListener('change', () => {
+      if (rawToggle?.checked) rawFields?.reloadRawMaterials?.();
+    });
   });
-  sel?.addEventListener('change', updateUnitHint);
   toggleRaw();
 
   const form = document.getElementById('designOrderForm');
@@ -497,26 +459,28 @@
 
   function missingFabFields() {
     const missing = [];
-    const files = fileNameInputs().map(i => (i.value || '').trim()).filter(Boolean);
-    if (!files.length) missing.push('archivo(s) en USB');
-    const material = (document.querySelector('select[name="material"]')?.value || '').trim();
-    const size = (document.querySelector('select[name="size"]')?.value
-      || document.querySelector('input[name="size"]')?.value || '').trim();
+    const rows = fileSpecRows();
+    if (!rows.length) {
+      missing.push('archivo(s) en USB');
+    } else {
+      rows.forEach((row, idx) => {
+        const name = (row.querySelector('.file-spec-name')?.value || '').trim();
+        const material = (row.querySelector('.file-spec-material')?.value || '').trim();
+        const size = (row.querySelector('.file-spec-size')?.value || '').trim();
+        const label = name || `#${idx + 1}`;
+        if (!name) missing.push(`archivo (${label})`);
+        if (!material) missing.push(`material de ${label}`);
+        if (!size) missing.push(`medida de ${label}`);
+      });
+    }
     const copies = Number(document.querySelector('input[name="copies"]')?.value || 0);
-    if (!material) missing.push('material');
-    if (!size) missing.push('medida');
     if (!copies || copies < 1) missing.push('copias');
     return missing;
   }
 
   function rawMaterialIncomplete() {
     if (!rawToggle?.checked) return null;
-    const rmId = (sel?.value || '').trim();
-    const qty = (qtyInput?.value || '').trim();
-    if (!rmId && !qty) return 'Marcó descontar materia prima, pero falta seleccionar la materia prima y la cantidad.';
-    if (!rmId) return 'Marcó descontar materia prima, pero falta seleccionar la materia prima.';
-    if (!qty) return 'Marcó descontar materia prima, pero falta indicar la cantidad.';
-    return null;
+    return validateRawMaterialRows(rawFields);
   }
 
   async function validateBeforeApprove() {

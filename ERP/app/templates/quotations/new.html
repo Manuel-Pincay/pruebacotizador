@@ -1,4 +1,5 @@
 {% extends 'layouts/base.html' %}
+{% from "components/catalog_select.html" import catalog_select %}
 
 {% block content %}
 
@@ -364,15 +365,15 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_category">Categoría</label>
-                <input id="new_cat_category" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                {{ catalog_select("new_cat_category", categories, "+ Agregar categoría", "/product-settings/api/category", id="new_cat_category", extra_class="rounded-xl px-3 py-2.5 text-sm border-slate-200") }}
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_color">Color</label>
-                <input id="new_cat_color" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                {{ catalog_select("new_cat_color", colors, "+ Agregar color", "/product-settings/api/color", id="new_cat_color", extra_class="rounded-xl px-3 py-2.5 text-sm border-slate-200") }}
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_theme">Forma / temática</label>
-                <input id="new_cat_theme" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                {{ catalog_select("new_cat_theme", themes, "+ Agregar temática", "/product-settings/api/theme", id="new_cat_theme", extra_class="rounded-xl px-3 py-2.5 text-sm border-slate-200") }}
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_measure">Medida</label>
@@ -380,11 +381,11 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_material">Material</label>
-                <input id="new_cat_material" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                {{ catalog_select("new_cat_material", materials, "+ Agregar material", "/product-settings/api/material", id="new_cat_material", extra_class="rounded-xl px-3 py-2.5 text-sm border-slate-200") }}
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_thickness">Grosor</label>
-                <input id="new_cat_thickness" type="text" placeholder="Opcional" class="w-full border rounded-xl p-3" />
+                {{ catalog_select("new_cat_thickness", thicknesses, "+ Agregar grosor", "/product-settings/api/thickness", id="new_cat_thickness", extra_class="rounded-xl px-3 py-2.5 text-sm border-slate-200") }}
             </div>
             <div class="sm:col-span-2">
                 <label class="block text-sm font-medium text-gray-600 mb-1" for="new_cat_description">Descripción</label>
@@ -562,6 +563,7 @@
     </div>
 </div>
 
+<script src="/static/js/catalog-select.js"></script>
 <script src="/static/js/color-swatch.js"></script>
 <script>
     // FUNCIONES CLIENTES
@@ -1683,6 +1685,7 @@
         const modal = document.getElementById("new_catalog_product_modal")
         modal.classList.remove("hidden")
         modal.classList.add("flex")
+        if (window.bindCatalogSelects) window.bindCatalogSelects(modal)
         document.getElementById("new_cat_name")?.focus()
     }
 
@@ -1694,10 +1697,12 @@
 
     function clearNewCatalogProductFields() {
         ;[
-            "new_cat_name", "new_cat_code", "new_cat_price", "new_cat_category",
-            "new_cat_color", "new_cat_theme", "new_cat_measure", "new_cat_material",
-            "new_cat_thickness", "new_cat_description",
+            "new_cat_name", "new_cat_code", "new_cat_price", "new_cat_measure", "new_cat_description",
         ].forEach(id => {
+            const el = document.getElementById(id)
+            if (el) el.value = ""
+        })
+        ;["new_cat_category", "new_cat_color", "new_cat_theme", "new_cat_material", "new_cat_thickness"].forEach(id => {
             const el = document.getElementById(id)
             if (el) el.value = ""
         })

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from io import BytesIO
 from typing import Any
@@ -95,7 +96,104 @@ def format_design_file_names_display(value: str | None) -> str:
     return ", ".join(parse_design_file_names(value))
 
 
+def _clean_file_spec_row(row: dict | None) -> dict[str, str]:
+    data = row if isinstance(row, dict) else {}
+    return {
+        "file_name": str(data.get("file_name") or "").strip(),
+        "material": str(data.get("material") or "").strip(),
+        "size": str(data.get("size") or "").strip(),
+    }
+
+
+def normalize_file_specs(specs: list[dict] | None) -> list[dict[str, str]]:
+    cleaned: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for row in specs or []:
+        spec = _clean_file_spec_row(row)
+        if not spec["file_name"]:
+            continue
+        key = spec["file_name"].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(spec)
+    return cleaned
+
+
+def parse_design_file_specs(order: ProductionOrder) -> list[dict[str, str]]:
+    """Lista de {file_name, material, size} por archivo físico."""
+    if order.design_file_specs:
+        try:
+            raw = json.loads(order.design_file_specs)
+            if isinstance(raw, list):
+                return normalize_file_specs(raw)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    names = parse_design_file_names(order.design_file_name)
+    legacy_material = (order.design_material or "").strip()
+    legacy_size = (order.design_size or "").strip()
+    if not names:
+        if legacy_material or legacy_size:
+            return [{"file_name": "", "material": legacy_material, "size": legacy_size}]
+        return []
+    return [
+        {"file_name": name, "material": legacy_material, "size": legacy_size}
+        for name in names
+    ]
+
+
+def serialize_design_file_specs(specs: list[dict] | None) -> str | None:
+    cleaned = normalize_file_specs(specs)
+    if not cleaned:
+        return None
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
+def parse_file_specs_from_form(form) -> list[dict[str, str]]:
+    names = form.getlist("spec_file_name")
+    materials = form.getlist("spec_material")
+    sizes = form.getlist("spec_size")
+    specs: list[dict[str, str]] = []
+    for index, name in enumerate(names):
+        material = (materials[index] if index < len(materials) else "").strip()
+        size = (sizes[index] if index < len(sizes) else "").strip()
+        part = (name or "").strip()
+        if part or material or size:
+            specs.append({"file_name": part, "material": material, "size": size})
+    return specs
+
+
+def sync_legacy_fields_from_specs(order: ProductionOrder, specs: list[dict[str, str]]) -> None:
+    cleaned = normalize_file_specs(specs)
+    order.design_file_specs = serialize_design_file_specs(cleaned)
+    order.design_file_name = join_design_file_names([row["file_name"] for row in cleaned]) or None
+    if not cleaned:
+        return
+
+    materials = [row["material"] for row in cleaned if row["material"]]
+    sizes = [row["size"] for row in cleaned if row["size"]]
+    unique_materials = list(dict.fromkeys(materials))
+    unique_sizes = list(dict.fromkeys(sizes))
+    order.design_material = (
+        unique_materials[0]
+        if len(unique_materials) == 1
+        else "; ".join(unique_materials) if unique_materials else None
+    )
+    order.design_size = (
+        unique_sizes[0]
+        if len(unique_sizes) == 1
+        else "; ".join(unique_sizes) if unique_sizes else None
+    )
+
+
 def fabrication_data_complete(order: ProductionOrder) -> bool:
+    specs = parse_design_file_specs(order)
+    if specs:
+        return bool(
+            all(row["file_name"] and row["material"] and row["size"] for row in specs)
+            and (order.design_copies or 0) > 0
+        )
     return bool(
         parse_design_file_names(order.design_file_name)
         and (order.design_material or "").strip()
@@ -105,6 +203,23 @@ def fabrication_data_complete(order: ProductionOrder) -> bool:
 
 
 def validate_fabrication_data(order: ProductionOrder) -> None:
+    specs = parse_design_file_specs(order)
+    if specs:
+        missing: list[str] = []
+        for index, row in enumerate(specs, start=1):
+            label = row["file_name"] or f"#{index}"
+            if not row["file_name"]:
+                missing.append(f"archivo ({label})")
+            if not row["material"]:
+                missing.append(f"material de {label}")
+            if not row["size"]:
+                missing.append(f"medida de {label}")
+        if not (order.design_copies or 0):
+            missing.append("copias")
+        if missing:
+            raise ValueError(f"Complete datos de fabricación: {', '.join(missing)}.")
+        return
+
     missing = []
     if not parse_design_file_names(order.design_file_name):
         missing.append("archivo")
@@ -153,6 +268,20 @@ def quotation_needs_fabrication(quotation: Quotation | None) -> bool:
     return any(not bool(getattr(item, "fulfill_from_inventory", False)) for item in items)
 
 
+def _item_image_urls(item) -> tuple[str | None, str | None]:
+    from app.utils.image_storage import product_image_url
+
+    image_name = (getattr(item, "product_image", None) or "").strip()
+    product = getattr(item, "product", None)
+    if not image_name and product:
+        image_name = (product.image or "").strip()
+    if not image_name:
+        return None, None
+    full = product_image_url(image_name, thumb=False)
+    thumb = product_image_url(image_name, thumb=True) or full
+    return full, thumb
+
+
 def work_items_payload(quotation: Quotation | None) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if not quotation:
@@ -160,6 +289,7 @@ def work_items_payload(quotation: Quotation | None) -> list[dict[str, Any]]:
     for item in _work_quotation_items(quotation):
         product = item.product
         name = (item.detail or "").strip() or (product.name if product else "—")
+        image_url, image_thumb_url = _item_image_urls(item)
         rows.append(
             {
                 "id": item.id,
@@ -172,6 +302,8 @@ def work_items_payload(quotation: Quotation | None) -> list[dict[str, Any]]:
                 "stock": product.stock if product else None,
                 "fulfill_from_inventory": bool(getattr(item, "fulfill_from_inventory", False)),
                 "design_item_done": bool(getattr(item, "design_item_done", False)),
+                "image_url": image_url,
+                "image_thumb_url": image_thumb_url,
             }
         )
     return rows
@@ -441,6 +573,7 @@ def update_design_fields(
     order: ProductionOrder,
     *,
     file_name: str | None = None,
+    file_specs: list[dict] | None = None,
     material: str = "",
     size: str = "",
     usb_reference: str = "",
@@ -450,15 +583,22 @@ def update_design_fields(
     use_fabrication_materials: bool | None = None,
     raw_material_id: int | None = None,
     raw_material_qty: float | None = None,
+    raw_material_items: list[dict] | None = None,
 ) -> ProductionOrder:
-    if material and material not in DESIGN_MATERIALS:
-        raise ValueError("Material no válido.")
-
-    if file_name is not None:
+    if file_specs is not None:
+        sync_legacy_fields_from_specs(order, file_specs)
+    elif file_name is not None:
         order.design_file_name = join_design_file_names(parse_design_file_names(file_name)) or None
-    if material:
-        order.design_material = material
-    if size:
+        if material:
+            order.design_material = material.strip()
+        if size:
+            order.design_size = size.strip()
+
+    if file_specs is None and material:
+        if material not in DESIGN_MATERIALS:
+            raise ValueError("Material no válido.")
+        order.design_material = material.strip()
+    if file_specs is None and size:
         order.design_size = size.strip()
     order.design_usb_reference = usb_reference.strip() or None
     order.design_notes = notes.strip() or None
@@ -474,6 +614,7 @@ def update_design_fields(
             use_fabrication_materials=use_fabrication_materials,
             raw_material_id=raw_material_id,
             raw_material_qty=raw_material_qty,
+            raw_material_items=raw_material_items,
         )
 
     current = normalize_status(order.status)
@@ -494,6 +635,7 @@ def approve_design(
     use_fabrication_materials: bool | None = None,
     raw_material_id: int | None = None,
     raw_material_qty: float | None = None,
+    raw_material_items: list[dict] | None = None,
 ) -> ProductionOrder:
     current = normalize_status(order.status)
     if current not in DESIGN_EDIT_STATUSES:
@@ -508,6 +650,7 @@ def approve_design(
         use_fabrication_materials = False
         raw_material_id = None
         raw_material_qty = None
+        raw_material_items = None
     if needs_fab:
         validate_fabrication_data(order)
 
@@ -520,6 +663,7 @@ def approve_design(
             use_fabrication_materials=use_fabrication_materials,
             raw_material_id=raw_material_id,
             raw_material_qty=raw_material_qty,
+            raw_material_items=raw_material_items,
         )
 
     if current == "pendiente":
@@ -527,15 +671,16 @@ def approve_design(
         order = get_production_order(db, order.id) or order
 
     fab_note = ""
-    if needs_fab and order.use_fabrication_materials and order.raw_material_id:
-        from app.services.raw_material_service import get_raw_material
+    if needs_fab and order.use_fabrication_materials:
+        from app.services.raw_material_service import parse_fabrication_raw_materials
 
-        rm = get_raw_material(db, order.raw_material_id)
-        if rm:
-            fab_note = (
-                f" Material de fabricación: {rm.label} "
-                f"({float(order.raw_material_qty or 0):g} {rm.unit})."
-            )
+        rows = parse_fabrication_raw_materials(order)
+        if rows:
+            parts = [
+                f"{row.get('label') or 'Materia prima'} ({float(row['qty']):g} {row.get('unit') or ''})".strip()
+                for row in rows
+            ]
+            fab_note = " Material de fabricación: " + "; ".join(parts) + "."
 
     if needs_fab:
         target = "produccion"
@@ -565,24 +710,28 @@ def assign_designer(db: Session, order: ProductionOrder, designer_user_id: int |
 
 
 def claim_design_order(db: Session, order: ProductionOrder, *, user: User) -> ProductionOrder:
-    """Diseñador toma una orden de producción sin asignar."""
+    """Diseñador se marca responsable. No excluye a otros; solo registra quién lidera."""
     if not user or user.role != "disenador":
         raise ValueError("Solo un diseñador puede tomarse esta orden.")
-    if order.assigned_to_user_id and order.assigned_to_user_id != user.id:
-        raise ValueError("Esta orden ya fue tomada por otro diseñador.")
     if normalize_status(order.status) not in DESIGN_EDIT_STATUSES:
         raise ValueError("Solo se pueden tomar órdenes en fase de diseño.")
-    if not order.assigned_to_user_id:
-        assign_designer(db, order, user.id)
-        log_history(
-            db,
-            order,
-            status=normalize_status(order.status),
-            notes=f"Diseñador se autoasignó: {_user_label(user)}",
-            user_id=user.id,
-        )
-        db.commit()
-        db.refresh(order)
+    previous = order.assigned_to_user_id
+    if previous == user.id:
+        return order
+    assign_designer(db, order, user.id)
+    if previous:
+        notes = f"{_user_label(user)} se marcó responsable (antes otro diseñador)."
+    else:
+        notes = f"Diseñador se autoasignó: {_user_label(user)}"
+    log_history(
+        db,
+        order,
+        status=normalize_status(order.status),
+        notes=notes,
+        user_id=user.id,
+    )
+    db.commit()
+    db.refresh(order)
     return order
 
 
@@ -701,12 +850,21 @@ def list_design_orders(
 def build_order_dict(order: ProductionOrder, *, client_name: str = "—") -> dict[str, Any]:
     status = normalize_status(order.status)
     file_names = parse_design_file_names(order.design_file_name)
+    file_specs = parse_design_file_specs(order)
+    from app.services.raw_material_service import parse_fabrication_raw_materials
+
+    raw_material_items = parse_fabrication_raw_materials(order)
+    raw_labels = [
+        f"{row.get('label') or 'Materia prima'} ({float(row['qty']):g} {row.get('unit') or ''})".strip()
+        for row in raw_material_items
+    ]
     return {
         "id": order.id,
         "order_label": f"OP-{order.id:04d}",
         "quotation_id": order.quotation_id,
         "client_name": client_name,
         "file_names": file_names,
+        "file_specs": file_specs,
         "file_name": order.design_file_name or "",
         "file_name_display": format_design_file_names_display(order.design_file_name),
         "material": order.design_material or "",
@@ -723,6 +881,9 @@ def build_order_dict(order: ProductionOrder, *, client_name: str = "—") -> dic
         "raw_material_id": order.raw_material_id,
         "raw_material_qty": float(order.raw_material_qty) if order.raw_material_qty is not None else None,
         "raw_material_label": order.raw_material.label if order.raw_material else "",
+        "raw_material_items": raw_material_items,
+        "raw_material_labels": raw_labels,
+        "raw_material_display": "; ".join(raw_labels),
     }
 
 
@@ -822,19 +983,40 @@ def export_design_sheet_pdf(order_dict: dict[str, Any], products: list[dict[str,
     story.append(Paragraph("<b>DATOS DE FABRICACIÓN</b>", section))
     story.append(Spacer(1, 1 * mm))
 
+    file_specs = list(order_dict.get("file_specs") or [])
     table_data = [
-        [Paragraph("<b>Archivo</b>", cell_center), Paragraph("<b>Material</b>", cell_center),
-         Paragraph("<b>Medida</b>", cell_center), Paragraph("<b>USB</b>", cell_center),
-         Paragraph("<b>Cant.</b>", cell_center), Paragraph("<b>Cliente</b>", cell_center)],
         [
-            Paragraph("<br/>".join(parse_design_file_names(order_dict.get("file_name"))) or "—", cell),
-            Paragraph(order_dict.get("material") or "—", cell_center),
-            Paragraph(order_dict.get("size") or "—", cell_center),
-            Paragraph(order_dict.get("usb_reference") or "—", cell_center),
-            Paragraph(str(order_dict.get("copies") or 0), cell_center),
-            Paragraph((order_dict.get("client_name") or "—")[:24], cell),
+            Paragraph("<b>Archivo</b>", cell_center),
+            Paragraph("<b>Material</b>", cell_center),
+            Paragraph("<b>Medida</b>", cell_center),
+            Paragraph("<b>USB</b>", cell_center),
+            Paragraph("<b>Cant.</b>", cell_center),
+            Paragraph("<b>Cliente</b>", cell_center),
         ],
     ]
+    if file_specs:
+        for index, spec in enumerate(file_specs):
+            table_data.append(
+                [
+                    Paragraph(spec.get("file_name") or "—", cell),
+                    Paragraph(spec.get("material") or "—", cell),
+                    Paragraph(spec.get("size") or "—", cell_center),
+                    Paragraph(order_dict.get("usb_reference") or "—", cell_center) if index == 0 else Paragraph("", cell_center),
+                    Paragraph(str(order_dict.get("copies") or 0), cell_center) if index == 0 else Paragraph("", cell_center),
+                    Paragraph((order_dict.get("client_name") or "—")[:24], cell) if index == 0 else Paragraph("", cell),
+                ]
+            )
+    else:
+        table_data.append(
+            [
+                Paragraph("<br/>".join(parse_design_file_names(order_dict.get("file_name"))) or "—", cell),
+                Paragraph(order_dict.get("material") or "—", cell_center),
+                Paragraph(order_dict.get("size") or "—", cell_center),
+                Paragraph(order_dict.get("usb_reference") or "—", cell_center),
+                Paragraph(str(order_dict.get("copies") or 0), cell_center),
+                Paragraph((order_dict.get("client_name") or "—")[:24], cell),
+            ]
+        )
     if order_dict.get("detail"):
         table_data.append([Paragraph(f"<b>Obs:</b> {order_dict['detail']}", cell), "", "", "", "", ""])
 

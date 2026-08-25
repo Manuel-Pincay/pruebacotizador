@@ -10,8 +10,8 @@
             <p class="text-slate-500 mt-1 text-sm sm:text-base">Catálogo de inventario y precios</p>
         </div>
 
-        {% if is_admin %}
         <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+            {% if is_admin %}
             <a href="/imports/products/export"
                 class="erp-full-mobile sm:w-auto text-center border border-emerald-300 text-emerald-700 px-5 py-3 rounded-xl hover:bg-emerald-50 transition text-sm font-medium">
                 📥 Exportar Excel
@@ -20,12 +20,14 @@
                 class="erp-full-mobile sm:w-auto text-center border border-purple-300 text-purple-700 px-5 py-3 rounded-xl hover:bg-purple-50 transition text-sm font-medium">
                 ⚙️ Ajustes
             </a>
+            {% endif %}
+            {% if can_manage_products %}
             <a href="/products/new"
                 class="erp-full-mobile sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition font-medium">
                 + Nuevo Producto
             </a>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 
     {% if flash_deleted %}
@@ -260,13 +262,15 @@
             Aún no existe ningún producto en el catálogo. Crea el primero para usarlo en cotizaciones e inventario.
           {% endif %}
         </p>
-        {% if is_admin %}
+        {% if can_manage_products %}
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            {% if is_admin %}
             <a href="/product-settings/init"
                 onclick="return erpConfirmLink(event, '¿Cargar catálogos iniciales (categorías, materiales, etc.)?')"
                 class="border border-purple-300 text-purple-700 px-6 py-3 rounded-xl font-medium hover:bg-purple-50 transition">
                 Cargar catálogos base
             </a>
+            {% endif %}
             <a href="/products/new"
                 class="inline-flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 text-white px-6 py-3 rounded-xl font-medium transition">
                 + Crear primer producto

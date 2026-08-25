@@ -1,7 +1,7 @@
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
@@ -9,6 +9,7 @@ from app.auth.auth_handler import role_required
 from app.auth.design_permissions import (
     can_delete_design_order,
     can_edit_design_order,
+    can_edit_fabrication_data,
     can_export_design_orders,
     can_reassign_design_order,
     can_self_assign_design_order,
@@ -35,9 +36,9 @@ from app.services.production_order_service import (
     export_design_sheet_pdf,
     get_production_order,
     get_production_order_by_quotation,
-    join_design_file_names,
     list_design_orders,
     normalize_status,
+    parse_file_specs_from_form,
     quotation_needs_fabrication,
     transition_status,
     update_design_fields,
@@ -123,6 +124,8 @@ def _order_form_context(
         "history": build_history_list(order_model),
         "can_edit": can_edit,
         "can_approve": can_edit and status in DESIGN_EDIT_STATUSES,
+        "can_edit_fabrication": can_edit_fabrication_data(user, order_model)
+        and quotation_needs_fabrication(order_model.quotation),
         "can_claim": can_self_assign_design_order(user, order_model),
         "can_reassign": can_reassign_design_order(user),
         "designers": list_designers(db) if is_design_admin(user) else [],
@@ -151,8 +154,8 @@ async def design_orders_list(request: Request, db: Session = Depends(get_db)):
 
     rows = list_design_orders(
         db,
-        viewer_user_id=user.id if user.role == ROLE_DISENADOR else None,
-        admin_view=is_design_admin(user),
+        viewer_user_id=None,
+        admin_view=True,
     )
     for row in rows:
         order_model = get_production_order(db, row["id"])
@@ -263,8 +266,6 @@ async def design_order_save(
     copies: int = Form(1),
     assigned_to_user_id: str = Form(""),
     use_fabrication_materials: str = Form("0"),
-    raw_material_id: str = Form(""),
-    raw_material_qty: str = Form(""),
     action: str = Form("save"),
     db: Session = Depends(get_db),
 ):
@@ -277,17 +278,16 @@ async def design_order_save(
         return RedirectResponse(url="/design/orders", status_code=302)
 
     form = await request.form()
-    file_name = join_design_file_names(form.getlist("file_names"))
+    file_specs = parse_file_specs_from_form(form)
     if can_edit_design_order(user, order_model):
         apply_quotation_item_fulfillment(order_model.quotation, form)
 
     needs_fab = quotation_needs_fabrication(order_model.quotation)
     use_fab = needs_fab and str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
-    rm_id = int(raw_material_id) if use_fab and str(raw_material_id or "").strip().isdigit() else None
-    from app.services.raw_material_service import parse_raw_material_qty
+    from app.services.raw_material_service import parse_raw_material_items_from_form
 
     try:
-        rm_qty = parse_raw_material_qty(raw_material_qty) if use_fab else None
+        raw_items = parse_raw_material_items_from_form(form) if use_fab else None
     except ValueError as exc:
         order_model = get_production_order(db, order_id)
         return templates.TemplateResponse(
@@ -308,11 +308,10 @@ async def design_order_save(
             if needs_fab:
                 update_design_fields(
                     db, order_model,
-                    file_name=file_name, material=material, size=size,
+                    file_specs=file_specs,
                     usb_reference=usb_reference, notes=detail, copies=copies, user=user,
                     use_fabrication_materials=use_fab,
-                    raw_material_id=rm_id,
-                    raw_material_qty=rm_qty,
+                    raw_material_items=raw_items,
                 )
             else:
                 # Solo nota: sin datos de fabricación
@@ -325,8 +324,7 @@ async def design_order_save(
             approve_design(
                 db, order_model, user=user, notes=detail,
                 use_fabrication_materials=use_fab if needs_fab else False,
-                raw_material_id=rm_id if needs_fab else None,
-                raw_material_qty=rm_qty if needs_fab else None,
+                raw_material_items=raw_items if needs_fab and use_fab else None,
             )
             if not needs_fab:
                 ship_url = (
@@ -343,11 +341,10 @@ async def design_order_save(
             if needs_fab:
                 update_design_fields(
                     db, order_model,
-                    file_name=file_name, material=material, size=size,
+                    file_specs=file_specs,
                     usb_reference=usb_reference, notes=detail, copies=copies, user=user,
                     use_fabrication_materials=use_fab,
-                    raw_material_id=rm_id,
-                    raw_material_qty=rm_qty,
+                    raw_material_items=raw_items,
                 )
             else:
                 update_design_fields(
@@ -366,6 +363,56 @@ async def design_order_save(
         )
 
     return RedirectResponse(url=f"/design/orders/{order_id}", status_code=302)
+
+
+@router.post("/orders/{order_id}/fabrication")
+async def design_order_fabrication_save(
+    order_id: int,
+    request: Request,
+    usb_reference: str = Form(""),
+    detail: str = Form(""),
+    copies: int = Form(1),
+    use_fabrication_materials: str = Form("0"),
+    db: Session = Depends(get_db),
+):
+    user = _require_design_access(request)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    order_model = get_production_order(db, order_id)
+    if not order_model or not can_view_design_order(user, order_model):
+        return JSONResponse({"success": False, "message": "Orden no encontrada."}, status_code=404)
+
+    if not can_edit_fabrication_data(user, order_model):
+        return JSONResponse({"success": False, "message": "Sin permiso para editar estos datos."}, status_code=403)
+
+    form = await request.form()
+    file_specs = parse_file_specs_from_form(form)
+    use_fab = str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
+    from app.services.raw_material_service import parse_raw_material_items_from_form
+
+    try:
+        raw_items = parse_raw_material_items_from_form(form) if use_fab else None
+    except ValueError as exc:
+        return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+
+    try:
+        update_design_fields(
+            db,
+            order_model,
+            file_specs=file_specs,
+            usb_reference=usb_reference,
+            notes=detail,
+            copies=copies,
+            user=user,
+            use_fabrication_materials=use_fab,
+            raw_material_items=raw_items,
+        )
+        db.commit()
+    except ValueError as exc:
+        return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+
+    return JSONResponse({"success": True})
 
 
 @router.post("/orders/{order_id}/delete")

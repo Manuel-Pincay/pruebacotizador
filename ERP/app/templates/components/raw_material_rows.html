@@ -1,0 +1,62 @@
+{% macro raw_material_rows(items, id_prefix='') %}
+{% set rows = items if items else [] %}
+{% if not rows %}
+{% set rows = [{"raw_material_id": none, "qty": ""}] %}
+{% endif %}
+{% set list_id = id_prefix ~ 'raw-material-rows-list' if id_prefix else 'raw-material-rows-list' %}
+{% set add_btn_id = id_prefix ~ 'add-raw-material' if id_prefix else 'add-raw-material' %}
+
+<div class="raw-material-rows-root space-y-3" id="{{ id_prefix }}raw-material-rows-root" data-raw-rows-root="1">
+    <div id="{{ list_id }}" class="raw-material-rows-list space-y-3">
+        {% for item in rows %}
+        <div class="raw-material-row rounded-xl border border-emerald-100 bg-white p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+                <label class="text-xs font-medium text-gray-600">Materia prima *</label>
+                <button type="button"
+                        class="raw-material-remove w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 {% if loop.first and rows|length <= 1 %}hidden{% endif %}"
+                        title="Quitar" aria-label="Quitar materia prima">×</button>
+            </div>
+            <select name="raw_material_id"
+                    class="raw-material-select w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+                    data-selected-id="{{ item.raw_material_id or '' }}">
+                <option value="">Cargando...</option>
+            </select>
+            <div>
+                <label class="block text-xs text-gray-600 mb-1">Cantidad a consumir *</label>
+                <input type="number" name="raw_material_qty" step="0.01" min="0.01" inputmode="decimal"
+                       placeholder="Ej: 0.5"
+                       value="{{ item.qty if item.qty is not none and item.qty != '' else '' }}"
+                       class="raw-material-qty w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                    <button type="button" data-qty="0.25" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">1/4</button>
+                    <button type="button" data-qty="0.5" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">1/2</button>
+                    <button type="button" data-qty="0.75" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">3/4</button>
+                    <button type="button" data-qty="1" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">1</button>
+                    <button type="button" data-qty="2" class="raw-qty-btn px-2.5 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-50">2</button>
+                </div>
+                <p class="raw-material-unit-hint text-xs text-gray-500 mt-1.5">En <strong>planchas</strong> puede usar decimales: 0.25, 0.5, 1…</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <button type="button" id="{{ add_btn_id }}"
+            class="add-raw-material-btn inline-flex items-center gap-1 text-sm font-medium text-emerald-800 hover:text-emerald-950">
+        + Agregar otra materia prima
+    </button>
+</div>
+{% endmacro %}
+
+{% macro raw_material_rows_readonly(items) %}
+{% if items %}
+<ul class="space-y-1 text-sm text-emerald-900">
+    {% for item in items %}
+    <li>
+        {{ item.label or 'Materia prima' }}
+        {% if item.qty is not none %}({{ '%.2f'|format(item.qty) }} {{ item.unit or '' }}){% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-emerald-900">Sin materia prima registrada.</p>
+{% endif %}
+{% endmacro %}

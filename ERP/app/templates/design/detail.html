@@ -1,6 +1,7 @@
 {% extends 'layouts/base.html' %}
 {% from "components/design_status_badge.html" import design_status_badge %}
 {% from "components/design_carousel_scripts.html" import design_carousel_scripts %}
+{% from "components/fabrication_edit_modal.html" import fabrication_edit_modal %}
 
 {% block content %}
 <div class="mb-4">
@@ -65,6 +66,14 @@
                     {% for p in detail.products %}
                     <div class="p-3 sm:p-4 bg-white hover:bg-slate-50/80">
                         <div class="flex items-start gap-3">
+                            {% if p.image_thumb_url %}
+                            <button type="button" onclick="openDesignPreview('{{ p.image_url }}')"
+                                    class="shrink-0 rounded-lg border border-slate-200 overflow-hidden hover:ring-2 hover:ring-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                                    title="Ver imagen en grande">
+                                <img src="{{ p.image_thumb_url }}" alt="{{ p.name }}"
+                                     class="w-14 h-14 sm:w-16 sm:h-16 object-cover bg-slate-50" />
+                            </button>
+                            {% endif %}
                             <label class="mt-0.5 flex items-center gap-2 cursor-pointer shrink-0">
                                 <input type="hidden" name="done_item_{{ p.id }}" id="done_hidden_{{ p.id }}" value="{{ '1' if p.design_item_done else '0' }}">
                                 <input type="checkbox" class="w-5 h-5 rounded border-gray-300 text-purple-700 focus:ring-purple-600"
@@ -270,6 +279,12 @@
                class="block w-full text-center px-4 py-3 rounded-xl bg-purple-700 text-white text-sm hover:bg-purple-800 font-semibold shadow-sm">
                 {% if needs_fabrication %}Pasar a producción{% else %}Pasar a envío{% endif %}
             </a>
+            {% if can_edit_fabrication and fabrication_order %}
+            <button type="button" onclick="openFabricationEditModal()"
+                    class="block w-full text-center px-4 py-2.5 rounded-xl border border-indigo-300 bg-indigo-50 text-indigo-800 text-sm hover:bg-indigo-100 font-semibold">
+                Editar orden de producción
+            </button>
+            {% endif %}
             <a href="/production/{{ detail.production_order_id }}"
                class="block w-full text-center px-4 py-2.5 rounded-xl border border-gray-200 text-sm hover:bg-gray-50 font-medium">
                 Ver en producción
@@ -287,6 +302,10 @@
         </div>
     </div>
 </div>
+
+{% if can_edit_fabrication and fabrication_order and detail.production_order_id %}
+{{ fabrication_edit_modal(detail.production_order_id, fabrication_order, materials, sizes, usb_references) }}
+{% endif %}
 
 <div id="designPreviewModal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-[70] p-4" onclick="closeDesignPreview()">
     <div class="max-w-5xl max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">

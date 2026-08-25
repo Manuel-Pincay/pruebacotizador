@@ -140,7 +140,7 @@ async def products_page(
 @router.get("/new", response_class=HTMLResponse)
 async def new_product_page(request: Request, db: Session = Depends(get_db)):
 
-    user = role_required(request, ["admin"])
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
 
     if isinstance(user, RedirectResponse):
         return user
@@ -291,7 +291,7 @@ async def create_product(
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
-    user = role_required(request, ["admin"])
+    user = role_required(request, PRODUCT_MANAGE_ROLES)
     if isinstance(user, RedirectResponse):
         return user
 

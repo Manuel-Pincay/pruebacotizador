@@ -28,7 +28,8 @@ class ProductionOrder(Base):
     notes = Column(String)
 
     design_file_name = Column(Text)
-    design_material = Column(String(50))
+    design_file_specs = Column(Text)
+    design_material = Column(Text)
     design_size = Column(String(100))
     design_usb_reference = Column(String(100))
     design_notes = Column(Text)
@@ -40,6 +41,7 @@ class ProductionOrder(Base):
     use_fabrication_materials = Column(Boolean, nullable=False, default=False)
     raw_material_id = Column(Integer, ForeignKey("raw_materials.id"), nullable=True)
     raw_material_qty = Column(Float, nullable=True)
+    fabrication_raw_materials = Column(Text)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

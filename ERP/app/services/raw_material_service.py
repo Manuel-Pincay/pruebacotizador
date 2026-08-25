@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from sqlalchemy.orm import Session
 
 from app.models.production_order import ProductionOrder
@@ -224,47 +226,6 @@ def _add_movement(
     return mov
 
 
-def set_fabrication_source(
-    db: Session,
-    order: ProductionOrder,
-    *,
-    use_fabrication_materials: bool,
-    raw_material_id: int | None = None,
-    raw_material_qty: float | None = None,
-) -> ProductionOrder:
-    order.use_fabrication_materials = bool(use_fabrication_materials)
-    if not use_fabrication_materials:
-        order.raw_material_id = None
-        order.raw_material_qty = None
-        db.flush()
-        return order
-
-    if not raw_material_id:
-        raise ValueError("Seleccione la materia prima a utilizar.")
-    material = get_raw_material(db, int(raw_material_id))
-    if not material or not material.active:
-        raise ValueError("La materia prima seleccionada no existe o está inactiva.")
-
-    qty = float(raw_material_qty or 0)
-    if qty <= 0:
-        raise ValueError(
-            "Indique cuántas planchas (o metros) consumirá. "
-            "Puede usar fracciones: 0.25, 0.5, 0.75, 1…"
-        )
-    qty = round(qty, 3)
-
-    if float(material.stock or 0) < qty:
-        raise ValueError(
-            f"Stock insuficiente de {material.label}. "
-            f"Disponible: {float(material.stock or 0):g} {material.unit}, solicitado: {qty:g}."
-        )
-
-    order.raw_material_id = material.id
-    order.raw_material_qty = qty
-    db.flush()
-    return order
-
-
 def parse_raw_material_qty(value) -> float | None:
     """Normaliza cantidad desde formulario ('0,5' / '0.5'). Vacío → None."""
     if value is None:
@@ -283,6 +244,148 @@ def parse_raw_material_qty(value) -> float | None:
     return round(qty, 3)
 
 
+def _clean_raw_material_row(row: dict | None) -> dict:
+    data = row if isinstance(row, dict) else {}
+    rm_id = data.get("raw_material_id")
+    try:
+        parsed_id = int(rm_id) if rm_id is not None and str(rm_id).strip().isdigit() else None
+    except (TypeError, ValueError):
+        parsed_id = None
+    qty = data.get("qty")
+    try:
+        parsed_qty = round(float(qty), 3) if qty is not None and str(qty).strip() != "" else None
+    except (TypeError, ValueError):
+        parsed_qty = None
+    return {
+        "raw_material_id": parsed_id,
+        "qty": parsed_qty,
+        "label": str(data.get("label") or "").strip(),
+        "unit": str(data.get("unit") or "").strip(),
+    }
+
+
+def normalize_raw_material_items(items: list[dict] | None) -> list[dict]:
+    cleaned: list[dict] = []
+    for row in items or []:
+        spec = _clean_raw_material_row(row)
+        if spec["raw_material_id"] and spec["qty"]:
+            cleaned.append(spec)
+    return cleaned
+
+
+def parse_fabrication_raw_materials(order: ProductionOrder) -> list[dict]:
+    if order.fabrication_raw_materials:
+        try:
+            raw = json.loads(order.fabrication_raw_materials)
+            if isinstance(raw, list):
+                return normalize_raw_material_items(raw)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if order.raw_material_id and order.raw_material_qty:
+        return normalize_raw_material_items(
+            [{"raw_material_id": order.raw_material_id, "qty": order.raw_material_qty}]
+        )
+    return []
+
+
+def serialize_fabrication_raw_materials(items: list[dict] | None) -> str | None:
+    cleaned = normalize_raw_material_items(items)
+    if not cleaned:
+        return None
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
+def parse_raw_material_items_from_form(form) -> list[dict]:
+    ids = form.getlist("raw_material_id")
+    qtys = form.getlist("raw_material_qty")
+    items: list[dict] = []
+    for index, rm_id in enumerate(ids):
+        qty_raw = qtys[index] if index < len(qtys) else ""
+        id_text = str(rm_id or "").strip()
+        qty_text = str(qty_raw or "").strip()
+        if id_text or qty_text:
+            parsed_qty = parse_raw_material_qty(qty_raw) if qty_text else None
+            parsed_id = int(id_text) if id_text.isdigit() else None
+            items.append({"raw_material_id": parsed_id, "qty": parsed_qty})
+    return items
+
+
+def sync_legacy_raw_material_fields(order: ProductionOrder, items: list[dict]) -> None:
+    cleaned = normalize_raw_material_items(items)
+    order.fabrication_raw_materials = serialize_fabrication_raw_materials(cleaned)
+    if cleaned:
+        order.raw_material_id = cleaned[0]["raw_material_id"]
+        order.raw_material_qty = cleaned[0]["qty"]
+    else:
+        order.raw_material_id = None
+        order.raw_material_qty = None
+
+
+def set_fabrication_source(
+    db: Session,
+    order: ProductionOrder,
+    *,
+    use_fabrication_materials: bool,
+    raw_material_id: int | None = None,
+    raw_material_qty: float | None = None,
+    raw_material_items: list[dict] | None = None,
+) -> ProductionOrder:
+    order.use_fabrication_materials = bool(use_fabrication_materials)
+    if not use_fabrication_materials:
+        order.raw_material_id = None
+        order.raw_material_qty = None
+        order.fabrication_raw_materials = None
+        db.flush()
+        return order
+
+    if raw_material_items is not None:
+        pending = raw_material_items
+    elif raw_material_id:
+        pending = [{"raw_material_id": raw_material_id, "qty": raw_material_qty}]
+    else:
+        pending = []
+
+    if not pending:
+        raise ValueError("Seleccione al menos una materia prima a utilizar.")
+
+    stored: list[dict] = []
+    for index, row in enumerate(pending, start=1):
+        rm_id = row.get("raw_material_id")
+        if not rm_id:
+            raise ValueError(f"Seleccione la materia prima #{index}.")
+        material = get_raw_material(db, int(rm_id))
+        if not material or not material.active:
+            raise ValueError(f"La materia prima #{index} no existe o está inactiva.")
+
+        qty_raw = row.get("qty")
+        if qty_raw is None:
+            raise ValueError(
+                f"Indique cuántas planchas o metros consumirá en la fila #{index}. "
+                "Puede usar fracciones: 0.25, 0.5, 0.75, 1…"
+            )
+        qty = round(float(qty_raw), 3)
+        if qty <= 0:
+            raise ValueError(f"La cantidad de la fila #{index} debe ser mayor a cero.")
+
+        if float(material.stock or 0) < qty:
+            raise ValueError(
+                f"Stock insuficiente de {material.label}. "
+                f"Disponible: {float(material.stock or 0):g} {material.unit}, solicitado: {qty:g}."
+            )
+        stored.append(
+            {
+                "raw_material_id": material.id,
+                "qty": qty,
+                "label": material.label,
+                "unit": material.unit,
+            }
+        )
+
+    sync_legacy_raw_material_fields(order, stored)
+    db.flush()
+    return order
+
+
 def consume_for_production(
     db: Session,
     order: ProductionOrder,
@@ -292,27 +395,28 @@ def consume_for_production(
     """Descuenta materia prima al pasar la OP a producción."""
     if not order.use_fabrication_materials:
         return
-    if not order.raw_material_id:
+
+    items = parse_fabrication_raw_materials(order)
+    if not items:
         raise ValueError("La orden usa material de fabricación pero no tiene materia prima asignada.")
 
-    material = get_raw_material(db, order.raw_material_id)
-    if not material:
-        raise ValueError("Materia prima no encontrada.")
-
-    qty = float(order.raw_material_qty or 0)
-    if qty <= 0:
-        raise ValueError("Indique la cantidad de materia prima a consumir.")
-
-    adjust_stock(
-        db,
-        material,
-        quantity=qty,
-        movement_type="salida",
-        reason=f"OP-{order.id:04d} → Producción",
-        production_order_id=order.id,
-        user_id=user_id,
-        commit=False,
-    )
+    for row in items:
+        material = get_raw_material(db, row["raw_material_id"])
+        if not material:
+            raise ValueError("Materia prima no encontrada.")
+        qty = float(row["qty"] or 0)
+        if qty <= 0:
+            raise ValueError("Indique la cantidad de materia prima a consumir.")
+        adjust_stock(
+            db,
+            material,
+            quantity=qty,
+            movement_type="salida",
+            reason=f"OP-{order.id:04d} → Producción",
+            production_order_id=order.id,
+            user_id=user_id,
+            commit=False,
+        )
 
 
 def material_to_dict(material: RawMaterial) -> dict:

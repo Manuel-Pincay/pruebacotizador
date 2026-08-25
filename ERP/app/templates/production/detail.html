@@ -1,6 +1,7 @@
 {% extends 'layouts/base.html' %}
 {% from "components/production_status_badge.html" import production_status_badge %}
 {% from "components/catalog_select.html" import catalog_select %}
+{% from "components/file_specs_fields.html" import file_specs_editor %}
 
 {% block content %}
 
@@ -356,34 +357,8 @@
 
             {% if can_edit_fabrication %}
             <form action="/production/{{ order.id }}/fabrication/" method="POST" class="p-5 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Archivo final *</label>
-                    <input type="text" name="file_name" value="{{ fabrication.file_name or '' }}"
-                        placeholder="Ej: TOPPER_001.ai"
-                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Material *</label>
-                        <select name="material" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
-                            <option value="">Seleccionar...</option>
-                            {% for material in materials %}
-                            <option value="{{ material }}" {% if fabrication.material == material %}selected{% endif %}>{{ material }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Medida *</label>
-                        {{ catalog_select(
-                            "size",
-                            sizes,
-                            "+ Agregar medida",
-                            "/product-settings/api/size",
-                            selected=fabrication.size or '',
-                            extra_class="rounded-xl px-3 py-2.5 text-sm border-gray-200"
-                        ) }}
-                    </div>
-                </div>
+                {{ file_specs_editor(fabrication.file_specs, materials, sizes, readonly=false) }}
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
@@ -423,16 +398,9 @@
                         </label>
                     </div>
                     <div id="fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
-                        <div>
-                            <label class="block text-xs text-gray-600 mb-1">Materia prima *</label>
-                            <select name="raw_material_id" id="raw_material_id"
-                                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
-                                <option value="">Cargando...</option>
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">Si no hay stock de producto, elige plancha o vinil de tu inventario.</p>
-                        </div>
-                        {% from "components/raw_material_qty.html" import raw_material_qty_field %}
-                        {{ raw_material_qty_field(order.raw_material_qty if order.raw_material_qty is not none else '') }}
+                        {% from "components/raw_material_rows.html" import raw_material_rows %}
+                        {{ raw_material_rows(fabrication.raw_material_items, id_prefix='') }}
+                        <p class="text-xs text-gray-500">Si no hay stock de producto, elige plancha o vinil de tu inventario.</p>
                     </div>
                 </div>
 
@@ -446,91 +414,106 @@
                         Enviar a producción →
                     </button>
                 </div>
-                <p class="text-xs text-gray-400">Para pasar a producción se requiere archivo, material, medida y copias.</p>
+                <p class="text-xs text-gray-400">Para pasar a producción se requiere al menos un archivo con material, medida y copias.</p>
             </form>
+            <script src="/static/js/raw-material-rows.js"></script>
             <script>
             (function () {
-              const selectedId = {{ order.raw_material_id | tojson }};
               const radios = document.querySelectorAll('.fab-source-radio');
               const fields = document.getElementById('fab-raw-fields');
-              const sel = document.getElementById('raw_material_id');
-              const qtyInput = document.getElementById('raw_material_qty');
-              const materialSelect = document.querySelector('select[name="material"]');
-              const unitHint = document.getElementById('raw_material_unit_hint');
+              if (fields) initRawMaterialRows(fields);
+              const fileSpecsList = document.getElementById('file-specs-list');
+              const addFileSpecBtn = document.getElementById('add-file-spec');
 
-              document.querySelectorAll('.raw-qty-btn').forEach(btn => {
+              function fileSpecRows() {
+                return Array.from(document.querySelectorAll('#file-specs-list .file-spec-row'));
+              }
+
+              function syncFileSpecRemoveButtons() {
+                const rows = fileSpecRows();
+                rows.forEach(row => {
+                  const btn = row.querySelector('.file-spec-remove');
+                  if (!btn) return;
+                  btn.classList.toggle('hidden', rows.length <= 1);
+                });
+              }
+
+              function addFileSpecRow(values = {}) {
+                if (!fileSpecsList) return;
+                const row = document.createElement('tr');
+                row.className = 'file-spec-row';
+                const esc = (v) => String(v || '').replace(/"/g, '&quot;');
+                row.innerHTML = `
+                  <td class="px-3 py-2 align-top">
+                    <input type="text" name="spec_file_name" value="${esc(values.file_name)}"
+                           placeholder="Ej: bases.ai"
+                           class="file-spec-name w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
+                  </td>
+                  <td class="px-3 py-2 align-top">
+                    <input type="text" name="spec_material" value="${esc(values.material)}"
+                           list="material-suggestions"
+                           placeholder="Ej: MDF + Vinil negro 1m"
+                           class="file-spec-material w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+                  </td>
+                  <td class="px-3 py-2 align-top">
+                    <input type="text" name="spec_size" value="${esc(values.size)}"
+                           list="size-suggestions"
+                           placeholder="Ej: 120x90"
+                           class="file-spec-size w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+                  </td>
+                  <td class="px-2 py-2 align-top text-center">
+                    <button type="button" class="file-spec-remove w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Quitar fila" aria-label="Quitar fila">×</button>
+                  </td>
+                `;
+                fileSpecsList.appendChild(row);
+                row.querySelector('.file-spec-remove')?.addEventListener('click', () => {
+                  row.remove();
+                  if (!fileSpecRows().length) addFileSpecRow();
+                  syncFileSpecRemoveButtons();
+                });
+                row.querySelector('.file-spec-material')?.addEventListener('change', () => {
+                  if (document.querySelector('.fab-source-radio:checked')?.value === '1') {
+                    fields?.reloadRawMaterials?.();
+                  }
+                });
+                syncFileSpecRemoveButtons();
+                row.querySelector('.file-spec-name')?.focus();
+              }
+
+              addFileSpecBtn?.addEventListener('click', () => addFileSpecRow());
+              document.querySelectorAll('#file-specs-list .file-spec-remove').forEach(btn => {
                 btn.addEventListener('click', () => {
-                  if (qtyInput) qtyInput.value = btn.dataset.qty;
+                  btn.closest('.file-spec-row')?.remove();
+                  if (!fileSpecRows().length) addFileSpecRow();
+                  syncFileSpecRemoveButtons();
                 });
               });
-              qtyInput?.addEventListener('blur', () => {
-                if (!qtyInput.value) return;
-                qtyInput.value = String(qtyInput.value).replace(',', '.');
-              });
+              syncFileSpecRemoveButtons();
 
               function toggleFields() {
                 const useFab = document.querySelector('.fab-source-radio:checked')?.value === '1';
                 fields?.classList.toggle('hidden', !useFab);
-                if (useFab) loadMaterials();
-              }
-
-              async function loadMaterials() {
-                if (!sel) return;
-                const designMat = materialSelect?.value || '';
-                sel.innerHTML = '<option value="">Cargando...</option>';
-                try {
-                  const res = await fetch(`/inventory/api/materials?design_material=${encodeURIComponent(designMat)}`, {
-                    credentials: 'same-origin',
-                    headers: { Accept: 'application/json' },
-                  });
-                  const data = await res.json();
-                  sel.innerHTML = '<option value="">Seleccionar materia prima...</option>';
-                  (data || []).forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m.id;
-                    opt.dataset.unit = m.unit;
-                    const low = m.is_low_stock ? ' ⚠ bajo' : '';
-                    const stockLabel = Number(m.stock).toLocaleString('es-EC', { maximumFractionDigits: 3 });
-                    opt.textContent = `${m.label} — ${stockLabel} ${m.unit}${low}`;
-                    if (selectedId && m.id == selectedId) opt.selected = true;
-                    sel.appendChild(opt);
-                  });
-                  updateUnitHint();
-                } catch (_) {
-                  sel.innerHTML = '<option value="">No se pudo cargar materia prima</option>';
-                }
-              }
-
-              function updateUnitHint() {
-                const opt = sel?.options[sel.selectedIndex];
-                if (!unitHint) return;
-                const unit = opt?.dataset?.unit || 'planchas';
-                if (unit === 'planchas') {
-                  unitHint.innerHTML = 'Unidad: <strong>planchas</strong>. Decimales OK: 0.25 (1/4), 0.5 (media), 1 (completa).';
-                } else {
-                  unitHint.innerHTML = 'Unidad: <strong>' + unit + '</strong>. Puede usar decimales (ej. 1.5).';
-                }
+                if (useFab) fields?.reloadRawMaterials?.();
               }
 
               radios.forEach(r => r.addEventListener('change', toggleFields));
-              materialSelect?.addEventListener('change', () => {
-                if (document.querySelector('.fab-source-radio:checked')?.value === '1') loadMaterials();
+              document.querySelectorAll('.file-spec-material').forEach(input => {
+                input.addEventListener('change', () => {
+                  if (document.querySelector('.fab-source-radio:checked')?.value === '1') {
+                    fields?.reloadRawMaterials?.();
+                  }
+                });
               });
-              sel?.addEventListener('change', updateUnitHint);
               toggleFields();
             })();
             </script>
             {% else %}
-            <div class="p-5">
-                {% if fabrication.file_name or fabrication.material %}
+            <div class="p-5 space-y-4">
+                {% if fabrication.file_specs or fabrication.file_name or fabrication.material %}
+                {% if fabrication.file_specs %}
+                {{ file_specs_editor(fabrication.file_specs, materials, sizes, readonly=true) }}
+                {% endif %}
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                    <div><dt class="text-gray-500">Archivo{% if fabrication.file_names|length > 1 %}s{% endif %}</dt><dd class="font-mono font-semibold text-slate-900 mt-0.5">
-                        {% if fabrication.file_names %}
-                            {% for f in fabrication.file_names %}<div>{{ f }}</div>{% endfor %}
-                        {% else %}—{% endif %}
-                    </dd></div>
-                    <div><dt class="text-gray-500">Material</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.material or '—' }}</dd></div>
-                    <div><dt class="text-gray-500">Medida</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.size or '—' }}</dd></div>
                     <div><dt class="text-gray-500">USB</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.usb_reference or '—' }}</dd></div>
                     <div><dt class="text-gray-500">Copias</dt><dd class="font-semibold text-slate-900 mt-0.5">{{ fabrication.copies or '—' }}</dd></div>
                     <div class="sm:col-span-2">
@@ -538,10 +521,8 @@
                         <dd class="font-semibold text-slate-900 mt-0.5">
                             {% if order.use_fabrication_materials %}
                             Material de fabricación
-                            {% if order.raw_material %}
-                            — {{ order.raw_material.label }}
-                            ({{ '%.2f'|format(order.raw_material_qty or 0) }} {{ order.raw_material.unit }})
-                            {% endif %}
+                            {% from "components/raw_material_rows.html" import raw_material_rows_readonly %}
+                            <div class="mt-1 font-normal">{{ raw_material_rows_readonly(fabrication.raw_material_items) }}</div>
                             {% else %}
                             Stock de producto terminado
                             {% endif %}

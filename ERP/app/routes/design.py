@@ -15,6 +15,7 @@ from app.auth.auth_handler import role_required
 from app.auth.design_permissions import (
     can_attach_design_images,
     can_edit_design_order,
+    can_edit_fabrication_data,
     can_self_assign_design_item,
     can_view_design_item,
     designer_item_scope_user_id,
@@ -56,6 +57,13 @@ from app.services.design_service import (
 
     update_design_status,
 
+)
+
+from app.services.design_catalog_service import list_design_sizes, list_usb_references
+from app.services.production_order_service import (
+    DESIGN_MATERIALS,
+    build_order_dict,
+    quotation_needs_fabrication,
 )
 
 from app.services.quotation_design_service import (
@@ -138,62 +146,32 @@ async def design_dashboard(request: Request, db: Session = Depends(get_db)):
 
 
     designer_scope = designer_item_scope_user_id(user)
-
     kpis = compute_design_kpis(db, designer_scope_user_id=designer_scope)
 
-    available_items = list_design_order_groups(
+    # Cola compartida: todos ven pendientes / en diseño
+    queue_rows = list_design_order_groups(
         db,
-        design_filter="available",
-        designer_scope_user_id=designer_scope,
+        design_filter="pending",
+        designer_scope_user_id=None,
         limit=12,
+        sort_by="delivery",
     )
-
-    # Abajo: solo diseños ya asignados / aceptados por el diseñador (fase pendiente/diseño)
-    if user.role == ROLE_DISENADOR:
-        recent = list_design_order_groups(
-            db,
-            design_filter="mine",
-            assigned_user_id=user.id,
-            limit=20,
-        )
-        recent = [
-            row
-            for row in recent
-            if row.get("production_status") in {"pendiente", "diseno"}
-        ][:8]
-    else:
-        recent = list_design_order_groups(
-            db,
-            design_filter="pending",
-            designer_scope_user_id=designer_scope,
-            limit=8,
-        )
-
-
+    available_items = [r for r in queue_rows if not r.get("assigned_to_user_id")][:8]
+    recent = [r for r in queue_rows if r.get("production_status") in {"pendiente", "diseno"}][:8]
 
     return templates.TemplateResponse(
-
         request=request,
-
         name="design/dashboard.html",
-
         context={
-
             "user": user,
-
             "kpis": kpis,
-
             "available_items": available_items,
-
             "recent_items": recent,
-
+            "shared_queue": True,
             "design_statuses": DESIGN_STATUSES,
-
             "claim_success": request.query_params.get("claimed", ""),
             "claim_error": request.query_params.get("claim_error", ""),
-
         },
-
     )
 
 
@@ -211,7 +189,7 @@ async def design_pending(
     if isinstance(user, RedirectResponse):
         return user
 
-    designer_scope = designer_item_scope_user_id(user)
+    designer_scope = None  # cola compartida: todos ven todo
     assigned_id = user.id if user.role == ROLE_DISENADOR and filter == "mine" else None
 
     if filter == "mine":
@@ -241,9 +219,20 @@ async def design_pending(
         db,
         design_filter=design_filter,
         assigned_user_id=assigned_id,
-        designer_scope_user_id=designer_scope if filter != "mine" else None,
+        designer_scope_user_id=designer_scope,
         sort_by=sort_by,
     )
+    for row in rows:
+        # Marcar responsable es opcional; cualquier diseñador puede trabajar la orden
+        row["can_claim"] = bool(
+            user.role == ROLE_DISENADOR
+            and row.get("production_status") in {"pendiente", "diseno"}
+            and row.get("assigned_to_user_id") != user.id
+        )
+        row["can_work"] = bool(
+            row.get("production_status") in {"pendiente", "diseno"}
+            or is_design_admin(user)
+        )
 
     active = "available" if design_filter == "available" else filter
     return templates.TemplateResponse(
@@ -348,7 +337,20 @@ async def design_detail_page(
 
         return RedirectResponse(url="/design/pending", status_code=302)
 
-
+    po = item.quotation.production_order if item.quotation else None
+    client = item.quotation.client if item.quotation else None
+    fabrication_order = (
+        build_order_dict(po, client_name=client.name if client else "—") if po else None
+    )
+    needs_fabrication = any(
+        not bool(p.get("fulfill_from_inventory"))
+        for p in (detail.get("products") or [])
+    ) if (detail.get("products") or []) else True
+    can_edit_fabrication = bool(
+        po
+        and needs_fabrication
+        and can_edit_fabrication_data(user, po)
+    )
 
     return templates.TemplateResponse(
 
@@ -382,10 +384,12 @@ async def design_detail_page(
             "claim_error": request.query_params.get("claim_error", ""),
             "upload_ok": request.query_params.get("uploaded", ""),
             "upload_error": request.query_params.get("upload_error", ""),
-            "needs_fabrication": any(
-                not bool(p.get("fulfill_from_inventory"))
-                for p in (detail.get("products") or [])
-            ) if (detail.get("products") or []) else True,
+            "needs_fabrication": needs_fabrication,
+            "can_edit_fabrication": can_edit_fabrication,
+            "fabrication_order": fabrication_order,
+            "materials": DESIGN_MATERIALS,
+            "sizes": list_design_sizes(db),
+            "usb_references": list_usb_references(db),
         },
     )
 

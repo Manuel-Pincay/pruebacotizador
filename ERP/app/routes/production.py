@@ -55,6 +55,8 @@ from app.services.production_order_service import (
     fabrication_data_complete,
     get_production_order,
     normalize_status,
+    parse_file_specs_from_form,
+    quotation_needs_fabrication,
     update_design_fields,
     list_assignable_designers,
     list_assignable_fabricators,
@@ -79,7 +81,7 @@ from app.services.kanban_service import (
     validate_kanban_move,
     week_header_label,
 )
-from app.auth.design_permissions import can_edit_design_order, can_view_design_order
+from app.auth.design_permissions import can_edit_fabrication_data, can_view_design_order
 
 PRODUCTION_DETAIL_ROLES = ["admin", "produccion", "disenador"]
 
@@ -894,15 +896,10 @@ async def update_production_delivery_date(
 async def save_fabrication(
     order_id: int,
     request: Request,
-    file_name: str = Form(""),
-    material: str = Form(""),
-    size: str = Form(""),
     usb_reference: str = Form(""),
     detail: str = Form(""),
     copies: int = Form(1),
     use_fabrication_materials: str = Form("0"),
-    raw_material_id: str = Form(""),
-    raw_material_qty: str = Form(""),
     action: str = Form("save"),
     db: Session = Depends(get_db),
 ):
@@ -914,17 +911,19 @@ async def save_fabrication(
     if not order:
         return RedirectResponse(url="/production/", status_code=302)
 
-    if user.role == "disenador" and not can_edit_design_order(user, order):
+    if user.role == "disenador" and not can_edit_fabrication_data(user, order):
         return RedirectResponse(url=f"/production/{order_id}", status_code=302)
 
+    form = await request.form()
+    file_specs = parse_file_specs_from_form(form)
+
     use_fab = str(use_fabrication_materials or "0").strip() in ("1", "true", "on", "yes")
-    rm_id = int(raw_material_id) if str(raw_material_id or "").strip().isdigit() else None
     from urllib.parse import quote
 
-    from app.services.raw_material_service import parse_raw_material_qty
+    from app.services.raw_material_service import parse_raw_material_items_from_form
 
     try:
-        rm_qty = parse_raw_material_qty(raw_material_qty) if use_fab else None
+        raw_items = parse_raw_material_items_from_form(form) if use_fab else None
     except ValueError as exc:
         return RedirectResponse(
             url=f"/production/{order_id}?fab_error={quote(str(exc))}",
@@ -935,16 +934,13 @@ async def save_fabrication(
         update_design_fields(
             db,
             order,
-            file_name=file_name,
-            material=material,
-            size=size,
+            file_specs=file_specs,
             usb_reference=usb_reference,
             notes=detail,
             copies=copies,
             user=user,
             use_fabrication_materials=use_fab,
-            raw_material_id=rm_id,
-            raw_material_qty=rm_qty,
+            raw_material_items=raw_items,
         )
         if action == "approve":
             order = get_production_order(db, order_id) or order
@@ -953,8 +949,7 @@ async def save_fabrication(
                 order,
                 user=user,
                 use_fabrication_materials=use_fab,
-                raw_material_id=rm_id,
-                raw_material_qty=rm_qty,
+                raw_material_items=raw_items,
             )
     except ValueError as exc:
         from urllib.parse import quote
@@ -999,9 +994,8 @@ def _production_detail_context(order, request, shipment, user, db) -> dict:
     po = get_production_order(db, order.id) if order and order.id else order
     fab = build_order_dict(po or order) if order else {}
     can_edit_fab = (
-        user.role in {"admin", "disenador"}
-        and current_status in {"pendiente", "diseno"}
-        and (user.role == "admin" or can_edit_design_order(user, order))
+        can_edit_fabrication_data(user, order)
+        and quotation_needs_fabrication(order.quotation)
     )
     can_manage_order = user.role in {"admin", "produccion"}
     designers = list_assignable_designers(db)

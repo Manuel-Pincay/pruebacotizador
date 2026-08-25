@@ -27,6 +27,8 @@ from app.services.design_catalog_service import DEFAULT_SIZES, DEFAULT_USBS
 
 router = APIRouter(prefix="/product-settings", tags=["product_settings"])
 
+CATALOG_MANAGE_ROLES = ["admin", "ventas"]
+
 templates = Jinja2Templates(directory="app/templates")
 
 from app.utils.context import get_global_config
@@ -42,8 +44,16 @@ def _require_admin(request: Request):
     return user
 
 
+def _require_catalog_manage(request: Request):
+    """Admin y ventas pueden agregar valores de catálogo al crear productos."""
+    user = role_required(request, CATALOG_MANAGE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    return user
+
+
 def _create_catalog_item_json(request: Request, db: Session, model, name: str):
-    user = _require_admin(request)
+    user = _require_catalog_manage(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"success": False, "message": "No autorizado."})
 
@@ -68,7 +78,7 @@ def _create_catalog_item_json(request: Request, db: Session, model, name: str):
 
 
 def _create_thickness_json(request: Request, db: Session, name: str):
-    user = _require_admin(request)
+    user = _require_catalog_manage(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"success": False, "message": "No autorizado."})
 
@@ -93,7 +103,7 @@ def _create_thickness_json(request: Request, db: Session, name: str):
 
 
 def _create_unit_json(request: Request, db: Session, name: str, abbreviation: str):
-    user = _require_admin(request)
+    user = _require_catalog_manage(request)
     if isinstance(user, RedirectResponse):
         return JSONResponse(status_code=401, content={"success": False, "message": "No autorizado."})
 

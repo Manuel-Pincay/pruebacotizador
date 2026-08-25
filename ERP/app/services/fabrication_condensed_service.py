@@ -61,10 +61,13 @@ def _load_fabrication_orders(db: Session) -> list[ProductionOrder]:
 
 
 def _fabrication_meta(order: ProductionOrder) -> dict[str, Any]:
+    from app.services.production_order_service import parse_design_file_specs
+
     return {
         "production_order_id": order.id,
         "order_label": f"OP-{order.id:04d}",
         "file_name": order.design_file_name or "",
+        "file_specs": parse_design_file_specs(order),
         "material": order.design_material or "",
         "size": order.design_size or "",
         "usb_reference": order.design_usb_reference or "",

@@ -243,8 +243,7 @@ def build_design_row(item: QuotationItem) -> dict[str, Any]:
         "design_status_label": PRODUCTION_STATUS_LABELS.get(production_status, production_status),
         "assigned_to": _assigned_label_from_po(po, tracking),
         "assigned_to_user_id": _assigned_user_id(po, tracking),
-        "can_claim": _assigned_user_id(po, tracking) is None
-        and production_status in DESIGN_PHASE_FILTER,
+        "can_claim": production_status in DESIGN_PHASE_FILTER,
         "design_urls": get_design_urls(quotation) if quotation else [],
         "production_status": production_status,
         "fulfill_from_inventory": bool(getattr(item, "fulfill_from_inventory", False)),
@@ -308,6 +307,7 @@ def list_design_order_groups(
                 **row,
                 "products": [],
                 "product_count": 0,
+                "done_count": 0,
                 "total_qty": 0,
                 "has_inventory": False,
                 "has_production": False,
@@ -324,12 +324,14 @@ def list_design_order_groups(
             }
         )
         group["product_count"] = len(group["products"])
+        group["done_count"] = sum(1 for p in group["products"] if p.get("design_item_done"))
         group["total_qty"] += int(row["quantity"] or 0)
         if row.get("fulfill_from_inventory"):
             group["has_inventory"] = True
         else:
             group["has_production"] = True
-
+        # can_claim a nivel orden: en fase diseño y el usuario actual no es el responsable
+        # (se recalcula en la plantilla con row.assigned_to_user_id)
     groups = sort_design_order_groups(groups, sort_by)
     if limit:
         return groups[:limit]
@@ -525,7 +527,7 @@ def claim_design_item(
     *,
     user: User,
 ) -> ProductionOrder:
-    """Diseñador se autoasigna un ítem/cotización sin diseñador."""
+    """Diseñador se marca responsable. No bloquea a otros diseñadores."""
     if not user or user.role != "disenador":
         raise ValueError("Solo un diseñador puede tomarse esta cotización.")
 
@@ -542,24 +544,27 @@ def claim_design_item(
         raise ValueError("Producto no encontrado para diseño.")
 
     order = _ensure_po_for_item(db, item, user)
-    if order.assigned_to_user_id and order.assigned_to_user_id != user.id:
-        raise ValueError("Esta cotización ya fue tomada por otro diseñador.")
+    from app.services.production_order_service import (
+        DESIGN_EDIT_STATUSES,
+        assign_designer as assign_po_designer,
+        normalize_status,
+    )
 
-    from app.services.production_order_service import assign_designer as assign_po_designer
+    if normalize_status(order.status) not in DESIGN_EDIT_STATUSES:
+        raise ValueError("Solo se pueden tomar órdenes en fase de diseño.")
 
-    if not order.assigned_to_user_id:
-        assign_po_designer(db, order, user.id)
+    previous = order.assigned_to_user_id
+    assign_po_designer(db, order, user.id)
 
     tracking = item.design_tracking or get_or_create_design_tracking(db, item_id)
     tracking.assigned_to_user_id = user.id
     tracking.assigned_to = user.full_name or user.username
     tracking.updated_at = datetime.utcnow()
-    _add_observation(
-        db,
-        tracking,
-        user=user,
-        note=f"Diseñador se autoasignó: {tracking.assigned_to}",
-    )
+    if previous and previous != user.id:
+        note = f"{tracking.assigned_to} se marcó responsable (trabajo colaborativo)."
+    else:
+        note = f"Diseñador se autoasignó: {tracking.assigned_to}"
+    _add_observation(db, tracking, user=user, note=note)
     db.commit()
     return get_production_order_by_quotation(db, item.quotation_id) or order
 

@@ -1,0 +1,94 @@
+{% macro file_specs_editor(file_specs, materials, sizes, readonly=false, id_prefix='') %}
+{% set rows = file_specs if file_specs else [] %}
+{% if not rows and not readonly %}
+{% set rows = [{"file_name": "", "material": "", "size": ""}] %}
+{% endif %}
+{% set specs_list_id = id_prefix ~ 'file-specs-list' if id_prefix else 'file-specs-list' %}
+{% set add_btn_id = id_prefix ~ 'add-file-spec' if id_prefix else 'add-file-spec' %}
+{% set mat_list_id = id_prefix ~ 'material-suggestions' if id_prefix else 'material-suggestions' %}
+{% set size_list_id = id_prefix ~ 'size-suggestions' if id_prefix else 'size-suggestions' %}
+
+<div class="file-specs-block space-y-2" {% if id_prefix %}data-specs-prefix="{{ id_prefix }}"{% endif %}>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <label class="block text-sm font-semibold text-slate-800">Archivos y materiales *</label>
+        {% if not readonly %}
+        <button type="button" id="{{ add_btn_id }}"
+                class="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900 add-file-spec-btn">
+            + Agregar archivo
+        </button>
+        {% endif %}
+    </div>
+
+    {% if readonly and not rows %}
+    <p class="text-sm text-slate-400">Sin archivos registrados.</p>
+    {% else %}
+    <div class="overflow-x-auto rounded-xl border border-indigo-100">
+        <table class="min-w-full text-sm">
+            <thead class="bg-indigo-50/80 text-left text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
+                <tr>
+                    <th class="px-3 py-2.5 w-[28%]">Archivo</th>
+                    <th class="px-3 py-2.5 w-[36%]">Material</th>
+                    <th class="px-3 py-2.5 w-[28%]">Medida</th>
+                    {% if not readonly %}<th class="px-3 py-2 w-10"></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody id="{{ specs_list_id }}" class="divide-y divide-indigo-50 file-specs-list">
+                {% for spec in rows %}
+                <tr class="file-spec-row">
+                    <td class="px-3 py-2 align-top">
+                        {% if readonly %}
+                        <span class="font-mono text-slate-900">{{ spec.file_name or '—' }}</span>
+                        {% else %}
+                        <input type="text" name="spec_file_name" value="{{ spec.file_name or '' }}"
+                               placeholder="Ej: bases.ai"
+                               class="file-spec-name w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-2 align-top">
+                        {% if readonly %}
+                        <span class="text-slate-900">{{ spec.material or '—' }}</span>
+                        {% else %}
+                        <input type="text" name="spec_material" value="{{ spec.material or '' }}"
+                               list="{{ mat_list_id }}"
+                               placeholder="Ej: MDF + Vinil negro 1m"
+                               class="file-spec-material w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-2 align-top">
+                        {% if readonly %}
+                        <span class="text-slate-900">{{ spec.size or '—' }}</span>
+                        {% else %}
+                        <input type="text" name="spec_size" value="{{ spec.size or '' }}"
+                               list="{{ size_list_id }}"
+                               placeholder="Ej: 120x90"
+                               class="file-spec-size w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+                        {% endif %}
+                    </td>
+                    {% if not readonly %}
+                    <td class="px-2 py-2 align-top text-center">
+                        <button type="button"
+                                class="file-spec-remove w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 {% if loop.first and rows|length <= 1 %}hidden{% endif %}"
+                                title="Quitar fila" aria-label="Quitar fila">×</button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if not readonly %}
+    <datalist id="{{ mat_list_id }}">
+        {% for material in materials %}
+        <option value="{{ material }}"></option>
+        {% endfor %}
+    </datalist>
+    <datalist id="{{ size_list_id }}">
+        {% for size in sizes %}
+        <option value="{{ size.name if size.name is defined else size }}"></option>
+        {% endfor %}
+    </datalist>
+    <p class="text-[11px] text-slate-500">Una fila por archivo en USB. Puede combinar materiales, por ejemplo: <span class="font-mono">MDF 1 + Vinil negro 1m</span>.</p>
+    {% endif %}
+    {% endif %}
+</div>
+{% endmacro %}

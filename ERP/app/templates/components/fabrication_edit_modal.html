@@ -1,0 +1,257 @@
+{% from "components/catalog_select.html" import catalog_select %}
+{% from "components/file_specs_fields.html" import file_specs_editor %}
+
+{% macro fabrication_edit_modal(order_id, order, materials, sizes, usb_references) %}
+<div id="fabricationEditModal"
+     class="fixed inset-0 z-[80] hidden items-center justify-center p-4 bg-black/50"
+     role="dialog" aria-modal="true" aria-labelledby="fabricationEditTitle">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+         onclick="event.stopPropagation()">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 shrink-0">
+            <div>
+                <h2 id="fabricationEditTitle" class="text-lg font-bold text-slate-900">Editar orden de producción</h2>
+                <p class="text-sm text-gray-500 mt-0.5">Archivos, materiales, medidas y datos para fabricación</p>
+            </div>
+            <button type="button" onclick="closeFabricationEditModal()"
+                    class="w-9 h-9 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 shrink-0"
+                    aria-label="Cerrar">×</button>
+        </div>
+
+        <form id="fabricationEditForm" class="flex flex-col min-h-0 flex-1">
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                <div id="fabricationEditError" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm"></div>
+
+                {{ file_specs_editor(order.file_specs, materials, sizes, readonly=false, id_prefix='modal-') }}
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">USB</label>
+                        {{ catalog_select("usb_reference", usb_references, "+ Agregar USB", "/product-settings/api/usb", selected=order.usb_reference or '', id='modal_usb_reference', extra_class="rounded-xl px-3 py-2.5 text-sm") }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Copias *</label>
+                        <input type="number" name="copies" min="1" value="{{ order.copies or 1 }}"
+                               class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones diseño</label>
+                    <textarea name="detail" rows="3" placeholder="Instrucciones para impresión..."
+                              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">{{ order.detail or '' }}</textarea>
+                </div>
+
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+                    <p class="text-sm font-semibold text-emerald-900">Origen del material</p>
+                    <div class="flex flex-col sm:flex-row gap-3 text-sm">
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="use_fabrication_materials" value="0" class="modal-fab-source-radio"
+                                {% if not order.use_fabrication_materials %}checked{% endif %}>
+                            <span>Stock de producto terminado</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="use_fabrication_materials" value="1" class="modal-fab-source-radio"
+                                {% if order.use_fabrication_materials %}checked{% endif %}>
+                            <span>Usar material de fabricación</span>
+                        </label>
+                    </div>
+                    <div id="modal-fab-raw-fields" class="{% if not order.use_fabrication_materials %}hidden{% endif %} space-y-3">
+                        {% from "components/raw_material_rows.html" import raw_material_rows %}
+                        {{ raw_material_rows(order.raw_material_items, id_prefix='modal-') }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex flex-wrap justify-end gap-3 shrink-0 bg-gray-50/80">
+                <button type="button" onclick="closeFabricationEditModal()"
+                        class="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium hover:bg-white">
+                    Cancelar
+                </button>
+                <button type="submit" id="fabricationEditSaveBtn"
+                        class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">
+                    Guardar cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/static/js/catalog-select.js"></script>
+<script src="/static/js/raw-material-rows.js"></script>
+<script>
+(function () {
+  const modal = document.getElementById('fabricationEditModal');
+  const form = document.getElementById('fabricationEditForm');
+  const errorBox = document.getElementById('fabricationEditError');
+  const orderId = {{ order_id | tojson }};
+  const specsList = document.getElementById('modal-file-specs-list');
+  const addBtn = document.getElementById('modal-add-file-spec');
+  const matListId = 'modal-material-suggestions';
+  const sizeListId = 'modal-size-suggestions';
+  const rawFields = document.getElementById('modal-fab-raw-fields');
+  if (rawFields) initRawMaterialRows(rawFields);
+
+  function fileSpecRows() {
+    return Array.from(specsList?.querySelectorAll('.file-spec-row') || []);
+  }
+
+  function syncRemoveButtons() {
+    const rows = fileSpecRows();
+    rows.forEach(row => {
+      const btn = row.querySelector('.file-spec-remove');
+      if (btn) btn.classList.toggle('hidden', rows.length <= 1);
+    });
+  }
+
+  function addSpecRow(values = {}) {
+    if (!specsList) return;
+    const row = document.createElement('tr');
+    row.className = 'file-spec-row';
+    const esc = (v) => String(v || '').replace(/"/g, '&quot;');
+    row.innerHTML = `
+      <td class="px-3 py-2 align-top">
+        <input type="text" name="spec_file_name" value="${esc(values.file_name)}"
+               placeholder="Ej: bases.ai"
+               class="file-spec-name w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-200" />
+      </td>
+      <td class="px-3 py-2 align-top">
+        <input type="text" name="spec_material" value="${esc(values.material)}"
+               list="${matListId}"
+               placeholder="Ej: MDF + Vinil negro 1m"
+               class="file-spec-material w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+      </td>
+      <td class="px-3 py-2 align-top">
+        <input type="text" name="spec_size" value="${esc(values.size)}"
+               list="${sizeListId}"
+               placeholder="Ej: 120x90"
+               class="file-spec-size w-full border border-indigo-200 bg-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-200" />
+      </td>
+      <td class="px-2 py-2 align-top text-center">
+        <button type="button" class="file-spec-remove w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200" title="Quitar fila" aria-label="Quitar fila">×</button>
+      </td>
+    `;
+    specsList.appendChild(row);
+    bindSpecRow(row);
+    syncRemoveButtons();
+    row.querySelector('.file-spec-name')?.focus();
+  }
+
+  function bindSpecRow(row) {
+    row.querySelector('.file-spec-remove')?.addEventListener('click', () => {
+      row.remove();
+      if (!fileSpecRows().length) addSpecRow();
+      syncRemoveButtons();
+    });
+    row.querySelector('.file-spec-material')?.addEventListener('change', () => {
+      if (document.querySelector('.modal-fab-source-radio:checked')?.value === '1') {
+        rawFields?.reloadRawMaterials?.();
+      }
+    });
+  }
+
+  addBtn?.addEventListener('click', () => addSpecRow());
+  fileSpecRows().forEach(bindSpecRow);
+  syncRemoveButtons();
+
+  function toggleRawFields() {
+    const useFab = document.querySelector('.modal-fab-source-radio:checked')?.value === '1';
+    rawFields?.classList.toggle('hidden', !useFab);
+    if (useFab) rawFields?.reloadRawMaterials?.();
+  }
+
+  document.querySelectorAll('.modal-fab-source-radio').forEach(r => {
+    r.addEventListener('change', toggleRawFields);
+  });
+
+  window.openFabricationEditModal = function () {
+    if (!modal) return;
+    errorBox?.classList.add('hidden');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    toggleRawFields();
+  };
+
+  window.closeFabricationEditModal = function () {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+  };
+
+  modal?.addEventListener('click', () => closeFabricationEditModal());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      closeFabricationEditModal();
+    }
+  });
+
+  function validateSpecs() {
+    const missing = [];
+    const rows = fileSpecRows();
+    if (!rows.length) missing.push('al menos un archivo');
+    rows.forEach((row, idx) => {
+      const name = (row.querySelector('.file-spec-name')?.value || '').trim();
+      const material = (row.querySelector('.file-spec-material')?.value || '').trim();
+      const size = (row.querySelector('.file-spec-size')?.value || '').trim();
+      const label = name || `#${idx + 1}`;
+      if (!name) missing.push(`archivo (${label})`);
+      if (!material) missing.push(`material de ${label}`);
+      if (!size) missing.push(`medida de ${label}`);
+    });
+    const copies = Number(form?.querySelector('[name="copies"]')?.value || 0);
+    if (!copies || copies < 1) missing.push('copias');
+    if (document.querySelector('.modal-fab-source-radio:checked')?.value === '1') {
+      const rawErr = validateRawMaterialRows(rawFields);
+      if (rawErr) missing.push(rawErr.toLowerCase());
+    }
+    return missing;
+  }
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const missing = validateSpecs();
+    if (missing.length) {
+      if (errorBox) {
+        errorBox.textContent = 'Complete: ' + missing.join(', ') + '.';
+        errorBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const saveBtn = document.getElementById('fabricationEditSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando...';
+
+    try {
+      const res = await fetch(`/design/orders/${orderId}/fabrication`, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof ErpDialog !== 'undefined') {
+          await ErpDialog.success('Datos de fabricación actualizados.', 'Guardado');
+        }
+        window.location.reload();
+        return;
+      }
+      if (errorBox) {
+        errorBox.textContent = data.message || 'No se pudo guardar.';
+        errorBox.classList.remove('hidden');
+      }
+    } catch (_) {
+      if (errorBox) {
+        errorBox.textContent = 'Error de conexión. Intente de nuevo.';
+        errorBox.classList.remove('hidden');
+      }
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Guardar cambios';
+    }
+  });
+})();
+</script>
+{% endmacro %}
